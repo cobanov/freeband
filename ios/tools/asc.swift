@@ -217,6 +217,18 @@ func put(_ url: String, _ data: Data, headers: [[String: Any]]) throws {
     if !(200..<300).contains(status) { throw APIError(status: status, body: "upload") }
 }
 
+/// A language the page doesn't have yet (the first one comes with the app record); returns its id.
+func addLocalization(_ type: String, _ attrs: [String: Any], parent: (key: String, type: String, id: String)) -> String {
+    do {
+        let created = try call("POST", "/v1/\(type)", ["data": [
+            "type": type, "attributes": attrs,
+            "relationships": [parent.key: ["data": ["type": parent.type, "id": parent.id]]],
+        ]])["data"] as? [String: Any]
+        guard let id = created?["id"] as? String else { die("no id for the new \(type)") }
+        return id
+    } catch { die("adding \(attrs["locale"] ?? "?") \(type) failed: \(error)") }
+}
+
 /// The App Store page of the version being prepared, from listing.json, and
 /// the iPhone screenshots in shots/ (1320x2868 or 2868x1320, in name order).
 func listing(_ file: String, _ shots: String) {
@@ -229,10 +241,13 @@ func listing(_ file: String, _ shots: String) {
     let infos = list("/v1/apps/\(appID)/appInfos")
     guard let info = infos.first(where: { (attributes($0)["state"] as? String ?? attributes($0)["appStoreState"] as? String) != "READY_FOR_DISTRIBUTION" }) ?? infos.first,
           let infoID = info["id"] as? String else { die("no app info") }
+    let infoTexts: [String: Any] = ["subtitle": page["subtitle"] ?? "", "privacyPolicyUrl": page["privacyPolicyUrl"] ?? ""]
     if let loc = list("/v1/appInfos/\(infoID)/appInfoLocalizations").first(where: { attributes($0)["locale"] as? String == locale }), let id = loc["id"] as? String {
-        patch("appInfoLocalizations", id, attributes: ["subtitle": page["subtitle"] ?? "", "privacyPolicyUrl": page["privacyPolicyUrl"] ?? ""])
-        print("subtitle and privacy policy set")
+        patch("appInfoLocalizations", id, attributes: infoTexts)
+    } else {
+        _ = addLocalization("appInfoLocalizations", infoTexts.merging(["locale": locale, "name": appName]) { a, _ in a }, parent: ("appInfo", "appInfos", infoID))
     }
+    print("subtitle and privacy policy set")
     if let c = page["categories"] as? [String: String] {
         let category = { (id: String?) -> Any in id.map { ["data": ["type": "appCategories", "id": $0]] } ?? ["data": NSNull()] }
         patch("appInfos", infoID, relationships: [
@@ -257,8 +272,8 @@ func listing(_ file: String, _ shots: String) {
         ["PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED"].contains(attributes($0)["appStoreState"] as? String ?? attributes($0)["appVersionState"] as? String ?? "")
     }), let versionID = version["id"] as? String else { die("no version being prepared") }
     if let copyright = page["copyright"] { patch("appStoreVersions", versionID, attributes: ["copyright": copyright]) }
-    guard let vloc = list("/v1/appStoreVersions/\(versionID)/appStoreVersionLocalizations").first(where: { attributes($0)["locale"] as? String == locale }),
-          let vlocID = vloc["id"] as? String else { die("no \(locale) texts for the version") }
+    let vlocID = list("/v1/appStoreVersions/\(versionID)/appStoreVersionLocalizations").first(where: { attributes($0)["locale"] as? String == locale })?["id"] as? String
+        ?? addLocalization("appStoreVersionLocalizations", ["locale": locale], parent: ("appStoreVersion", "appStoreVersions", versionID))
     var texts: [String: Any] = [:]
     for key in ["description", "keywords", "promotionalText", "supportUrl", "marketingUrl"] { if let value = page[key] { texts[key] = value } }
     patch("appStoreVersionLocalizations", vlocID, attributes: texts)

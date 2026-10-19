@@ -1,0 +1,10 @@
+{
+  "locale": "tr",
+  "subtitle": "Hesapsız, yerel bant takibi",
+  "privacyPolicyUrl": "https://freeband.cobanov.dev/privacy",
+  "marketingUrl": "https://freeband.cobanov.dev/tr",
+  "supportUrl": "https://github.com/cobanov/freeband/issues",
+  "description": "Freeband, Xiaomi Smart Band 10 ya da 10 Pro'nu Xiaomi hesabı olmadan, doğrudan Bluetooth üzerinden okur ve verini iPhone'unda tutar.\n\nHer gün kendi skorlarını hesaplar ve her birinin neden oluştuğunu gösterir:\n• Uyku: süre, evreler (derin, hafif, REM, uyanık), verimlilik ve gece boyunca nabız\n• Toparlanma: kendi normaline göre kalp atış hızı değişkenliği (HRV) ve dinlenme nabzı\n• Yük: günün ne kadar zorladığı, nabız ve hareketten\n• 7, 30 ve 90 günlük eğilimler: toparlanma, uyku, yük, dinlenme nabzı, adım ve dahası\n\nUygulamadan senkronize edebilir, canlı nabzını izleyebilir, bandını bulabilir ve banda bildirim gönderebilirsin.\n\nBaşlamadan önce: bandın bu iPhone'da bir kez Mi Fitness ile eşlenmiş olmalı. Freeband bandın anahtarını Dosyalar uygulamasındaki Mi Fitness klasöründen okur; Xiaomi'ye hiçbir şey gönderilmez. Kurulum rehberi: https://freeband.cobanov.dev/tr/guide\n\nBant yanında değil mi? İlk ekranda Demo veriyle dene'ye dokun.\n\nİsteğe bağlı Web erişimi bandının verisini Freeband sunucusuna gönderir; böylece tarayıcıdan görebilir ya da API ile ulaşabilirsin. Davet kodu gerekir ve sen açmadıkça kapalı kalır.\n\nFreeband açık kaynaklıdır ve Xiaomi ile bağlantılı değildir. Tıbbi bir cihaz değildir; skorları genel sağlıklı yaşam içindir.",
+  "keywords": "akıllı bileklik,bileklik,uyku,toparlanma,nabız,hrv,adım,takip,gizlilik,fitness,sağlık",
+  "promotionalText": "Bandının verisi doğrudan Bluetooth'tan okunur ve iPhone'unda kalır. Hesap yok, bulut yok."
+}

@@ -1,0 +1,45 @@
+{
+  "locale": "en-US",
+  "subtitle": "Band tracking, no account",
+  "privacyPolicyUrl": "https://freeband.cobanov.dev/privacy",
+  "marketingUrl": "https://freeband.cobanov.dev",
+  "supportUrl": "https://github.com/cobanov/freeband/issues",
+  "categories": {
+    "primary": "HEALTH_AND_FITNESS"
+  },
+  "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT",
+  "copyright": "2026 Mert Cobanov",
+  "ageRating": {
+    "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+    "contests": "NONE",
+    "gamblingSimulated": "NONE",
+    "gunsOrOtherWeapons": "NONE",
+    "horrorOrFearThemes": "NONE",
+    "matureOrSuggestiveThemes": "NONE",
+    "medicalOrTreatmentInformation": "NONE",
+    "profanityOrCrudeHumor": "NONE",
+    "sexualContentGraphicAndNudity": "NONE",
+    "sexualContentOrNudity": "NONE",
+    "violenceCartoonOrFantasy": "NONE",
+    "violenceRealistic": "NONE",
+    "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+    "advertising": false,
+    "ageAssurance": false,
+    "gambling": false,
+    "lootBox": false,
+    "messagingAndChat": false,
+    "parentalControls": false,
+    "unrestrictedWebAccess": false,
+    "userGeneratedContent": false,
+    "healthOrWellnessTopics": true
+  },
+  "description": "Freeband reads your Xiaomi Smart Band 10 or 10 Pro directly over Bluetooth, without a Xiaomi account, and keeps your data on your iPhone.\n\nIt works out its own scores every day and shows what each one is made of:\n• Sleep: duration, stages (deep, light, REM, awake), efficiency and heart rate through the night\n• Recovery: heart rate variability and resting heart rate against your own baseline\n• Strain: how hard your day was, from heart rate and activity\n• Trends over 7, 30 and 90 days: recovery, sleep, strain, resting heart rate, steps and more\n\nFrom the app you can also sync, watch your live heart rate, find your band and send it a notification.\n\nBefore you start: the band needs to be paired with Mi Fitness once, on this iPhone. Freeband reads the band's key from Mi Fitness's folder in the Files app; nothing is sent to Xiaomi. The setup guide is at https://freeband.cobanov.dev/guide\n\nNo band at hand? Tap Try with demo data on the first screen.\n\nOptional Web access sends your band's data to the Freeband server, so you can see it in a browser or reach it through an API. It needs an invite code and stays off unless you turn it on.\n\nFreeband is open source and is not affiliated with Xiaomi. It is not a medical device; its scores are for general wellness.",
+  "keywords": "smart band,fitness band,sleep,recovery,strain,heart rate,hrv,steps,tracker,offline,privacy",
+  "promotionalText": "Your band's data, read straight over Bluetooth and kept on your iPhone. No account, no cloud.",
+  "review": {
+    "contactFirstName": "Mert",
+    "contactLastName": "Cobanov",
+    "contactEmail": "mertcobanov@gmail.com",
+    "notes": "Freeband is a companion app for the Xiaomi Smart Band 10 and 10 Pro fitness bands. It talks to the band over Bluetooth LE without a Xiaomi account, and all data stays on the phone.\n\nTo review without a band: on the first screen, tap \"Try with demo data\". The app shows every screen (Today, Sleep, Trends, Band, settings) with 30 days of sample data, in a separate in-memory store; \"Exit demo\" at the top returns to setup.\n\nWith a band: the band must have been paired once with Xiaomi's Mi Fitness app on the same iPhone. Freeband asks the user to pick Mi Fitness's folder in the Files app, reads the band's key from it on the device, and connects over Bluetooth LE. There is no sign-in and no account. The optional Web access feature needs an invite code and is not needed for review.\n\nFreeband is an independent project and is not affiliated with Xiaomi."
+  }
+}
