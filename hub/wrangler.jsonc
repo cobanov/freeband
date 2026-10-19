@@ -31,8 +31,8 @@
   "vars": {
     // Hostname the hub is served on. Webhooks may not point here.
     "PUBLIC_HOSTNAME": "freeband.cobanov.dev",
-    // Public TestFlight link shown on /join; empty until the app is in TestFlight.
-    "TESTFLIGHT_URL": ""
+    // Public TestFlight link shown on the home page, /guide and /join; empty hides it.
+    "TESTFLIGHT_URL": "https://testflight.apple.com/join/Qq9A6c1E"
   },
 
   // HUB_SECRET: at least 32 random characters. Used to encrypt webhook

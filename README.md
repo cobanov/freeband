@@ -13,7 +13,7 @@ Read your Xiaomi Smart Band 10 / 10 Pro on iPhone without Mi Fitness or a Xiaomi
 
 <sub>Screenshots use demo data.</sub>
 
-**Status:** early. Version 0.5 is in internal TestFlight testing and not on the App Store. Website: [freeband.cobanov.dev](https://freeband.cobanov.dev) ([Türkçe](https://freeband.cobanov.dev/tr)), including [How we did it](https://freeband.cobanov.dev/story), the story of how the protocol was worked out, and [Try it yourself](https://freeband.cobanov.dev/guide).
+**Status:** early. Version 0.5 is in public beta on [TestFlight](https://testflight.apple.com/join/Qq9A6c1E) and not on the App Store yet. Website: [freeband.cobanov.dev](https://freeband.cobanov.dev) ([Türkçe](https://freeband.cobanov.dev/tr)), including [How we did it](https://freeband.cobanov.dev/story), the story of how the protocol was worked out, and [Try it yourself](https://freeband.cobanov.dev/guide).
 
 ## What works
 

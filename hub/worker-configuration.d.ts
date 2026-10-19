@@ -4,7 +4,7 @@
 interface __BaseEnv_Env {
 	DB: D1Database;
 	PUBLIC_HOSTNAME: "freeband.cobanov.dev";
-	TESTFLIGHT_URL: "";
+	TESTFLIGHT_URL: "https://testflight.apple.com/join/Qq9A6c1E";
 	HUB_SECRET: string;
 	HUB_INVITE_CODES: string;
 }

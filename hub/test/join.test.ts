@@ -7,10 +7,10 @@ describe("/join", () => {
     expect(res.status).toBe(200);
     const page = await res.text();
     for (const s of ["Freeband&#39;e katıl", "Mi Fitness", "freeband://join?invite=", "join-code"]) expect(page).toContain(s);
-    // Without a TestFlight link configured, it asks the inviter for one.
-    expect(page).toContain("TestFlight bağlantısını iste");
+    // The public TestFlight link from wrangler.jsonc.
+    expect(page).toContain('<a href="https://testflight.apple.com/join/Qq9A6c1E">Freeband\'i TestFlight\'tan kur</a>');
     const en = await (await call("/join")).text();
-    for (const s of ["Join Freeband", "Install the app.", "freeband://join?invite=", "Ask the person who invited you"]) expect(en).toContain(s);
+    for (const s of ["Join Freeband", "Install the app.", "freeband://join?invite=", "Install Freeband from TestFlight"]) expect(en).toContain(s);
   });
 
   it("sends Turkish browsers to /tr/join and /tr/login, keeping the query", async () => {

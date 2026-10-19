@@ -74,8 +74,8 @@ describe("pages", () => {
     for (const s of ["No Mi Fitness, no account", "Sleep", "Recovery", "Strain", "Optional web access", "TestFlight", "App Store"]) {
       expect(home).toContain(s);
     }
-    // No TestFlight link, no old dial, no pixel wordmark.
-    expect(home).not.toContain("testflight.apple.com");
+    // The public beta link, no old dial, no pixel wordmark.
+    expect(home).toContain('<a class="btn" href="https://testflight.apple.com/join/Qq9A6c1E">Join the beta on TestFlight</a>');
     expect(home).not.toContain('class="dial"');
     expect(home).not.toContain('class="wordmark"');
     // Open Graph, hreflang, the language switch and the trademark line.
@@ -195,7 +195,7 @@ describe("pages", () => {
     // Seven steps with TestFlight, then three for building from source.
     expect(en.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(10);
     expect(en).toContain("Install Freeband from TestFlight");
-    expect(en).toContain("The public TestFlight link opens once Apple has reviewed the first build.");
+    expect(en).toContain('<a class="btn" href="https://testflight.apple.com/join/Qq9A6c1E">Join the beta on TestFlight</a>');
     for (const s of ["git clone https://github.com/cobanov/freeband", "brew install xcodegen", "xcodegen generate", "DEVELOPMENT_TEAM", "Get started", "Choose folder", "Connect", "Offload App", "Never unpair the band"]) {
       expect(en, s).toContain(s);
     }
