@@ -18,6 +18,7 @@ Referans uygulama ve test vektörleri: `ios/tests/activity/activity_ref.py` ve `
 - **[TEST]**: Gadgetbridge test dosyasında assert edilen değer.
 - **[TAHMİN]**: Kaynaktan çıkarım; kodda açıkça yazmıyor.
 - **[ÖNERİ]**: Freeband için tasarım tavsiyesi; Gadgetbridge'in yaptığı şey değil.
+- **[ÖLÇÜM]**: Freeband'in gerçek bir cihazda gözlediği davranış.
 
 Bütün çok baytlı alanlar aksi yazılmadıkça **little-endian**. Tek istisna, uyku detay dosyasındaki evre paketlerinin uzunluk alanı ve içerikleri (bölüm 6.3.3): onlar **big-endian**.
 
@@ -119,6 +120,7 @@ Freeband için [ÖNERİ]:
 - "Bugün" listesindeki günlük detay dosyası gün içinde büyüyor olabilir: id aynı kalıp içerik uzayabilir. Bugünün listesindeki dosyalar her senkronda yeniden çekilmeli ve eski kopyanın yerine yazılmalı. [TAHMİN; Gadgetbridge her seferinde ACK'leyip sildiği için bu durumu hiç görmüyor]
 - Mi Fitness aynı dosyaları ACK'leyip silebilir; Freeband'in listesi ile isteği arasında dosya kaybolursa istek zaman aşımına düşer. Bu normal akış sayılmalı. [TAHMİN]
 - Bileklik dolarsa senkron bozulabilir (Gadgetbridge uyarısı). Mi Fitness'ın periyodik çalışması bu riski azaltır. [KOD] `strings.xml:1277`, [TAHMİN]
+- **Redmi Watch 5 Active (firmware 2.2.105):** ACK'lenmemiş dosyaların hepsi "bugün" listesinde geliyor; geçmiş listesi boş. Saat istekleri geç ve sırasız cevaplayabiliyor: bir dosyanın içeriği, sonra istenen başka bir dosya beklenirken geliyor. Saat bazen bir bağlantıda dosya isteklerine hiç cevap vermiyor. [ÖLÇÜM] Bu yüzden dosya, beklenen id'ye göre değil içeriğin ilk 7 baytındaki id'ye göre saklanır; Gadgetbridge de id'yi içerikten okuyor [KOD] `X/activity/XiaomiActivityFileFetcher.java:142`. Cevap gelmeyen dosya bir kez daha istenir, yine gelmezse atlanır ve kalan dosyalar için yeni bağlantı açılır. [ÖNERİ]
 
 ## 3. Dosya kimliği (7 bayt)
 

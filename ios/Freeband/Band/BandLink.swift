@@ -181,6 +181,8 @@ final class BandLink: NSObject, ObservableObject {
     private var buffer: [UInt8] = []
     private var writeQueue: [Data] = []
     private var seq: UInt8 = 0
+    /// Data frames by sequence number, kept so a NACK can resend them; the UInt8 key bounds it to 256.
+    private var sentFrames: [UInt8: Data] = [:]
     private var phoneNonce = Data()
     private var keys: MiAuth.SessionKeys?
     private var active = false
@@ -200,8 +202,10 @@ final class BandLink: NSObject, ObservableObject {
     private var run = 0
     private var keyIndex = 0
     private var pendingStart: (() -> Void)?
-    /// Files that arrived complete (CRC-checked) in this sync.
-    private var filesReceived = 0
+    /// Files that arrived complete (CRC-checked) in this sync, by the id each one carries.
+    private var receivedFiles: Set<ActivityFileID> = []
+    /// The files this sync asked for; only these count toward a complete sync.
+    private var requestedFiles: Set<ActivityFileID> = []
     /// The file list did not arrive in time; the sync went on without files.
     private var fileListMissing = false
 
@@ -228,6 +232,7 @@ final class BandLink: NSObject, ObservableObject {
         buffer = []
         writeQueue = []
         seq = 0
+        sentFrames = [:]
         keys = nil
         phoneNonce = Data()
         authed = false
@@ -240,7 +245,8 @@ final class BandLink: NSObject, ObservableObject {
         fileQueue = []
         currentFile = nil
         fileProgress = nil
-        filesReceived = 0
+        receivedFiles = []
+        requestedFiles = []
         fileListMissing = false
         active = true
         note("start: \(target.name), \(target.keys.count) key(s)")
@@ -354,10 +360,16 @@ final class BandLink: NSObject, ObservableObject {
             return
         }
         phase = purpose == .live ? .live : .reading
-        note("auth ok → battery + live stats")
+        // A sync that reconnected for its next file (reconnectForNextFile) carries on fetching.
+        let resuming = purpose == .sync && fileStage == .fetching
+        note(resuming ? "auth ok → next file" : "auth ok → battery + live stats")
         sendCommand(MiAuth.batteryCommand(), encrypted: true)
         sendCommand(MiAuth.realtimeCommand(start: true), encrypted: true)
         realtimeOn = true
+        if resuming {
+            fetchNextFile()
+            return  // the first connection's time limit still runs
+        }
         if purpose == .sync {
             fileStage = .listingToday
             note("→ today's file list")
@@ -437,7 +449,8 @@ final class BandLink: NSObject, ObservableObject {
                 guard let id, let has = hasActivityFile else { return true }
                 return !has(id, file.hex)
             }
-            fileQueue = Array(Set(todayIDs + wanted)).sorted()
+            requestedFiles = Set(todayIDs + wanted)
+            fileQueue = requestedFiles.sorted()
             note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")
             fileProgress = (0, fileQueue.count)
             fileStage = .fetching
@@ -487,7 +500,8 @@ final class BandLink: NSObject, ObservableObject {
         armFileTimer()
     }
 
-    /// 5 s per chunk; one retry, then the file is skipped for this sync.
+    /// 5 s per chunk; one retry, then the file is skipped for this sync. A Redmi Watch 5 Active can
+    /// stop answering file requests on a connection, so the rest of the queue gets a fresh one.
     private func armFileTimer() {
         fileToken += 1
         let token = fileToken
@@ -497,10 +511,15 @@ final class BandLink: NSObject, ObservableObject {
                 self.currentRetried = true
                 self.note("file \(file.hex) did not answer, retrying")
                 self.requestCurrentFile()
-            } else {
-                self.note("file \(file.hex) skipped")
-                self.advanceFileProgress()
+                return
+            }
+            self.note("file \(file.hex) skipped")
+            self.advanceFileProgress()
+            if self.fileQueue.isEmpty {
                 self.fetchNextFile()
+            } else {
+                self.note("reconnecting for the \(self.fileQueue.count) remaining file(s)")
+                self.reconnectForNextFile()
             }
         }
     }
@@ -512,10 +531,23 @@ final class BandLink: NSObject, ObservableObject {
             armFileTimer()
         case .complete(let data):
             fileToken += 1
-            if let id = target?.id { onActivityFile?(id, file, data, todayIDs.contains(file)) }
-            filesReceived += 1
-            advanceFileProgress()
-            fetchNextFile()
+            // A file opens with its own id. The Redmi Watch 5 Active answers earlier requests late,
+            // so file the data under that id (as Gadgetbridge does), not under the one awaited;
+            // that one is still owed, so its timer restarts.
+            let got = ActivityFileID(data.prefix(7)) ?? file
+            let queued = fileQueue.contains(got)
+            fileQueue.removeAll { $0 == got }
+            if receivedFiles.insert(got).inserted, let id = target?.id {
+                onActivityFile?(id, got, data, todayIDs.contains(got))
+            }
+            if got == file || queued { advanceFileProgress() }
+            if got == file {
+                fetchNextFile()
+            } else {
+                note("← file \(got.hex) arrived while waiting for \(file.hex)")
+                assembler = ActivityAssembler()
+                armFileTimer()
+            }
         case .failed(let reason):
             fileToken += 1
             note("file \(file.hex) corrupt: \(reason)")
@@ -552,6 +584,27 @@ final class BandLink: NSObject, ObservableObject {
     private func retryWithNextKey() {
         keyIndex += 1
         note("key did not match, trying key \(keyIndex + 1)")
+        reconnect()
+    }
+
+    /// A fresh session for the rest of the file queue: a Redmi Watch 5 Active can stop answering file
+    /// requests on a connection. A skipped file stays on the device, unacknowledged (docs/ACTIVITY.md
+    /// 2.6), and comes with the next sync.
+    private func reconnectForNextFile() {
+        fileToken += 1
+        let token = fileToken
+        currentFile = nil
+        realtimeOn = false
+        reconnect()
+        // The start timeout only covers the first connection; the next file request moves the token.
+        after(20, run) { [weak self] in
+            guard let self, self.fileToken == token else { return }
+            self.fail(.timeout)
+        }
+    }
+
+    /// Drops the session and opens a new one within the same run; sync state is kept.
+    private func reconnect() {
         if let p = peripheral {
             if let rx, rx.isNotifying { p.setNotifyValue(false, for: rx) }
             central.cancelPeripheralConnection(p)
@@ -562,6 +615,7 @@ final class BandLink: NSObject, ObservableObject {
         buffer = []
         writeQueue = []
         seq = 0
+        sentFrames = [:]
         keys = nil
         phoneNonce = Data()
         let thisRun = run
@@ -596,9 +650,10 @@ final class BandLink: NSObject, ObservableObject {
         if fileListMissing || fileStage == .idle || fileStage == .listingToday || fileStage == .listingPast {
             return .partial(String(localized: "Couldn't get the file list. Records come with the next sync.", comment: "Partial sync"))
         }
-        let total = fileProgress?.total ?? 0
-        if filesReceived < total {
-            return .partial(String(localized: "\(filesReceived) of \(total) files received. The rest come with the next sync.", comment: "Partial sync"))
+        let total = requestedFiles.count
+        let received = receivedFiles.intersection(requestedFiles).count
+        if received < total {
+            return .partial(String(localized: "\(received) of \(total) files received. The rest come with the next sync.", comment: "Partial sync"))
         }
         return .complete
     }
@@ -606,6 +661,12 @@ final class BandLink: NSObject, ObservableObject {
     private func fail(_ error: LinkError) {
         guard active else { return }
         note("error: \(error.code)")
+        if authed, purpose == .sync {
+            // Files already stored still need their records sent, so end as a partial sync.
+            realtimeOn = false
+            finish()
+            return
+        }
         release()
         phase = .failed(error.message)
         lastOutcome = .failed(error)
@@ -631,7 +692,9 @@ final class BandLink: NSObject, ObservableObject {
         var body = protobuf
         if encrypted, let keys { body = MiCrypto.ctr(key: keys.encryptionKey, protobuf) }
         let payload = Data([0x01, encrypted ? 0x02 : 0x01]) + body
-        send(MiFrame.encode(kind: MiFrame.kindData, seq: seq, payload: payload))
+        let frame = MiFrame.encode(kind: MiFrame.kindData, seq: seq, payload: payload)
+        sentFrames[seq] = frame
+        send(frame)
         seq &+= 1
     }
 
@@ -664,7 +727,13 @@ final class BandLink: NSObject, ObservableObject {
                 send(MiFrame.encode(kind: MiFrame.kindAck, seq: packet.seq, payload: Data()))
                 decode(packet)
             case MiFrame.kindNack:
-                note("← NACK \(packet.seq)")
+                // The NACK carries the seq the device expects next: resend what was sent from there
+                // on, as Gadgetbridge's SPP path does (XiaomiSppProtocolV2.onNack; its BLE path only logs).
+                let resend = MiFrame.resendSeqs(next: seq, nack: packet.seq)
+                note(resend.isEmpty ? "← NACK \(packet.seq), nothing pending" : "← NACK \(packet.seq), resending \(resend.count)")
+                for s in resend {
+                    if let frame = sentFrames[s] { send(frame) }
+                }
             default:
                 break
             }
@@ -783,7 +852,8 @@ extension BandLink: CBPeripheralDelegate {
         guard active, characteristic.uuid == Self.rxUUID else { return }
         if error != nil {
             fail(.channelRefused)
-        } else if characteristic.isNotifying, keys == nil, !authed {
+        } else if characteristic.isNotifying, keys == nil {
+            // keys, not `authed`: a reconnect for the next file keeps `authed` but drops the keys.
             startSession()
         }
     }

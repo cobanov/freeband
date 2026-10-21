@@ -84,6 +84,9 @@ want = {
         + f_varint(7, 42))))).hex(),
     "find_start": (f_varint(1, 2) + f_varint(2, 18) + f_bytes(4, f_varint(5, 0))).hex(),
     "find_stop": (f_varint(1, 2) + f_varint(2, 18) + f_bytes(4, f_varint(5, 1))).hex(),
+    # (next, nack): resend nack..next-1 mod 256 when 0 < next-nack <= 32 (the TX window)
+    "resend_seqs": [[(nack + i) % 256 for i in range((next - nack) % 256)] if 0 < (next - nack) % 256 <= 32 else []
+                    for next, nack in [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)]],
 }
 bad = [k for k in want if got.get(k) != want[k]]
 for k in want:
