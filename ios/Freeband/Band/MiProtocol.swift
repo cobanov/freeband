@@ -28,6 +28,17 @@ enum MiFrame {
         0x04, 0x02, 0x00, 0x10, 0x27,
     ])
 
+    /// The TX window in startSessionPayload: data frames the device may have unacknowledged.
+    static let txWindow: UInt8 = 32
+
+    /// The seqs to resend for a NACK carrying `nack` (the seq the device expects next) when `next`
+    /// is the seq about to be sent: `nack` up to `next`, across the wrap; none outside the window.
+    static func resendSeqs(next: UInt8, nack: UInt8) -> [UInt8] {
+        let pending = next &- nack
+        guard pending > 0, pending <= txWindow else { return [] }
+        return (0..<pending).map { nack &+ $0 }
+    }
+
     /// CRC-16/ARC over the payload only.
     static func crc16arc(_ data: Data) -> UInt16 {
         var crc: UInt16 = 0
