@@ -40,7 +40,11 @@ enum BandPresentation {
         return link.nearby.contains(band.id) ? .nearby : .outOfRange
     }
 
-    static func model(_ band: Band) -> BandRender.Model { band.model == "band10pro" ? .band10Pro : .band10 }
+    static func model(_ band: Band) -> BandRender.Model {
+        // By name, like Band.shortName: the watch shares the band10 model code.
+        if band.name.localizedCaseInsensitiveContains(Band.redmiWatch5Active) { return .redmiWatch5Active }
+        return band.model == "band10pro" ? .band10Pro : .band10
+    }
 
     /// The latest battery: the running session's, else the stored one.
     static func battery(_ link: BandLink, _ band: Band) -> Int? {
