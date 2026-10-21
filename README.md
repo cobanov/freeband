@@ -2,7 +2,7 @@
 
 # Freeband
 
-Read your Xiaomi Smart Band 10 / 10 Pro on iPhone without Mi Fitness or a Xiaomi account. Freeband talks to the band directly over Bluetooth LE, and your data stays on your phone.
+Read your Xiaomi Smart Band 10 / 10 Pro or Redmi Watch 5 Active on iPhone without Mi Fitness or a Xiaomi account. Freeband talks to the band directly over Bluetooth LE, and your data stays on your phone.
 
 <p>
   <img src="docs/img/today.png" width="200" alt="Today: sleep, recovery and strain scores">
@@ -23,12 +23,17 @@ Read your Xiaomi Smart Band 10 / 10 Pro on iPhone without Mi Fitness or a Xiaomi
 | Battery, live steps, heart rate and calories | verified |
 | Notifications from Freeband, find band (vibrate), clock sync | verified |
 | Listing and fetching the band's activity files | verified |
+| Redmi Watch 5 Active: authentication, battery, live stats, and fetching and parsing its daily summary, per-minute and sleep files | verified on firmware 2.2.105 |
 | Parsing them: per-minute data, daily summary, sleep and sleep stages, manual readings | implemented and tested against fixtures; not yet checked with real files from a Band 10 |
 | Sleep, Recovery and Strain scores with contributors and confidence | implemented (algorithm v1) |
 | English and Turkish, light and dark themes | done |
 | Optional web hub: REST API, web panel, webhooks, CSV/JSON export | live at freeband.cobanov.dev |
 | Alarms, health monitoring settings, Do Not Disturb, weather, watch faces | not built yet |
 | Replacing Mi Fitness entirely (background connection, file acknowledgement) | not built yet |
+
+<img src="docs/img/redmi-watch-5-active.png" width="200" alt="Band: a Redmi Watch 5 Active with battery, sync and quick actions">
+
+<sub>The Band screen with a real Redmi Watch 5 Active connected.</sub>
 
 ## How it works
 
@@ -77,7 +82,7 @@ cd hub && npm install && npx tsc --noEmit && npx vitest run
 
 ## Try it yourself
 
-Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10 or 10 Pro, and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
+Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10, 10 Pro or Redmi Watch 5 Active, and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
 
 1. **Pair the band with Mi Fitness once**, if it isn't already, and let it sync. This is the only time you need Mi Fitness: Xiaomi's server creates the band's key during pairing.
 2. **Check the key folder.** In the Files app, On My iPhone should show a `Mi Fitness` folder.

@@ -30,18 +30,26 @@ final class Band {
         return hex.count >= 4 ? String(hex.suffix(4)) : nil
     }
 
-    var shortName: String { Self.shortName(model: model) }
+    var shortName: String { Self.shortName(name: name, model: model) }
     var displayName: String { Self.displayName(name: name, mac: mac) }
 
+    /// A Redmi Watch 5 Active gets band10 too: the hub accepts only band10 and band10pro
+    /// (hub/src/lib/validate.ts), so its pages call it Band 10.
     static func modelCode(for name: String) -> String {
         name.localizedCaseInsensitiveContains("pro") ? "band10pro" : "band10"
     }
 
-    static func shortName(model: String) -> String { model == "band10pro" ? "Band 10 Pro" : "Band 10" }
+    /// The watch advertises as "Redmi Watch 5 Active D3DD". Other Xiaomi watches get the Band 10 name and drawing.
+    static let redmiWatch5Active = "Redmi Watch 5 Active"
+
+    static func shortName(name: String, model: String) -> String {
+        if name.localizedCaseInsensitiveContains(redmiWatch5Active) { return redmiWatch5Active }
+        return model == "band10pro" ? "Band 10 Pro" : "Band 10"
+    }
 
     /// "Band 10 Pro (D9B9)": the suffix is what the band shows in its own Bluetooth name.
     static func displayName(name: String, mac: String?) -> String {
-        let short = shortName(model: modelCode(for: name))
+        let short = shortName(name: name, model: modelCode(for: name))
         let hex = (mac ?? "").uppercased().filter(\.isHexDigit)
         return hex.count >= 4 ? "\(short) (\(hex.suffix(4)))" : short
     }
