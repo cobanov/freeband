@@ -394,5 +394,30 @@ if let s = fixtureSleeps.first {
     check("4 RR beats are too few for HRV", result.hasRR && result.hrv == nil)
 }
 
+// MARK: - Files stored under another file's id
+
+section("refile")
+// freeband#2: 0.5.2 stored what a late band sent under the id it had asked for.
+func storedFile(_ id: ActivityFileID) -> Data { Data(id.bytes + [0xAA, 0xBB]) }
+let sleepID = ActivityFileID(timestamp: 0x6ADD_33C0, tzQuarterHours: 4, version: 5, type: 0, subtype: 0x08, detailType: 1)
+let dayID = ActivityFileID(timestamp: 0x6ADD_8B68, tzQuarterHours: 4, version: 4, type: 0, subtype: 0, detailType: 0)
+let summaryID = ActivityFileID(timestamp: 0x6ADD_3870, tzQuarterHours: 4, version: 5, type: 0, subtype: 0, detailType: 1)
+equal("sleep file id from the issue", sleepID.hex, "c033dd6a040521")
+equal("filed correctly: nothing to do", refilePlan([(dayID.hex, storedFile(dayID))]), [:])
+// The day's bytes under the sleep's id, nothing under the day's: moves, and frees the sleep's id.
+equal("misfiled: moves to the id it carries",
+      refilePlan([(sleepID.hex, storedFile(dayID))]), [sleepID.hex: .move(to: dayID)])
+// The day's bytes under the sleep's id, and the day's own copy filed correctly: dropped.
+equal("its id holds its own bytes: dropped",
+      refilePlan([(sleepID.hex, storedFile(dayID)), (dayID.hex, storedFile(dayID))]), [sleepID.hex: .drop])
+// Two files swapped: each moves to its own id.
+equal("swapped pair: both move",
+      refilePlan([(sleepID.hex, storedFile(summaryID)), (summaryID.hex, storedFile(sleepID))]),
+      [sleepID.hex: .move(to: summaryID), summaryID.hex: .move(to: sleepID)])
+// The same bytes under two wrong ids: one moves, the other is dropped.
+equal("one id claimed twice: one move",
+      refilePlan([(sleepID.hex, storedFile(dayID)), (summaryID.hex, storedFile(dayID))]).values.filter { $0 == .drop }.count, 1)
+equal("too short for an id: left alone", refilePlan([(sleepID.hex, Data([1, 2, 3]))]), [:])
+
 print("\(passed) passed, \(failed) failed")
 exit(failed == 0 ? 0 : 1)

@@ -88,8 +88,44 @@ final class ActivityIngest {
         return total
     }
 
+    /// Moves each stored file that carries another id to that id (`refilePlan`), or drops it when
+    /// that id holds its own bytes. Whatever sat under the old id is no longer stored, so the next
+    /// sync fetches it from the band's past list. A moved file counts as fetched from today, so it
+    /// is fetched once more too, now under the id it carries. Returns how many files changed.
+    @discardableResult
+    func refileMisfiled() -> Int {
+        let blobs = (try? context.fetch(FetchDescriptor<ActivityBlob>())) ?? []
+        var changed = 0
+        for (bandID, files) in Dictionary(grouping: blobs, by: \.bandID) {
+            let plan = refilePlan(files.map { ($0.fileID, $0.data) })
+            for blob in files {
+                guard let action = plan[blob.fileID] else { continue }
+                deleteRows(bandID: bandID, sourceFileID: blob.fileID)
+                switch action {
+                case .drop:
+                    context.delete(blob)
+                case .move(let id):
+                    blob.fileID = id.hex
+                    blob.ts = id.ts
+                    blob.type = Int(id.type)
+                    blob.subtype = Int(id.subtype)
+                    blob.detailType = Int(id.detailType)
+                    blob.version = Int(id.version)
+                    blob.fetchedFromToday = true
+                    blob.parserVersion = 0
+                    blob.parsedAt = nil
+                    blob.parseStatus = ParseStatus.pending.rawValue
+                }
+                changed += 1
+            }
+        }
+        if changed > 0 { try? context.save() }
+        return changed
+    }
+
     /// Drops every derived row (and scores), marks every file unparsed, parses them all again.
     func reparseAll() async -> IngestSummary {
+        refileMisfiled()
         Self.deleteDerived(context: context, bandID: nil, includingScores: true)
         let blobs = (try? context.fetch(FetchDescriptor<ActivityBlob>())) ?? []
         for blob in blobs {

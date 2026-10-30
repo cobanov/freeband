@@ -329,6 +329,12 @@ final class AppModel: ObservableObject {
     private func launchMaintenance() async {
         ingestBusy = true
         defer { ingestBusy = false }
+        // Files 0.5.2 stored under another file's id (freeband#2): refiled, then all parsed again,
+        // since minute days and sleeps merge rows from several files.
+        if ingest.refileMisfiled() > 0 {
+            absorb(await ingest.reparseAll())
+            rescoreAll()
+        }
         scheduleIngest()
         await waitForIngest()
         let quiet = !link.phase.isBusy

@@ -390,6 +390,37 @@ struct ActivityFileID: Hashable, Comparable, Sendable, CustomStringConvertible {
     var description: String { "\(hex) \(typeName)/\(subtypeName)/\(detailName) v\(version)" }
 }
 
+// MARK: - Files stored under another file's id
+
+/// What to do with a stored file whose bytes open with a different id than the one it is stored
+/// under.
+enum Refile: Equatable, Sendable {
+    /// File it under the id it carries.
+    case move(to: ActivityFileID)
+    /// That id already holds its own bytes, or another stored file moves there first.
+    case drop
+}
+
+/// Up to 0.5.2 a file was stored under the id the app had asked for, and a band that answers
+/// late (Band 10, Redmi Watch 5 Active) left files under another file's id. The file asked for was
+/// then never fetched again, which lost a night's sleep (freeband#2). A file opens with its own
+/// id, so each misfiled one moves to it, unless that id is already taken by bytes that are its
+/// own or by an earlier move. Keyed by the stored hex; files filed correctly, or too short to
+/// carry an id, are not in the result. One band's files at a time.
+func refilePlan(_ stored: [(hex: String, data: Data)]) -> [String: Refile] {
+    var claimed = Set<String>()
+    var misfiled: [(hex: String, own: ActivityFileID)] = []
+    for file in stored {
+        guard let own = ActivityFileID(file.data.prefix(7)) else { continue }
+        if own.hex == file.hex { claimed.insert(own.hex) } else { misfiled.append((file.hex, own)) }
+    }
+    var plan: [String: Refile] = [:]
+    for file in misfiled.sorted(by: { $0.hex < $1.hex }) {
+        plan[file.hex] = claimed.insert(file.own.hex).inserted ? .move(to: file.own) : .drop
+    }
+    return plan
+}
+
 // MARK: - Chunk reassembly (spec section 4)
 
 enum AssemblerEvent: Equatable, Sendable {
