@@ -30,6 +30,7 @@ Read your Xiaomi Smart Band 10 / 10 Pro or Redmi Watch 5 Active on iPhone withou
 | Optional web hub: REST API, web panel, webhooks, CSV/JSON export | live at freeband.cobanov.dev |
 | Alarms, health monitoring settings, Do Not Disturb, weather, watch faces | not built yet |
 | Replacing Mi Fitness entirely (background connection, file acknowledgement) | not built yet |
+| Mi Band 8 and older, which use the older BLE V1 channel | not supported; Freeband speaks only BLE V2 ([#4](https://github.com/cobanov/freeband/issues/4)) |
 
 <img src="docs/img/redmi-watch-5-active.png" width="200" alt="Band: a Redmi Watch 5 Active with battery, sync and quick actions">
 
