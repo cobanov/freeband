@@ -37,6 +37,7 @@ function render(
   extra: {
     script?: string;
     signedIn?: boolean;
+    analytics?: boolean;
     actions?: Safe;
     description?: string;
     og?: OpenGraph;
@@ -82,6 +83,7 @@ for (const lang of ["en", "tr"] as const) {
     const signedIn = (await pageSession(c)) !== null;
     const deleted = c.req.query("silindi") === "1" || c.req.query("deleted") === "1";
     return render(c, HOME_TITLE[lang], homeBody({ deleted, lang, testflight: c.env.TESTFLIGHT_URL }), {
+      analytics: true,
       signedIn,
       lang,
       alternates: alternates("/"),
@@ -93,6 +95,7 @@ for (const lang of ["en", "tr"] as const) {
   pages.get(localPath(lang, "/story"), async (c) => {
     const signedIn = (await pageSession(c)) !== null;
     return render(c, `${STORY_TITLE[lang]} · Freeband`, storyBody(lang), {
+      analytics: true,
       signedIn,
       lang,
       alternates: alternates("/story"),
@@ -104,6 +107,7 @@ for (const lang of ["en", "tr"] as const) {
   pages.get(localPath(lang, "/guide"), async (c) => {
     const signedIn = (await pageSession(c)) !== null;
     return render(c, `${GUIDE_TITLE[lang]} · Freeband`, guideBody(lang, c.env.TESTFLIGHT_URL), {
+      analytics: true,
       signedIn,
       lang,
       alternates: alternates("/guide"),
@@ -115,6 +119,7 @@ for (const lang of ["en", "tr"] as const) {
   pages.get(localPath(lang, "/privacy"), async (c) => {
     const signedIn = (await pageSession(c)) !== null;
     return render(c, PRIVACY_TITLE[lang], privacyBody(lang), {
+      analytics: true,
       signedIn,
       lang,
       alternates: alternates("/privacy"),
@@ -508,6 +513,7 @@ for (const lang of ["en", "tr"] as const) {
     const signedIn = (await pageSession(c)) !== null;
     const suffix = lang === "en" ? "" : `-${lang}`;
     return render(c, DOCS_TITLE[lang], docsBody(new URL(c.req.url).origin, lang), {
+      analytics: true,
       signedIn,
       lang,
       alternates: alternates("/docs"),

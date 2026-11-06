@@ -34,6 +34,9 @@ const EN = (): Safe =>
 <section class="split"><h2>Cloudflare</h2><div>
 <p>The hub runs on Cloudflare Workers and Cloudflare D1. Cloudflare provides the infrastructure as a data processor: it handles requests and hosts the database. While handling requests it keeps technical logs such as the IP address and the requested URL, and deletes them within a few days. The hub never writes keys, cookies or health data to those logs.</p>
 </div></section>
+<section class="split"><h2>Visits</h2><div>
+<p>The public pages (home, story, guide, docs and this one) count visits with OpenAnalytics, which runs on my own server. It keeps a random visitor ID in your browser's localStorage and records the pages you view, the labels of links and buttons you click, the referring site, your screen size, browser and device type, and the country and city looked up from your IP address. The IP address itself is not saved. It doesn't run on the sign-in pages or the panel. Cloudflare Web Analytics also counts page views across the site, without cookies; it sees page addresses and load times, never your health data.</p>
+</div></section>
 <section class="split"><h2>Webhooks</h2><div>
 <p>If you add a webhook, your data is also sent to the address you chose after every sync. Once it reaches that address, its owner is responsible for it.</p>
 </div></section>
@@ -76,6 +79,9 @@ const TR = (): Safe =>
 </div></section>
 <section class="split"><h2>Cloudflare</h2><div>
 <p>Hub, Cloudflare Workers ve Cloudflare D1 üzerinde çalışır. Cloudflare burada veri işleyen olarak altyapıyı sağlar: istekleri karşılar ve veritabanını barındırır. İstekleri işlerken IP adresi ve istenen adres gibi teknik kayıtlar tutar ve bunları birkaç gün içinde siler. Hub bu kayıtlara anahtar, çerez ya da sağlık verisi yazmaz.</p>
+</div></section>
+<section class="split"><h2>Ziyaretler</h2><div>
+<p>Herkese açık sayfalar (ana sayfa, hikâye, rehber, API belgesi ve bu sayfa) ziyaretleri kendi sunucumda çalışan OpenAnalytics ile sayar. Tarayıcının localStorage'ında rastgele bir ziyaretçi kimliği tutar; gezdiğin sayfaları, tıkladığın bağlantı ve düğmelerin adlarını, geldiğin siteyi, ekran boyutunu, tarayıcı ve cihaz türünü, IP adresinden bakılan ülke ve şehri kaydeder. IP adresinin kendisi saklanmaz. Giriş sayfalarında ve panelde çalışmaz. Cloudflare Web Analytics de sitenin tamamında sayfa görüntülemelerini çerezsiz sayar; sayfa adreslerini ve yüklenme sürelerini görür, sağlık verini asla görmez.</p>
 </div></section>
 <section class="split"><h2>Webhook'lar</h2><div>
 <p>Bir webhook eklersen verin her senkronizasyondan sonra seçtiğin adrese de gönderilir. O adrese ulaştıktan sonra veriden adresin sahibi sorumludur.</p>

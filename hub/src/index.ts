@@ -19,7 +19,7 @@ function htmlCsp(nonce: string): string {
     "font-src 'self'",
     "img-src 'self' data:",
     "manifest-src 'self'",
-    "connect-src 'self'",
+    "connect-src 'self' https://oa-c.cobanov.run",
     "form-action 'self'",
     "frame-ancestors 'none'",
     "base-uri 'none'",

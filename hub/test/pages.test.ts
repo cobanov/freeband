@@ -7,6 +7,15 @@ function cspNonce(csp: string): string {
   return m?.[1] ?? "";
 }
 
+describe("analytics", () => {
+  it("runs on public pages and never on the sign-in forms", async () => {
+    expect(await (await call("/")).text()).toContain("oa-c.cobanov.run/oa.js");
+    expect(await (await call("/tr/privacy")).text()).toContain("oa-c.cobanov.run/oa.js");
+    expect(await (await call("/login")).text()).not.toContain("oa-c.cobanov.run");
+    expect(await (await call("/tr/join")).text()).not.toContain("oa-c.cobanov.run");
+  });
+});
+
 describe("security headers", () => {
   it("sends a nonce-based CSP and hardening headers on HTML", async () => {
     for (const path of ["/", "/story", "/guide", "/tr", "/tr/story", "/tr/guide", "/tr/privacy", "/login", "/tr/login", "/join", "/tr/join", "/docs", "/tr/docs", "/privacy", "/does-not-exist", "/tr/does-not-exist"]) {
@@ -32,8 +41,8 @@ describe("security headers", () => {
       // No inline handlers or style attributes that the CSP would have to allow.
       expect(htmlText).not.toMatch(/\son[a-z]+\s*=/i);
       expect(htmlText).not.toMatch(/\sstyle\s*=/i);
-      // No third-party resources (outbound links such as GitHub are fine).
-      expect(htmlText).not.toMatch(/\ssrc="https?:\/\//);
+      // No third-party resources but the self-hosted visit counter (outbound links such as GitHub are fine).
+      expect(htmlText).not.toMatch(/\ssrc="https?:\/\/(?!oa-c\.cobanov\.run\/)/);
       // <link> may only point at this site (the hreflang alternates are absolute URLs).
       const linked = [...htmlText.matchAll(/<link\b[^>]*href="(https?:\/\/[^"]+)"/g)].map((m) => m[1] ?? "");
       expect(linked.filter((u) => !u.startsWith("https://freeband.cobanov.dev/")), path).toEqual([]);

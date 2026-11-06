@@ -357,6 +357,8 @@ export interface PageOpts {
   body: Safe;
   script?: string;
   signedIn?: boolean;
+  /** Public pages only: never the panel or the sign-in forms, which carry health data. */
+  analytics?: boolean;
   /** Request path, to mark the current nav link. */
   path?: string;
   /** Header actions that replace the default nav (e.g. the panel's sign-out button). */
@@ -469,6 +471,7 @@ ${meta(o)}
 <link rel="preload" href="/fonts/OpenSauceSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/OpenSauceSans-Medium.woff2" as="font" type="font/woff2" crossorigin>
 <style nonce="${o.nonce}">${raw(CSS)}</style>
+${o.analytics ? html`<script async nonce="${o.nonce}" src="https://oa-c.cobanov.run/oa.js" data-key="oa_pk_WqOPR-XTWPNBRdffHmLVbIMJLfBuX51X" data-collector="https://oa-c.cobanov.run"></script>` : ""}
 </head>
 <body>
 <header class="nav">
