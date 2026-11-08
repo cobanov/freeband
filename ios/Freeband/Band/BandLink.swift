@@ -137,6 +137,9 @@ final class BandLink: NSObject, ObservableObject {
     static let fe95 = CBUUID(string: "FE95")
     static let rxUUID = CBUUID(string: "005E")
     static let txUUID = CBUUID(string: "005F")
+    /// The older BLE V1 channel (Mi Band 8, Xiaomi Watch S1 Active): command read, command write,
+    /// activity data. Not spoken yet; only recognized so the log can say so.
+    static let v1UUIDs = ["0051", "0052", "0053"].map { CBUUID(string: $0) }
     static let liveLimit: TimeInterval = 120
     static let syncWindow: TimeInterval = 12
     /// Upper bound for a sync that also fetches activity files.
@@ -774,6 +777,18 @@ final class BandLink: NSObject, ObservableObject {
         log.append("\(Date().formatted(date: .omitted, time: .standard))  \(text)")
     }
 
+    /// "write-without-response, notify": what a characteristic allows, for the log.
+    static func propertyNames(_ properties: CBCharacteristicProperties) -> String {
+        let names: [(CBCharacteristicProperties, String)] = [
+            (.broadcast, "broadcast"), (.read, "read"), (.writeWithoutResponse, "write-without-response"),
+            (.write, "write"), (.notify, "notify"), (.indicate, "indicate"),
+            (.authenticatedSignedWrites, "signed-write"), (.extendedProperties, "extended"),
+            (.notifyEncryptionRequired, "notify-encrypted"), (.indicateEncryptionRequired, "indicate-encrypted"),
+        ]
+        let present = names.filter { properties.contains($0.0) }.map(\.1)
+        return present.isEmpty ? "none" : present.joined(separator: ", ")
+    }
+
     static func message(for state: CBManagerState) -> String {
         switch state {
         case .poweredOff: return String(localized: "Bluetooth is off. Turn it on in Control Centre.")
@@ -834,14 +849,24 @@ extension BandLink: CBPeripheralDelegate {
             fail(.channelUnavailable)
             return
         }
-        peripheral.discoverCharacteristics([Self.rxUUID, Self.txUUID], for: service)
+        // Every characteristic, not only 005E/005F, so the log shows which channel a band offers.
+        peripheral.discoverCharacteristics(nil, for: service)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard active else { return }
-        rx = service.characteristics?.first { $0.uuid == Self.rxUUID }
-        tx = service.characteristics?.first { $0.uuid == Self.txUUID }
+        let found = service.characteristics ?? []
+        if let error { note("FE95 characteristics: \(error.localizedDescription)") }
+        note("FE95 has \(found.count) characteristic(s)")
+        for characteristic in found {
+            note("  \(characteristic.uuid.uuidString): \(Self.propertyNames(characteristic.properties))")
+        }
+        rx = found.first { $0.uuid == Self.rxUUID }
+        tx = found.first { $0.uuid == Self.txUUID }
         guard let rx, tx != nil else {
+            if Set(Self.v1UUIDs).isSubset(of: Set(found.map(\.uuid))) {
+                note("BLE V1 channel (0051/0052/0053) present; Freeband speaks only BLE V2 (005E/005F)")
+            }
             fail(.channelUnavailable)
             return
         }
