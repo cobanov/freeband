@@ -13,6 +13,7 @@ final class AppModel: ObservableObject {
     let link = BandLink()
     let context: ModelContext
     let ingest: ActivityIngest
+    let healthExport: HealthExportService
 
     /// The hub stores minute/sleep/score records since migration 0002 (deployed 2026-10-14).
     static let hubAcceptsHealthTypes = true
@@ -28,6 +29,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var calibration: CalibrationReport?
     /// Parsing or scoring is running (reparse all, launch).
     @Published private(set) var ingestBusy = false
+    @Published var dataDeletionError: String?
 
     /// Fires with the new day's midnight when the day changes while the app runs.
     let dayChanged = PassthroughSubject<Date, Never>()
@@ -68,6 +70,7 @@ final class AppModel: ObservableObject {
         self.context = context
         self.isDemo = isDemo
         ingest = ActivityIngest(context: context)
+        healthExport = HealthExportService(context: context, demo: isDemo)
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
@@ -189,6 +192,7 @@ final class AppModel: ObservableObject {
     /// One band per MAC: folds bands added twice (Mi Fitness keeps several entries per band)
     /// into the oldest one, moving their samples, files, derived data and keys.
     func mergeDuplicateBands() {
+        healthExport.invalidate()
         let bands = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).sorted { $0.addedAt < $1.addedAt }
         var keeper: [String: Band] = [:]
         var changed = false
@@ -197,6 +201,12 @@ final class AppModel: ObservableObject {
             guard let first = keeper[suffix] else {
                 keeper[suffix] = band
                 continue
+            }
+            // A suffix is not enough to establish identity for an existing export namespace.
+            if first.healthExportNamespace != nil || band.healthExportNamespace != nil {
+                guard let a = first.mac, let b = band.mac, a.caseInsensitiveCompare(b) == .orderedSame else { continue }
+                if let a = first.healthExportNamespace, let b = band.healthExportNamespace, a != b { continue }
+                if first.healthExportNamespace == nil { first.healthExportNamespace = band.healthExportNamespace }
             }
             let from = band.id
             reassign(from: from, to: first.id)
@@ -214,7 +224,7 @@ final class AppModel: ObservableObject {
             context.delete(band)
             changed = true
         }
-        if changed { try? context.save() }
+        if changed { try? context.save(); scheduleIngest() }
     }
 
     /// Moves every row of one band to another (bug fix 1). Raw files are deduplicated by file id
@@ -267,6 +277,7 @@ final class AppModel: ObservableObject {
 
     /// Stores (or replaces: today's files grow during the day) a raw file, then parses it.
     private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data, today: Bool) {
+        healthExport.invalidate()
         if let existing = blob(bandID, file.hex) {
             existing.data = data
             existing.fetchedAt = Date()
@@ -299,6 +310,7 @@ final class AppModel: ObservableObject {
             } while self.ingestAgain
             self.ingestTask = nil
             self.runPendingRollups()
+            self.healthExport.schedule()
         }
     }
 
@@ -355,6 +367,7 @@ final class AppModel: ObservableObject {
     /// Diagnostics: drops every derived row and score, parses every stored file again, rescores.
     func reparseAll() async {
         guard !ingestBusy else { return }
+        healthExport.invalidate()
         ingestBusy = true
         defer { ingestBusy = false }
         await waitForIngest()
@@ -368,7 +381,7 @@ final class AppModel: ObservableObject {
         if ingestAgain {
             ingestAgain = false
             scheduleIngest()
-        }
+        } else { healthExport.schedule() }
     }
 
     func band(_ id: UUID) -> Band? {
@@ -458,7 +471,10 @@ final class AppModel: ObservableObject {
     }
 
     /// Removes the band with everything stored for it: samples, raw files, derived rows, scores.
-    func remove(_ band: Band) {
+    @discardableResult
+    func remove(_ band: Band) -> Bool {
+        do { try healthExport.suppressHistory(); dataDeletionError = nil }
+        catch { dataDeletionError = String(localized: "Could not safely delete local data. Try again."); return false }
         let id = band.id
         Vault.removeBandKey(id)
         try? context.delete(model: Sample.self, where: #Predicate { $0.bandID == id })
@@ -468,10 +484,13 @@ final class AppModel: ObservableObject {
         pendingHubRecords[id] = nil
         context.delete(band)
         try? context.save()
+        return true
     }
 
     /// Deletes every observation, raw file, derived row and score; bands, keys and webhooks stay.
     func deleteAllData() {
+        do { try healthExport.suppressHistory(); dataDeletionError = nil }
+        catch { dataDeletionError = String(localized: "Could not safely delete local data. Try again."); return }
         try? context.delete(model: Sample.self)
         try? context.delete(model: ActivityBlob.self)
         ActivityIngest.deleteDerived(context: context, bandID: nil, includingScores: true)

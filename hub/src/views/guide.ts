@@ -70,6 +70,10 @@ const STEPS: Record<Lang, Step[]> = {
       title: "Sync and give it a few nights",
       body: html`<p>Freeband syncs when you open it, if the last sync is more than 15 minutes old, and when you pull down on Today. Sleep, Recovery and Strain need a few nights to learn your normal; until then they say they're calibrating.</p>`,
     },
+    {
+      title: "Optional: Apple Health",
+      body: html`<p>Under Band → Freeband settings → Integrations → Apple Health you can opt in to write eligible steps, heart rate and sleep stages, including local history, while Freeband is open. Freeband does not read Health data. Corrections can change its own entries; turning export off leaves them in Health. Use one exporting iPhone per band.</p><p>When building this version from source, check in Xcode that your Apple Developer team's development provisioning profile supports the HealthKit entitlement.</p>`,
+    },
   ],
   tr: [
     {
@@ -100,6 +104,10 @@ const STEPS: Record<Lang, Step[]> = {
     {
       title: "Senkronize et, birkaç gece bekle",
       body: html`<p>Freeband açıldığında, son senkron 15 dakikadan eskiyse kendiliğinden senkronize olur; Bugün ekranını aşağı çekerek de senkronlayabilirsin. Uyku, Toparlanma ve Yük senin normalini öğrenmek için birkaç gece ister; o zamana kadar kalibre edildiklerini söylerler.</p>`,
+    },
+    {
+      title: "İsteğe bağlı: Apple Health",
+      body: html`<p>Bant → Freeband ayarları → Entegrasyonlar → Apple Health bölümünden uygun adım, nabız ve uyku evrelerinin, telefondaki geçmiş dahil, Freeband açıkken aktarılmasını açabilirsin. Freeband Sağlık verilerini okumaz. Düzeltmeler kendi kayıtlarını değiştirebilir; kapatmak Sağlık'taki kayıtları silmez. Her bileklik için tek iPhone kullan.</p><p>Bu sürümü kaynak koddan derlerken Apple Developer ekibinin geliştirme hazırlama profilinin HealthKit yetkisini desteklediğini Xcode'da kontrol et.</p>`,
     },
   ],
 };

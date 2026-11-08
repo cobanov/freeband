@@ -50,6 +50,7 @@ struct SettingsView: View {
 
                 section(String(localized: "Integrations")) {
                     ListCard {
+                        link(.appleHealth, String(localized: "Apple Health"), icon: "heart")
                         link(.webAccess, String(localized: "Web access"),
                              value: model.hubEnabled ? String(localized: "On · \(model.hubURL.host ?? "")") : String(localized: "Off"),
                              icon: "globe")
@@ -84,9 +85,10 @@ struct SettingsView: View {
                     Footnote(exportError ?? String(localized: "\(FBFormat.number(sampleCount)) readings on this phone. Parsing again rebuilds sleep, minutes and scores from the stored raw files."))
                     FBDestructiveButton(title: String(localized: "Delete data on this phone"),
                                         confirmTitle: String(localized: "Delete data"),
-                                        message: String(localized: "Readings, the band's raw files, sleep and scores are deleted. Bands and their keys stay. Data on the server isn't affected.")) {
+                                        message: String(localized: "Readings, raw files, sleep and scores are deleted. Bands and keys stay. Server and Apple Health data are not deleted. Older history will not be exported again.")) {
                         model.deleteAllData()
                     }
+                    if let error = model.dataDeletionError { Footnote(error) }
                 }
 
                 section(String(localized: "Appearance")) {

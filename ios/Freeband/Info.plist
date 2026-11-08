@@ -42,6 +42,8 @@
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Freeband uses Bluetooth to talk directly to the band on your wrist.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Freeband writes your band steps, heart rate and sleep stages to Apple Health when you choose to export them.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>OpenSauceSans-Regular.otf</string>

@@ -263,11 +263,11 @@ struct AboutBandView: View {
                     }
                     VStack(alignment: .leading, spacing: FBSpace.xs) {
                         FBDestructiveButton(title: String(localized: "Remove band"),
-                                            message: String(localized: "This band's records, raw files, scores and key are deleted from this phone.")) {
-                            model.remove(band)
-                            dismiss()
+                                            message: String(localized: "This band's records, raw files, scores and key are deleted from this phone. Apple Health entries remain. Older history will not be exported again.")) {
+                            if model.remove(band) { dismiss() }
                         }
                         Footnote(String(localized: "Removing only deletes the band from Freeband. Its pairing in Mi Fitness stays."))
+                        if let error = model.dataDeletionError { Footnote(error) }
                     }
                 }
                 .padding(.horizontal, FBSpace.gutter)

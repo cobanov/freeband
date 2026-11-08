@@ -82,7 +82,8 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             // Live mode keeps the band measuring; never leave it running in the background.
             if phase == .background { model.stop() }
-            if phase == .active { autoSync() }
+            if phase == .active { autoSync(); model.healthExport.schedule() }
+            if phase == .background { model.healthExport.invalidate() }
         }
         .onChange(of: link.bluetooth) { _, state in
             if state == .poweredOn { autoSync() }

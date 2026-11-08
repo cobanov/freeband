@@ -1,60 +1,77 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "CFBundleDisplayName": {
-      "comment": "Bundle display name",
-      "extractionState": "extracted_with_value",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Freeband"
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Freeband"
           }
         },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Freeband"
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband"
           }
         }
       }
     },
-    "CFBundleName": {
-      "comment": "Bundle name",
-      "extractionState": "extracted_with_value",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Freeband"
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Freeband"
           }
         },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Freeband"
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband"
           }
         }
       }
     },
-    "NSBluetoothAlwaysUsageDescription": {
-      "comment": "Privacy - Bluetooth Always Usage Description",
-      "extractionState": "extracted_with_value",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Freeband uses Bluetooth to talk directly to the band on your wrist."
+    "NSBluetoothAlwaysUsageDescription" : {
+      "comment" : "Privacy - Bluetooth Always Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Freeband uses Bluetooth to talk directly to the band on your wrist."
           }
         },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Freeband, bileğindeki bantla doğrudan konuşmak için Bluetooth kullanır."
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband, bileğindeki bantla doğrudan konuşmak için Bluetooth kullanır."
+          }
+        }
+      }
+    },
+    "NSHealthUpdateUsageDescription" : {
+      "comment" : "Privacy - Health Update Usage Description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband writes your band steps, heart rate and sleep stages to Apple Health when you choose to export them."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband, aktarmayı seçtiğinde bilekliğinin adım, nabız ve uyku evresi verilerini Apple Health’e yazar."
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }

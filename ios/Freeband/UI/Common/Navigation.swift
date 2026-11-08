@@ -22,6 +22,7 @@ enum Route: Hashable {
     case bands
     case profile
     case webAccess
+    case appleHealth
     case webhooks
     case shortcuts
     case diagnostics
@@ -112,6 +113,7 @@ private struct RouteView: View {
         case .bands: BandsView()
         case .profile: ProfileView()
         case .webAccess: WebAccessView()
+        case .appleHealth: AppleHealthView()
         case .webhooks: WebhooksView()
         case .shortcuts: ShortcutsView()
         case .diagnostics: DiagnosticsView()

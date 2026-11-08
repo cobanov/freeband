@@ -592,9 +592,14 @@ python3 -I activity_ref.py fileid 21F328650403A0  # id ya da id listesi
 
 Gadgetbridge test ağacında **günlük detay, uyku detayı ve uyku evreleri için hiç gerçek veri yok**; bunlar için yalnız sentetik fikstür var. Sentetik dosyalar bu belgedeki düzenle `make_fixtures.py` içinde, parser'dan bağımsız olarak paketlendi; beklenen değerler paketlenen değerler. Yani iki uygulamanın birbirine uyduğunu gösteriyorlar, bilekliğin gerçekten böyle gönderdiğini değil. İlk gerçek Band 10 dosyaları geldiğinde (`activity_ref.py parse` ile) bu bölümler doğrulanmalı.
 
+**Ek gözlem:** Bölüm 11.1'de gerçek Band 10 Pro dosyaları anlatılıyor. Bunlar yukarıdaki test
+fikstürlerinden ayrıdır ve sağlık verisi içerdiklerinden repoda değiller.
+
 ### 11.1 Gerçek Band 10 Pro dosyaları (2026-10-14)
 
 İlk gerçek dosyalar, uygulamanın veritabanından alındı (12 dosya: 8 DailyDetails v4, 2 DailySummary v5, 1 ManualSamples v2, 1 SleepDetails v6). Hepsinin CRC'si doğru ve hepsi hem referans parser'da hem Swift'te hatasız çözülüyor. Uyku dosyasında son tip-16 özetindeki hafif/derin/REM/uyanık dakikaları, son tip-17 paketindeki evre sürelerinin toplamıyla birebir aynı; ham evre kodu eşlemesi (bölüm 8) doğrulandı.
+
+Bu kontrol dosyaların ayrıştırılmasını ve bir uyku dosyasının iç tutarlılığını gösterir; ölçümlerin veya uyku evrelerinin doğruluğunu, skorların doğruluğunu, RR/HRV verisinin her cihazda bulunduğunu ya da Apple Health aktarımını doğrulamaz.
 
 Sağlık verisi oldukları için repoda değiller (`out/`, gitignored). Kendi dosyalarınızı denemek için: `python3 -I activity_ref.py parse DOSYA.bin`.
 

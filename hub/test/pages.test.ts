@@ -201,8 +201,9 @@ describe("pages", () => {
   it("renders the step-by-step guide in both languages", async () => {
     const en = await (await call("/guide")).text();
     expect(en).toContain("<title>Try Freeband with your own band · Freeband</title>");
-    // Seven steps with TestFlight, then three for building from source.
-    expect(en.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(10);
+    // Eight steps including optional Apple Health, then three for building from source.
+    expect(en.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(11);
+    expect(en).toContain("Freeband does not read Health data");
     expect(en).toContain("Install Freeband from TestFlight");
     expect(en).toContain('<a class="btn" href="https://testflight.apple.com/join/Qq9A6c1E">Join the beta on TestFlight</a>');
     for (const s of ["git clone https://github.com/cobanov/freeband", "brew install xcodegen", "xcodegen generate", "DEVELOPMENT_TEAM", "Get started", "Choose folder", "Connect", "Offload App", "Never unpair the band"]) {
@@ -210,7 +211,8 @@ describe("pages", () => {
     }
     expect(en).toContain('<link rel="alternate" hreflang="tr" href="https://freeband.cobanov.dev/tr/guide">');
     const tr = await (await call("/tr/guide")).text();
-    expect(tr.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(10);
+    expect(tr.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(11);
+    expect(tr).toContain("Freeband Sağlık verilerini okumaz");
     expect(tr).toContain("TestFlight&#39;tan kur");
     for (const s of ["Başlayalım", "Klasörü seç", "Bağlan", "Uygulamayı Boşalt", "eşleşmeden çıkarma"]) expect(tr, s).toContain(s);
     // The home page links it.

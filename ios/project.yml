@@ -11,12 +11,16 @@ settings:
     SWIFT_VERSION: "5.0"
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
     SWIFT_EMIT_LOC_STRINGS: YES
-    MARKETING_VERSION: "0.5.2"
+    MARKETING_VERSION: "0.6.0"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   Freeband:
     type: application
     platform: iOS
+    entitlements:
+      path: Freeband/Freeband.entitlements
+      properties:
+        com.apple.developer.healthkit: true
     sources:
       - path: Freeband
         excludes:
@@ -31,6 +35,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSBluetoothAlwaysUsageDescription: Freeband uses Bluetooth to talk directly to the band on your wrist.
+        NSHealthUpdateUsageDescription: Freeband writes your band steps, heart rate and sleep stages to Apple Health when you choose to export them.
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.healthcare-fitness
         UILaunchScreen: {}

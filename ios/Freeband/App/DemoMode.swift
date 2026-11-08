@@ -21,6 +21,7 @@ final class AppSession: ObservableObject {
     /// app as it was, and to the app proper whenever a real band is already set up.
     func setDemo(_ on: Bool) {
         model.stop()
+        model.healthExport.invalidate()
         DemoMode.isOn = on
         (container, model) = Self.make(demo: on)
         if !on, ((try? container.mainContext.fetchCount(FetchDescriptor<Band>())) ?? 0) > 0 {
@@ -31,7 +32,8 @@ final class AppSession: ObservableObject {
 
     static let models: [any PersistentModel.Type] = [Band.self, Sample.self, Webhook.self, ActivityBlob.self,
                                                      MinuteDay.self, DaySummary.self, SleepRecord.self, SleepRR.self,
-                                                     ManualReading.self, DailyScore.self]
+                                                     ManualReading.self, DailyScore.self, HealthExportLedgerRow.self,
+                                                     HealthExportSettings.self]
 
     private static func make(demo: Bool) -> (ModelContainer, AppModel) {
         let container: ModelContainer

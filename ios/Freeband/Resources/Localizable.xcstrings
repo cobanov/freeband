@@ -762,6 +762,22 @@
         }
       }
     },
+    "Allowed to write" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allowed to write"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazma izni var"
+          }
+        }
+      }
+    },
     "An estimate: only %@ of 100 weight points had data." : {
       "localizations" : {
         "tr" : {
@@ -849,6 +865,118 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sistem"
+          }
+        }
+      }
+    },
+    "Apple Health" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health"
+          }
+        }
+      }
+    },
+    "Apple Health access is restricted on this device." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health access is restricted on this device."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu cihazda Apple Health erişimi kısıtlanmış."
+          }
+        }
+      }
+    },
+    "Apple Health is unavailable on this device or with demo data." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health is unavailable on this device or with demo data."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health bu cihazda veya demo verileriyle kullanılamıyor."
+          }
+        }
+      }
+    },
+    "Apple Health permission request failed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health permission request failed."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health izin isteği başarısız oldu."
+          }
+        }
+      }
+    },
+    "Apple Health sync could not finish. Try again when Health data is available." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health sync could not finish. Try again when Health data is available."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health eşzamanlaması tamamlanamadı. Sağlık verileri kullanılabilir olduğunda yeniden dene."
+          }
+        }
+      }
+    },
+    "Apple Health sync finished." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health sync finished."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health eşzamanlaması tamamlandı."
+          }
+        }
+      }
+    },
+    "Apple Health write access was denied. Change it in the Health app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health write access was denied. Change it in the Health app."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health yazma izni verilmedi. Sağlık uygulamasından değiştirebilirsin."
           }
         }
       }
@@ -1002,6 +1130,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bantlar kelime taşır"
+          }
+        }
+      }
+    },
+    "Bands with matching identifiers need attention; Apple Health sync is paused for them." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bands with matching identifiers need attention; Apple Health sync is paused for them."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kimlikleri eşleşen bileklikler için Apple Health eşzamanlaması duraklatıldı; bu bileklikleri kontrol et."
           }
         }
       }
@@ -1188,6 +1332,22 @@
         }
       }
     },
+    "Change write access in the Health app under your profile, Apps, Freeband." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change write access in the Health app under your profile, Apps, Freeband."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazma iznini Sağlık uygulamasında profilin, Uygulamalar, Freeband bölümünden değiştir."
+          }
+        }
+      }
+    },
     "Charging" : {
       "localizations" : {
         "tr" : {
@@ -1368,6 +1528,38 @@
         }
       }
     },
+    "Could not safely delete local data. Try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not safely delete local data. Try again."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telefondaki veriler güvenli biçimde silinemedi. Yeniden dene."
+          }
+        }
+      }
+    },
+    "Could not save Apple Health settings." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not save Apple Health settings."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health ayarları kaydedilemedi."
+          }
+        }
+      }
+    },
     "Couldn't connect to the band. Turn Bluetooth off and on, then try again." : {
       "localizations" : {
         "tr" : {
@@ -1538,6 +1730,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Webhook'u sil"
+          }
+        }
+      }
+    },
+    "Deleting Freeband data or removing a band does not delete Health entries. Older history on this phone will not be exported again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleting Freeband data or removing a band does not delete Health entries. Older history on this phone will not be exported again."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband verilerini veya bilekliği silmek Sağlık kayıtlarını silmez. Bu telefondaki eski geçmiş yeniden aktarılmaz."
           }
         }
       }
@@ -1835,6 +2043,22 @@
         }
       }
     },
+    "Freeband can write eligible band steps, heart rate and sleep stages to Apple Health. It never reads Apple Health." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband can write eligible band steps, heart rate and sleep stages to Apple Health. It never reads Apple Health."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband, uygun bileklik adımlarını, nabzı ve uyku evrelerini Apple Health’e yazabilir. Apple Health verilerini asla okumaz."
+          }
+        }
+      }
+    },
     "Freeband can't use Bluetooth. Allow it in Settings › Freeband." : {
       "localizations" : {
         "tr" : {
@@ -1892,6 +2116,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Freeband v3"
+          }
+        }
+      }
+    },
+    "Freeband writes eligible history and may update or remove its own entries when band data changes. Re-enabling resumes pending corrections." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband writes eligible history and may update or remove its own entries when band data changes. Re-enabling resumes pending corrections."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband uygun geçmişi yazar ve bileklik verileri değiştiğinde kendi kayıtlarını güncelleyebilir veya silebilir. Yeniden açmak bekleyen düzeltmeleri sürdürür."
           }
         }
       }
@@ -2474,6 +2714,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Son oturum"
+          }
+        }
+      }
+    },
+    "Last successful sync" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last successful sync"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son başarılı eşzamanlama"
           }
         }
       }
@@ -3176,6 +3432,22 @@
         }
       }
     },
+    "Not requested" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not requested"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İstenmedi"
+          }
+        }
+      }
+    },
     "Not set" : {
       "localizations" : {
         "tr" : {
@@ -3273,6 +3545,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "API belgesini aç"
+          }
+        }
+      }
+    },
+    "Open app settings" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open app settings"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uygulama ayarlarını aç"
           }
         }
       }
@@ -3447,7 +3735,24 @@
         }
       }
     },
+    "Readings, raw files, sleep and scores are deleted. Bands and keys stay. Server and Apple Health data are not deleted. Older history will not be exported again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Readings, raw files, sleep and scores are deleted. Bands and keys stay. Server and Apple Health data are not deleted. Older history will not be exported again."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ölçümler, ham dosyalar, uyku ve skorlar silinir. Bileklikler ve anahtarlar kalır. Sunucu ve Apple Health verileri silinmez. Eski geçmiş yeniden aktarılmaz."
+          }
+        }
+      }
+    },
     "Readings, the band's raw files, sleep and scores are deleted. Bands and their keys stay. Data on the server isn't affected." : {
+      "extractionState" : "stale",
       "localizations" : {
         "tr" : {
           "stringUnit" : {
@@ -3474,6 +3779,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hazır"
+          }
+        }
+      }
+    },
+    "Ready to sync" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready to sync"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eşzamanlamaya hazır"
           }
         }
       }
@@ -4044,6 +4365,22 @@
         }
       }
     },
+    "Some data is waiting for permission or a complete, unambiguous band sync." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some data is waiting for permission or a complete, unambiguous band sync."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bazı veriler izin veya eksiksiz, belirsiz olmayan bir bileklik eşzamanlaması bekliyor."
+          }
+        }
+      }
+    },
     "Stage" : {
       "localizations" : {
         "tr" : {
@@ -4236,6 +4573,22 @@
         }
       }
     },
+    "Sync now" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync now"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şimdi eşzamanla"
+          }
+        }
+      }
+    },
     "Sync progress" : {
       "localizations" : {
         "tr" : {
@@ -4316,6 +4669,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Senkronize ediliyor."
+          }
+        }
+      }
+    },
+    "Syncing…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syncing…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eşzamanlanıyor…"
           }
         }
       }
@@ -4643,11 +5012,28 @@
       }
     },
     "This band's records, raw files, scores and key are deleted from this phone." : {
+      "extractionState" : "stale",
       "localizations" : {
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bu bandın kayıtları, ham dosyaları, skorları ve anahtarı bu telefondan silinir."
+          }
+        }
+      }
+    },
+    "This band's records, raw files, scores and key are deleted from this phone. Apple Health entries remain. Older history will not be exported again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This band's records, raw files, scores and key are deleted from this phone. Apple Health entries remain. Older history will not be exported again."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu bilekliğin kayıtları, ham dosyaları, skorları ve anahtarı telefondan silinir. Apple Health kayıtları kalır. Eski geçmiş yeniden aktarılmaz."
           }
         }
       }
@@ -4762,6 +5148,22 @@
         }
       }
     },
+    "Turn off Apple Health" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off Apple Health"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health’i kapat"
+          }
+        }
+      }
+    },
     "Turn off web access" : {
       "localizations" : {
         "tr" : {
@@ -4782,12 +5184,60 @@
         }
       }
     },
+    "Turn on Apple Health" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apple Health"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health’i aç"
+          }
+        }
+      }
+    },
+    "Turn on Apple Health export?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apple Health export?"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health aktarımı açılsın mı?"
+          }
+        }
+      }
+    },
     "Turn on web access" : {
       "localizations" : {
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Web erişimini aç"
+          }
+        }
+      }
+    },
+    "Turning on exports eligible history stored on this phone and later syncs while Freeband is open. Corrections can update or remove entries Freeband previously wrote." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turning on exports eligible history stored on this phone and later syncs while Freeband is open. Corrections can update or remove entries Freeband previously wrote."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açıldığında bu telefondaki uygun geçmiş aktarılır ve Freeband açıkken sonraki eşzamanlamalar yapılır. Düzeltmeler Freeband’in önceden yazdığı kayıtları güncelleyebilir veya silebilir."
           }
         }
       }
@@ -4820,6 +5270,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En fazla 5 adres, yalnızca https://. İmza biçimi API belgesinde (Web erişimi › API belgesini aç)."
+          }
+        }
+      }
+    },
+    "Use one exporting iPhone per band. Reinstalling or using another phone can create duplicates. Health-side deletions cannot be detected." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use one exporting iPhone per band. Reinstalling or using another phone can create duplicates. Health-side deletions cannot be detected."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her bileklik için aktarım yapan tek bir iPhone kullan. Yeniden yükleme veya başka telefon kullanma yinelenen kayıtlar oluşturabilir. Sağlık uygulamasındaki silmeler algılanamaz."
           }
         }
       }
@@ -5085,6 +5551,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Antrenman özeti"
+          }
+        }
+      }
+    },
+    "Write access" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write access"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazma izni"
+          }
+        }
+      }
+    },
+    "Write access denied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write access denied"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazma izni verilmedi"
           }
         }
       }
