@@ -307,12 +307,17 @@ func run() async {
         ("Redmi Watch 5 Active D3DD", .redmiWatch5Active, "band10"),
         ("Xiaomi Watch S1 Active", .watchS1Active, "band10"),
         ("XiaomiWatchS1Active 6373", .watchS1Active, "band10"),
+        ("Xiaomi Smart Band 8", .band8, "band10"),
+        ("Xiaomi Smart Band 8 A1B2", .band8, "band10"),
+        ("Xiaomi Smart Band 8 Pro 1C2D", .band10Pro, "band10pro"),  // Bluetooth Classic only: not a Band 8 here
+        ("Xiaomi Smart Band 8 Active 3E4F", .band10, "band10"),
     ]
     for (name, family, code) in bandNames {
         equal(name, Band.family(name: name), family)
         equal("\(name) model code", Band.modelCode(for: name), code)
     }
-    equal("short name", Band(name: "XiaomiWatchS1Active 6373", mac: nil).shortName, "Watch S1 Active")
+    equal("short names", [Band(name: "XiaomiWatchS1Active 6373", mac: nil).shortName, Band(name: "Xiaomi Smart Band 8", mac: nil).shortName],
+          ["Watch S1 Active", "Band 8"])
     equal("display name", Band.displayName(name: "Xiaomi Watch S1 Active", mac: "D0:62:2C:4A:63:73"), "Watch S1 Active (6373)")
 }
 

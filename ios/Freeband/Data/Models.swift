@@ -33,7 +33,7 @@ final class Band {
     var shortName: String { Self.shortName(name: name, model: model) }
     var displayName: String { Self.displayName(name: name, mac: mac) }
 
-    /// The watches get band10 too: the hub accepts only band10 and band10pro
+    /// The watches and the Band 8 get band10 too: the hub accepts only band10 and band10pro
     /// (hub/src/lib/validate.ts), so its pages call them Band 10. `family` tells them apart.
     static func modelCode(for name: String) -> String {
         name.localizedCaseInsensitiveContains("pro") ? "band10pro" : "band10"
@@ -41,12 +41,13 @@ final class Band {
 
     /// What the band is, for its name and drawing.
     enum Family: Sendable, CaseIterable {
-        case band10, band10Pro, redmiWatch5Active, watchS1Active
+        case band10, band10Pro, band8, redmiWatch5Active, watchS1Active
 
         var shortName: String {
             switch self {
             case .band10: "Band 10"
             case .band10Pro: "Band 10 Pro"
+            case .band8: "Band 8"
             case .redmiWatch5Active: "Redmi Watch 5 Active"
             case .watchS1Active: "Watch S1 Active"
             }
@@ -54,11 +55,17 @@ final class Band {
     }
 
     /// From Mi Fitness's name or the Bluetooth one: "Redmi Watch 5 Active D3DD", "Xiaomi Watch S1
-    /// Active" or "XiaomiWatchS1Active 6373". Anything else is a Band 10 or 10 Pro by its model code.
+    /// Active" or "XiaomiWatchS1Active 6373", "Xiaomi Smart Band 8 A1B2" (not the 8 Pro, which
+    /// speaks only Bluetooth Classic, nor the 8 Active). Anything else is a Band 10 or 10 Pro by
+    /// its model code.
     static func family(name: String, model: String? = nil) -> Family {
         let compact = name.lowercased().filter { !$0.isWhitespace }
         if compact.contains("redmiwatch5active") { return .redmiWatch5Active }
         if compact.contains("watchs1active") { return .watchS1Active }
+        if name.range(of: "band ?8(?![0-9])", options: [.regularExpression, .caseInsensitive]) != nil,
+           !compact.contains("pro"), !compact.contains("active") {
+            return .band8
+        }
         return (model ?? modelCode(for: name)) == "band10pro" ? .band10Pro : .band10
     }
 

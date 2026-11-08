@@ -1,14 +1,14 @@
 import SwiftUI
 
 /// The band as Tesla draws the car: a flat vector object, no gradients, no shadows. A pill
-/// body with strap stubs (Band 10); the 10 Pro has a lighter metal frame; the Redmi
+/// body with strap stubs (Band 10, Band 8); the 10 Pro has a lighter metal frame; the Redmi
 /// Watch 5 Active is a rounded rectangle; the Watch S1 Active is round, with a wide bezel and two
 /// buttons on the right. A live overlay on the screen shows the time, battery (with a bolt
 /// while charging), live heart rate or "Not worn".
 /// The screen is AMOLED black in both themes; the strap and frame follow the theme.
 struct BandRender: View {
     enum Model: String, CaseIterable, Identifiable, Sendable {
-        case band10, band10Pro, redmiWatch5Active, watchS1Active
+        case band10, band10Pro, band8, redmiWatch5Active, watchS1Active
 
         var id: String { rawValue }
 
@@ -16,6 +16,7 @@ struct BandRender: View {
             switch self {
             case .band10: "Band 10"
             case .band10Pro: "Band 10 Pro"
+            case .band8: "Band 8"
             case .redmiWatch5Active: "Redmi Watch 5 Active"
             case .watchS1Active: "Watch S1 Active"
             }
@@ -38,7 +39,7 @@ struct BandRender: View {
 
     @Environment(\.locale) private var locale
 
-    // Proportions in body widths (Smart Band 10: about 22.6 × 48.3 mm;
+    // Proportions in body widths (Smart Band 10: about 22.6 × 48.3 mm, Band 8 about the same;
     // Redmi Watch 5 Active: about 38.3 × 45.6 mm; Watch S1 Active: a 46.5 mm round case with
     // 22 mm straps).
     private var isSquareWatch: Bool { model == .redmiWatch5Active }
