@@ -76,7 +76,7 @@ Modellere göre durum:
 
 ### 3.2 Üç taşıma katmanı
 
-**BLE V1** (Mi Band 8 kuşağı): `0xFE95` altında `0051` (komut okuma), `0052` (komut yazma), `0053` (aktivite), `0055` (veri yükleme). Kendi parçalama (chunking) şeması, mesaj başına AES-CCM. [KOD] `X/XiaomiUuids.java:40-46`, `X/XiaomiCharacteristicV1.java:443-446`, `X/XiaomiCharacteristicV1.java:389`
+**BLE V1** (Mi Band 8 kuşağı): `0xFE95` altında `0051` (komut okuma), `0052` (komut yazma), `0053` (aktivite), `0055` (veri yükleme). Kendi parçalama (chunking) şeması, mesaj başına AES-CCM. [KOD] `X/XiaomiUuids.java:40-46`, `X/XiaomiCharacteristicV1.java:443-446`, `X/XiaomiCharacteristicV1.java:389`. Çerçeve düzeni, şifreleme ve Xiaomi Watch S1 Active ölçümü: [`docs/BLE-V1.md`](docs/BLE-V1.md).
 
 **BLE V2** (Mi Band 9 Active): `0xFE95` altında `005E` RX/notify, `005F` TX/write. İçinden SPP v2 paketleri akar. `XiaomiBleSupport` önce V1 karakteristiklerini arar, bulamazsa V2'yi dener. [KOD] `X/XiaomiUuids.java:28-31`, `X/XiaomiBleSupport.java:64-83`
 

@@ -223,17 +223,36 @@ enum MiCrypto {
     /// Returns ciphertext ‖ tag. Apple frameworks have no CCM, so it is built on AES-ECB.
     static func ccmEncrypt(key: Data, nonce: Data, plaintext: Data) -> Data {
         precondition(nonce.count == 12)
-        let tagLength = 4
-        let lengthSize = 15 - nonce.count
         let p = [UInt8](plaintext)
+        let tag = ccmTag(key: key, nonce: nonce, plaintext: p)
+        return ccmKeystream(key: key, nonce: nonce, p) + Data(tag)
+    }
 
-        func counterBlock(_ counter: Int) -> Data {
-            Data([UInt8(lengthSize - 1)]) + nonce
-                + Data([UInt8((counter >> 16) & 0xFF), UInt8((counter >> 8) & 0xFF), UInt8(counter & 0xFF)])
-        }
+    /// The reverse of ccmEncrypt: nil when the input is shorter than the tag or the tag doesn't match.
+    static func ccmDecrypt(key: Data, nonce: Data, ciphertextAndTag: Data) -> Data? {
+        precondition(nonce.count == 12)
+        let c = [UInt8](ciphertextAndTag)
+        guard c.count >= ccmTagLength else { return nil }
+        let bodyLength = c.count - ccmTagLength
+        let plaintext = ccmKeystream(key: key, nonce: nonce, Array(c[..<bodyLength]))
+        let tag = ccmTag(key: key, nonce: nonce, plaintext: [UInt8](plaintext))
+        var difference: UInt8 = 0
+        for j in 0..<ccmTagLength { difference |= tag[j] ^ c[bodyLength + j] }
+        return difference == 0 ? plaintext : nil
+    }
 
-        // CBC-MAC over B0 and the zero-padded plaintext
-        var b0 = Data([UInt8(((tagLength - 2) / 2) << 3 | (lengthSize - 1))]) + nonce
+    private static let ccmTagLength = 4
+    /// Bytes of the length field: 15 minus the 12-byte nonce.
+    private static let ccmLengthSize = 3
+
+    private static func ccmCounterBlock(_ nonce: Data, _ counter: Int) -> Data {
+        Data([UInt8(ccmLengthSize - 1)]) + nonce
+            + Data([UInt8((counter >> 16) & 0xFF), UInt8((counter >> 8) & 0xFF), UInt8(counter & 0xFF)])
+    }
+
+    /// CBC-MAC over B0 and the zero-padded plaintext, masked with counter block 0.
+    private static func ccmTag(key: Data, nonce: Data, plaintext p: [UInt8]) -> [UInt8] {
+        var b0 = Data([UInt8(((ccmTagLength - 2) / 2) << 3 | (ccmLengthSize - 1))]) + nonce
         b0.append(contentsOf: [UInt8((p.count >> 16) & 0xFF), UInt8((p.count >> 8) & 0xFF), UInt8(p.count & 0xFF)])
         var mac = aesBlock(key: key, b0)
         for start in stride(from: 0, to: p.count, by: 16) {
@@ -241,14 +260,17 @@ enum MiCrypto {
             for j in 0..<min(16, p.count - start) { block[j] ^= p[start + j] }
             mac = aesBlock(key: key, Data(block))
         }
+        let s0 = aesBlock(key: key, ccmCounterBlock(nonce, 0))
+        return (0..<ccmTagLength).map { mac[$0] ^ s0[$0] }
+    }
 
+    /// Counter blocks 1, 2, … XORed over the input: encrypts and decrypts alike.
+    private static func ccmKeystream(key: Data, nonce: Data, _ input: [UInt8]) -> Data {
         var out = Data()
-        for (n, start) in stride(from: 0, to: p.count, by: 16).enumerated() {
-            let s = aesBlock(key: key, counterBlock(n + 1))
-            for j in 0..<min(16, p.count - start) { out.append(p[start + j] ^ s[j]) }
+        for (n, start) in stride(from: 0, to: input.count, by: 16).enumerated() {
+            let s = aesBlock(key: key, ccmCounterBlock(nonce, n + 1))
+            for j in 0..<min(16, input.count - start) { out.append(input[start + j] ^ s[j]) }
         }
-        let s0 = aesBlock(key: key, counterBlock(0))
-        for j in 0..<tagLength { out.append(mac[j] ^ s0[j]) }
         return out
     }
 
