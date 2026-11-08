@@ -40,7 +40,12 @@ cd ios/tests/analytics && swiftc ../../Freeband/Analytics/*.swift main.swift -o 
 
 # the app: generate the project, then build for the simulator without signing
 cd ios && xcodegen generate && xcodebuild -project Freeband.xcodeproj -scheme Freeband -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+
+# an unsigned Release .ipa for SideStore/AltStore (restores the string catalogs afterwards)
+cd ios && sh tools/build-ipa.sh
 ```
+
+No iOS simulator runtime installed? Typecheck the whole app with `xcrun --sdk iphonesimulator swiftc -typecheck -target arm64-apple-ios17.0-simulator -swift-version 5 -module-name Freeband $(find ios/Freeband -name "*.swift")`, and render a view to PNG through Mac Catalyst (`swiftc -target arm64-apple-ios17.0-macabi` with the iOSSupport frameworks and `ImageRenderer`) to look at a drawing.
 
 The contract test (`ios/tests/contract`) writes into `hub/test/fixtures`; pass it another folder unless you mean to update those fixtures.
 
