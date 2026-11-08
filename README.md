@@ -104,6 +104,8 @@ Freeband isn't on the App Store yet, so for now you build it from source. You ne
    - Turn on Developer Mode on the iPhone.
    - Pick the iPhone as the run destination and press Run.
    - Trust your developer certificate under Settings → General → VPN & Device Management.
+
+   With SideStore or AltStore on the iPhone, you can skip steps 4 and 5: `sh tools/build-ipa.sh` (from `ios/`) writes an unsigned `build/Freeband.ipa`, which they sign with your Apple ID when you install it. AirDropped to the iPhone, the file lands in Files › Downloads.
 6. **Read the key.** In Freeband, tap Get started, then Choose folder, then go to Browse → On My iPhone → Mi Fitness → Open.
 7. **Connect.** Close Mi Fitness from the app switcher, keep the band close and tap Connect.
 8. **Keep Mi Fitness out of the way.** Turn off its Background App Refresh or offload it (see below).
