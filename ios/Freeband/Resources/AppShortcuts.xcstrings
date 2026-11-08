@@ -1,46 +1,75 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "${applicationName} find my band": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bandımı bul ${applicationName}"
+  "sourceLanguage" : "en",
+  "strings" : {
+    "${applicationName} find my band" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bandımı bul ${applicationName}"
           }
         }
       }
     },
-    "Find my band with ${applicationName}": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "${applicationName} ile bandımı bul"
+    "Find my band with ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Find my band with ${applicationName}",
+              "${applicationName} find my band"
+            ]
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "${applicationName} ile bandımı bul"
           }
         }
       }
     },
-    "Send a message to my band with ${applicationName}": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "${applicationName} ile bandıma mesaj gönder"
+    "Send a message to my band with ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Send a message to my band with ${applicationName}"
+            ]
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "${applicationName} ile bandıma mesaj gönder"
           }
         }
       }
     },
-    "Sync my band with ${applicationName}": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "${applicationName} ile bandımı senkronize et"
+    "Sync my band with ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Sync my band with ${applicationName}"
+            ]
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "${applicationName} ile bandımı senkronize et"
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }
