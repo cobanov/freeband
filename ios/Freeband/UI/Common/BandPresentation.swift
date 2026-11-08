@@ -41,10 +41,11 @@ enum BandPresentation {
     }
 
     static func model(_ band: Band) -> BandRender.Model {
-        // By name, like Band.shortName: the watches share the band10 model code.
+        // By name, like Band.shortName: the watches and the Band 8 share the band10 model code.
         switch Band.family(name: band.name, model: band.model) {
         case .band10: .band10
         case .band10Pro: .band10Pro
+        case .band8: .band8
         case .redmiWatch5Active: .redmiWatch5Active
         case .watchS1Active: .watchS1Active
         }
