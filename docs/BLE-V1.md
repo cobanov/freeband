@@ -1,6 +1,6 @@
 # BLE V1: the older Xiaomi channel
 
-Status: protocol notes for Freeband's V1 transport. Everything below except section 2 comes from reading Gadgetbridge; nothing has been sent to a device over V1 yet.
+Status: protocol notes for Freeband's V1 transport, written from Gadgetbridge before the first test. Sections 2 and 10 record what the watch showed; Freeband now logs in and syncs over V1.
 Measured device: Xiaomi Watch S1 Active, Bluetooth name `XiaomiWatchS1Active 6373`, 2026-11-08.
 Source: Gadgetbridge `master`, commit `db008768` (2026-11-07).
 
@@ -117,11 +117,19 @@ The body is a protobuf `Command`, as on V2, but with nothing in front of it: V1 
 - **Activity files:** messages on `0053` go to the same activity fetcher that V2's channel 5 feeds, so Freeband's `ActivityAssembler` and parsers apply unchanged. [CODE] `PV1:113`
 - **Releasing the channel:** turn notifications off on every characteristic so Mi Fitness can take over (`findings.md` §5.4).
 
-## 10. To check on the watch
+## 10. Checked on the watch
 
-1. Authentication with `device_type = iOS` succeeds over V1.
-2. The watch encrypts with counter 0 (section 8).
-3. The watch accepts writes of iOS's `maximumWriteValueLength`.
-4. The watch's acknowledgements arrive on the characteristic that was written.
-5. Find band: Gadgetbridge marks it unsupported on the S1 Active. [CODE] `W/XiaomiWatchS1ActiveCoordinator.java:51-54`
-6. Which activity file versions the watch lists.
+Xiaomi Watch S1 Active, model `M2116W1`, firmware `1.4.174`, 2026-11-08. iOS reported 509-byte writes.
+
+| Question | Result |
+|---|---|
+| Authentication over V1 with `device_type = iOS` | works [MEASURED] |
+| The watch encrypts with counter 0 (section 8) | yes: its encrypted replies decrypt with matching tags [MEASURED] |
+| Where acknowledgements and replies arrive | acknowledgements on the characteristic written (`0052`), replies on `0051` [MEASURED] |
+| Commands | device info, live stats and both file lists answer; the clock command gets no reply [MEASURED] |
+| Activity files | arrive on `0053` and pass the CRC: daily details v3, daily summary v4, sleep details v2, manual samples v2, and subtype 10 v1 (14 bytes; unknown to Gadgetbridge too) [MEASURED] |
+
+Still open:
+
+1. A write near the 509-byte maximum: so far every outgoing message was a short single write.
+2. Find band: Gadgetbridge marks it unsupported on the S1 Active. [CODE] `W/XiaomiWatchS1ActiveCoordinator.java:51-54`

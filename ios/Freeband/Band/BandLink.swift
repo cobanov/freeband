@@ -12,9 +12,10 @@ struct BandTarget {
 }
 
 /// One BLE session with a band at a time: find it (iOS connection or advertisement), open an
-/// SPP v2 session on FE95/005E/005F, authenticate as an iOS companion, read battery and live
-/// stats, then always hand the channel back (unsubscribe 005E, release the connection) so
-/// Mi Fitness keeps working. Protocol details: findings.md, sections 4–6.
+/// SPP v2 session on FE95/005E/005F (or, on older bands, the V1 channel 0051/0052/0053),
+/// authenticate as an iOS companion, read battery and live stats, then always hand the channel
+/// back (unsubscribe, release the connection) so Mi Fitness keeps working. Protocol details:
+/// findings.md, sections 4–6; V1: docs/BLE-V1.md.
 final class BandLink: NSObject, ObservableObject {
     /// `send` authenticates, sends the given protobuf commands encrypted, then lets go.
     enum Purpose: Equatable { case check, sync, live, send([Data]) }
@@ -53,9 +54,9 @@ final class BandLink: NSObject, ObservableObject {
         case timeout
         case disconnected
         case connectFailed
-        /// The band does not expose FE95/005E/005F.
+        /// The band exposes neither FE95/005E/005F (V2) nor FE95/0051/0052/0053 (V1).
         case channelUnavailable
-        /// Subscribing to 005E failed.
+        /// Turning on notifications (005E, or the V1 characteristics) failed.
         case channelRefused
         /// The session ended (stopped) before the band was read.
         case notRead
@@ -137,9 +138,16 @@ final class BandLink: NSObject, ObservableObject {
     static let fe95 = CBUUID(string: "FE95")
     static let rxUUID = CBUUID(string: "005E")
     static let txUUID = CBUUID(string: "005F")
-    /// The older BLE V1 channel (Mi Band 8, Xiaomi Watch S1 Active): command read, command write,
-    /// activity data. Not spoken yet; only recognized so the log can say so.
-    static let v1UUIDs = ["0051", "0052", "0053"].map { CBUUID(string: $0) }
+    /// The older BLE V1 channel (Mi Band 8, Xiaomi Watch S1 Active; docs/BLE-V1.md): the watch's
+    /// commands arrive on 0051, the phone writes commands to 0052, activity files arrive on 0053.
+    static let v1CommandRead = CBUUID(string: "0051")
+    static let v1CommandWrite = CBUUID(string: "0052")
+    static let v1Activity = CBUUID(string: "0053")
+    static let v1UUIDs = [v1CommandRead, v1CommandWrite, v1Activity]
+    /// Data upload (watch faces, firmware): not used, but subscribed when present, as Gadgetbridge does.
+    static let v1Upload = CBUUID(string: "0055")
+    /// The order Gadgetbridge turns notifications on in (docs/BLE-V1.md section 4).
+    static let v1SubscribeOrder = [v1CommandWrite, v1CommandRead, v1Activity, v1Upload]
     static let liveLimit: TimeInterval = 120
     static let syncWindow: TimeInterval = 12
     /// Upper bound for a sync that also fetches activity files.
@@ -182,8 +190,20 @@ final class BandLink: NSObject, ObservableObject {
     private var rx: CBCharacteristic?
     private var tx: CBCharacteristic?
     private var buffer: [UInt8] = []
-    private var writeQueue: [Data] = []
+    /// Values waiting for the peripheral to accept writes without response, each with its characteristic.
+    private var writeQueue: [(value: Data, characteristic: CBCharacteristic)] = []
     private var seq: UInt8 = 0
+
+    /// The channel this connection speaks: V2 (005E/005F) or the older V1 (0051/0052/0053).
+    private enum Transport { case v2, v1 }
+    private var transport = Transport.v2
+    /// V1: the three characteristics, and one MiV1Channel each, by UUID.
+    private var v1Characteristics: [CBUUID: CBCharacteristic] = [:]
+    private var v1Channels: [CBUUID: MiV1Channel] = [:]
+    /// V1: the latest missing-slice timer per characteristic; `sliceTimerSerial` never resets, so a
+    /// timer from before a reconnect never matches.
+    private var sliceTimers: [CBUUID: Int] = [:]
+    private var sliceTimerSerial = 0
     /// Data frames by sequence number, kept so a NACK can resend them; the UInt8 key bounds it to 256.
     private var sentFrames: [UInt8: Data] = [:]
     private var phoneNonce = Data()
@@ -230,14 +250,7 @@ final class BandLink: NSObject, ObservableObject {
         battery = nil
         log = []
         peripheral = nil
-        rx = nil
-        tx = nil
-        buffer = []
-        writeQueue = []
-        seq = 0
-        sentFrames = [:]
-        keys = nil
-        phoneNonce = Data()
+        resetConnection()
         authed = false
         finishing = false
         realtimeOn = false
@@ -417,10 +430,15 @@ final class BandLink: NSObject, ObservableObject {
                 return
             }
             keys = result.keys
+            // V1 decrypts the watch's messages from here on, but encrypts its own only once the
+            // watch accepts step 2 (docs/BLE-V1.md section 6).
+            for uuid in Array(v1Channels.keys) { v1Channels[uuid]?.cipher = MiV1Cipher(keys: result.keys) }
             note("→ auth 2/2")
             sendCommand(result.command, encrypted: false)
 
         case (MiAuth.commandTypeAuth, MiAuth.subtypeAuth):
+            // V1: encrypt from now on, counting from 1, on every characteristic (docs/BLE-V1.md section 8).
+            for uuid in Array(v1Channels.keys) { v1Channels[uuid]?.authenticated() }
             didAuthenticate()
 
         case (2, 1):
@@ -609,18 +627,11 @@ final class BandLink: NSObject, ObservableObject {
     /// Drops the session and opens a new one within the same run; sync state is kept.
     private func reconnect() {
         if let p = peripheral {
-            if let rx, rx.isNotifying { p.setNotifyValue(false, for: rx) }
+            unsubscribe(p)
             central.cancelPeripheralConnection(p)
         }
         peripheral = nil
-        rx = nil
-        tx = nil
-        buffer = []
-        writeQueue = []
-        seq = 0
-        sentFrames = [:]
-        keys = nil
-        phoneNonce = Data()
+        resetConnection()
         let thisRun = run
         after(1.0, thisRun) { [weak self] in self?.locate(thisRun) }
     }
@@ -683,15 +694,45 @@ final class BandLink: NSObject, ObservableObject {
         writeQueue = []
         if central.isScanning { central.stopScan() }
         if let p = peripheral {
-            if let rx, rx.isNotifying { p.setNotifyValue(false, for: rx) }
+            unsubscribe(p)
             central.cancelPeripheralConnection(p)
         }
         note("channel released")
     }
 
+    /// Notifications off on every characteristic this connection turned them on for.
+    private func unsubscribe(_ p: CBPeripheral) {
+        let subscribed = [rx].compactMap { $0 } + Array(v1Characteristics.values)
+        for characteristic in subscribed where characteristic.isNotifying {
+            p.setNotifyValue(false, for: characteristic)
+        }
+    }
+
+    /// Forgets everything tied to one connection: characteristics, framing state, session keys.
+    private func resetConnection() {
+        rx = nil
+        tx = nil
+        buffer = []
+        writeQueue = []
+        seq = 0
+        sentFrames = [:]
+        keys = nil
+        phoneNonce = Data()
+        transport = .v2
+        v1Characteristics = [:]
+        v1Channels = [:]
+        sliceTimers = [:]
+    }
+
     // MARK: frames
 
     private func sendCommand(_ protobuf: Data, encrypted: Bool) {
+        if transport == .v1 {
+            // The V1 channel encrypts once the watch has accepted the login, which is exactly when
+            // callers pass `encrypted: true`.
+            v1Step(Self.v1CommandWrite) { $0.send(protobuf) }
+            return
+        }
         var body = protobuf
         if encrypted, let keys { body = MiCrypto.ctr(key: keys.encryptionKey, protobuf) }
         let payload = Data([0x01, encrypted ? 0x02 : 0x01]) + body
@@ -702,20 +743,21 @@ final class BandLink: NSObject, ObservableObject {
     }
 
     private func send(_ frame: Data) {
-        guard let p = peripheral else { return }
+        guard let p = peripheral, let tx else { return }
         let size = max(20, p.maximumWriteValueLength(for: .withoutResponse))
         var offset = 0
         while offset < frame.count {
-            writeQueue.append(frame.subdata(in: offset..<min(offset + size, frame.count)))
+            writeQueue.append((frame.subdata(in: offset..<min(offset + size, frame.count)), tx))
             offset += size
         }
         pump()
     }
 
     private func pump() {
-        guard let p = peripheral, let tx else { return }
+        guard let p = peripheral else { return }
         while !writeQueue.isEmpty, p.canSendWriteWithoutResponse {
-            p.writeValue(writeQueue.removeFirst(), for: tx, type: .withoutResponse)
+            let next = writeQueue.removeFirst()
+            p.writeValue(next.value, for: next.characteristic, type: .withoutResponse)
         }
     }
 
@@ -756,12 +798,77 @@ final class BandLink: NSObject, ObservableObject {
             receiveActivityChunk(body)
             return
         }
-        guard channel == 1, let command = PBMessage(body) else { return }
+        guard channel == 1 else { return }
+        handleCommandBytes(body)
+    }
+
+    /// One protobuf Command from the band, over either channel.
+    private func handleCommandBytes(_ body: Data) {
+        guard let command = PBMessage(body) else { return }
         if command.varints[1] == 2, command.varints[2] == 110 {
             // Unknown everywhere (docs/CAPABILITIES.md §16); keep the bytes for decoding later.
             note("← 2/110 \(body.count) bytes: \(body.map { String(format: "%02x", $0) }.joined())")
         }
         handle(command)
+    }
+
+    // MARK: V1 (docs/BLE-V1.md)
+
+    /// Runs one step of a V1 channel: writes what it returns to the same characteristic, then acts
+    /// on its events. The channel is stored back first, since an event can send more.
+    private func v1Step(_ uuid: CBUUID, _ step: (inout MiV1Channel) -> MiV1Channel.Output) {
+        guard var channel = v1Channels[uuid], let characteristic = v1Characteristics[uuid] else { return }
+        // iOS may settle the MTU after discovery; a chunked message in flight keeps its own slice size.
+        if let p = peripheral { channel.maxWrite = p.maximumWriteValueLength(for: .withoutResponse) }
+        let out = step(&channel)
+        v1Channels[uuid] = channel
+        for value in out.writes {
+            if !authed { note("→ \(uuid.uuidString) \(Self.hexPrefix(value))") }
+            writeQueue.append((value, characteristic))
+        }
+        pump()
+        armSliceTimer(uuid)
+        for event in out.events where active { v1Handle(event, from: uuid) }
+    }
+
+    private func v1Handle(_ event: MiV1Channel.Event, from uuid: CBUUID) {
+        switch event {
+        case .message(let body):
+            switch uuid {
+            case Self.v1Activity: receiveActivityChunk(body)
+            case Self.v1CommandRead, Self.v1CommandWrite: handleCommandBytes(body)
+            default: note("← \(uuid.uuidString) \(body.count) bytes, not used")
+            }
+        case .acknowledged(let accepted):
+            if !accepted { note("← \(uuid.uuidString) refused a message") }
+        case .undecryptable(let count):
+            note("← \(uuid.uuidString) \(count) bytes didn't decrypt")
+        case .unexpected(let what):
+            note("← \(uuid.uuidString) \(what)")
+        }
+    }
+
+    /// A V1 chunked message that stops partway: ask for the missing slices every 5 s until it is
+    /// complete (docs/BLE-V1.md section 7).
+    private func armSliceTimer(_ uuid: CBUUID) {
+        guard v1Channels[uuid]?.isReceiving == true else {
+            sliceTimers[uuid] = nil
+            return
+        }
+        sliceTimerSerial += 1
+        let serial = sliceTimerSerial
+        sliceTimers[uuid] = serial
+        after(5, run) { [weak self] in
+            guard let self, self.active, self.sliceTimers[uuid] == serial else { return }
+            self.note("← \(uuid.uuidString) slices missing, asking again")
+            self.v1Step(uuid) { $0.requestMissing() }
+        }
+    }
+
+    /// Up to `limit` bytes as hex, for the log.
+    static func hexPrefix(_ data: Data, limit: Int = 48) -> String {
+        let shown = data.prefix(limit).map { String(format: "%02x", $0) }.joined()
+        return data.count > limit ? "\(shown)… (\(data.count) bytes)" : shown
     }
 
     // MARK: helpers
@@ -857,35 +964,79 @@ extension BandLink: CBPeripheralDelegate {
         guard active else { return }
         let found = service.characteristics ?? []
         if let error { note("FE95 characteristics: \(error.localizedDescription)") }
-        note("FE95 has \(found.count) characteristic(s)")
-        for characteristic in found {
-            note("  \(characteristic.uuid.uuidString): \(Self.propertyNames(characteristic.properties))")
+        if !authed {
+            // What the band offers, once per sync (a reconnect for the next file doesn't repeat it).
+            note("FE95 has \(found.count) characteristic(s)")
+            for characteristic in found {
+                note("  \(characteristic.uuid.uuidString): \(Self.propertyNames(characteristic.properties))")
+            }
         }
         rx = found.first { $0.uuid == Self.rxUUID }
         tx = found.first { $0.uuid == Self.txUUID }
-        guard let rx, tx != nil else {
-            if Set(Self.v1UUIDs).isSubset(of: Set(found.map(\.uuid))) {
-                note("BLE V1 channel (0051/0052/0053) present; Freeband speaks only BLE V2 (005E/005F)")
-            }
+        if let rx, tx != nil {
+            transport = .v2
+            peripheral.setNotifyValue(true, for: rx)
+            return
+        }
+        // No V2: the older V1 channel, with notifications on 0051/0052/0053, and 0055 when the band
+        // has it (docs/BLE-V1.md section 4).
+        guard Self.v1UUIDs.allSatisfy({ uuid in found.contains { $0.uuid == uuid } }) else {
             fail(.channelUnavailable)
             return
         }
-        peripheral.setNotifyValue(true, for: rx)
+        transport = .v1
+        let maxWrite = peripheral.maximumWriteValueLength(for: .withoutResponse)
+        note("BLE V1 channel, \(maxWrite)-byte writes")
+        for uuid in Self.v1SubscribeOrder {
+            guard let characteristic = found.first(where: { $0.uuid == uuid }) else { continue }
+            v1Characteristics[characteristic.uuid] = characteristic
+            v1Channels[characteristic.uuid] = MiV1Channel(maxWrite: maxWrite)
+            peripheral.setNotifyValue(true, for: characteristic)
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
-        guard active, characteristic.uuid == Self.rxUUID else { return }
-        if error != nil {
-            fail(.channelRefused)
-        } else if characteristic.isNotifying, keys == nil {
-            // keys, not `authed`: a reconnect for the next file keeps `authed` but drops the keys.
-            startSession()
+        guard active else { return }
+        switch transport {
+        case .v2:
+            guard characteristic.uuid == Self.rxUUID else { return }
+            if error != nil {
+                fail(.channelRefused)
+            } else if characteristic.isNotifying, keys == nil {
+                // keys, not `authed`: a reconnect for the next file keeps `authed` but drops the keys.
+                startSession()
+            }
+        case .v1:
+            guard v1Characteristics[characteristic.uuid] != nil else { return }
+            if let error {
+                note("\(characteristic.uuid.uuidString) notifications refused: \(error.localizedDescription)")
+                guard characteristic.uuid == Self.v1Upload else {
+                    fail(.channelRefused)
+                    return
+                }
+                // 0055 is optional: carry on without it.
+                v1Characteristics[Self.v1Upload] = nil
+                v1Channels[Self.v1Upload] = nil
+            }
+            if v1Characteristics.values.allSatisfy(\.isNotifying), keys == nil, phoneNonce.isEmpty {
+                // V1 has no SessionConfig: authentication starts once every subscription is on.
+                phase = .authenticating
+                startAuth()
+            }
         }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard characteristic.uuid == Self.rxUUID, let value = characteristic.value else { return }
-        receive(value)
+        guard let value = characteristic.value else { return }
+        switch transport {
+        case .v2:
+            if characteristic.uuid == Self.rxUUID { receive(value) }
+        case .v1:
+            guard active, v1Characteristics[characteristic.uuid] != nil else { return }
+            // Every value until the watch accepts the login, to debug the handshake.
+            if !authed { note("← \(characteristic.uuid.uuidString) \(Self.hexPrefix(value))") }
+            v1Step(characteristic.uuid) { $0.receive(value) }
+        }
     }
 
     func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
