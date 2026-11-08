@@ -231,6 +231,8 @@ final class BandLink: NSObject, ObservableObject {
     private var requestedFiles: Set<ActivityFileID> = []
     /// The file list did not arrive in time; the sync went on without files.
     private var fileListMissing = false
+    /// Factory file dumps (13/2) already logged in this session, by name.
+    private var factoryDumps: Set<String> = []
 
     override init() {
         super.init()
@@ -264,6 +266,7 @@ final class BandLink: NSObject, ObservableObject {
         receivedFiles = []
         requestedFiles = []
         fileListMissing = false
+        factoryDumps = []
         active = true
         note("start: \(target.name), \(target.keys.count) key(s)")
 
@@ -491,6 +494,15 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
+
+        case (13, 2):
+            // A Xiaomi Watch S1 Active sends these during file fetches. AstroBox calls type 13
+            // Factory and subtype 2 DUMP_FILE: Command.factory(15).file(3){name 1, is_append 2,
+            // data 3} (AstroBox-NG-Module-Pb wear.proto, wear_factory.proto). Not needed for a
+            // sync, so one log line per file name.
+            let name = command.message(15)?.message(3)?.blobs[1].map { String(decoding: $0, as: UTF8.self) }
+            let label = name.map { "\"\($0)\"" } ?? "fields \(command.fieldNumbers)"
+            if factoryDumps.insert(label).inserted { note("← 13/2 factory file dump \(label), not used") }
 
         default:
             note("← \(type)/\(subtype) not handled")
