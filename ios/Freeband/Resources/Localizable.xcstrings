@@ -1649,12 +1649,12 @@
         }
       }
     },
-    "Freeband talks to your Xiaomi Smart Band 10 or 10 Pro directly. No account: your data stays on this phone and only leaves it if you turn that on.": {
+    "Freeband talks to your Xiaomi band or watch directly. No account: your data stays on this phone and only leaves it if you turn that on.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband, Xiaomi Smart Band 10 ya da 10 Pro ile doğrudan konuşur. Hesap gerekmez: verilerin bu telefonda kalır ve sen açmadıkça hiçbir yere gitmez."
+            "value": "Freeband, Xiaomi bilekliğinle ya da saatinle doğrudan konuşur. Hesap gerekmez: verilerin bu telefonda kalır ve sen açmadıkça hiçbir yere gitmez."
           }
         }
       }

@@ -1,13 +1,14 @@
 import SwiftUI
 
 /// The band as Tesla draws the car: a flat vector object, no gradients, no shadows. A pill
-/// body with strap stubs; the 10 Pro has a lighter metal frame; the Redmi Watch 5 Active
-/// is a rounded rectangle. A live overlay on the screen shows the time, battery (with a bolt
+/// body with strap stubs (Band 10); the 10 Pro has a lighter metal frame; the Redmi
+/// Watch 5 Active is a rounded rectangle; the Watch S1 Active is round, with a wide bezel and two
+/// buttons on the right. A live overlay on the screen shows the time, battery (with a bolt
 /// while charging), live heart rate or "Not worn".
 /// The screen is AMOLED black in both themes; the strap and frame follow the theme.
 struct BandRender: View {
     enum Model: String, CaseIterable, Identifiable, Sendable {
-        case band10, band10Pro, redmiWatch5Active
+        case band10, band10Pro, redmiWatch5Active, watchS1Active
 
         var id: String { rawValue }
 
@@ -16,6 +17,7 @@ struct BandRender: View {
             case .band10: "Band 10"
             case .band10Pro: "Band 10 Pro"
             case .redmiWatch5Active: "Redmi Watch 5 Active"
+            case .watchS1Active: "Watch S1 Active"
             }
         }
     }
@@ -36,26 +38,32 @@ struct BandRender: View {
 
     @Environment(\.locale) private var locale
 
-    // Proportions in body widths (Smart Band 10: about 22.6 × 48.3 mm; Redmi Watch 5 Active:
-    // about 38.3 × 45.6 mm).
-    private var bodyAspect: CGFloat { model == .redmiWatch5Active ? 1.19 : 2.14 }
-    private var stub: CGFloat { model == .redmiWatch5Active ? 0.5 : 0.62 }
+    // Proportions in body widths (Smart Band 10: about 22.6 × 48.3 mm;
+    // Redmi Watch 5 Active: about 38.3 × 45.6 mm; Watch S1 Active: a 46.5 mm round case with
+    // 22 mm straps).
+    private var isSquareWatch: Bool { model == .redmiWatch5Active }
+    private var isRoundWatch: Bool { model == .watchS1Active }
+    private var isWatch: Bool { isSquareWatch || isRoundWatch }
+    private var bodyAspect: CGFloat { isSquareWatch ? 1.19 : isRoundWatch ? 1 : 2.14 }
+    private var stub: CGFloat { isSquareWatch ? 0.5 : isRoundWatch ? 0.42 : 0.62 }
 
     private var w: CGFloat { height / (bodyAspect + 2 * stub) }
     private var bodyHeight: CGFloat { w * bodyAspect }
     private var stubLength: CGFloat { w * stub }
-    /// Corner radius of a part inset by `inset`: a capsule on the bands, rounded corners on the watch.
+    /// Corner radius of a part inset by `inset`: a capsule on the bands, a circle on the round
+    /// watch (its body is square), rounded corners on the square watch.
     private func radius(_ inset: CGFloat) -> CGFloat {
-        model == .redmiWatch5Active ? max(w * 0.22 - inset, 0) : (w - 2 * inset) / 2
+        isSquareWatch ? max(w * 0.22 - inset, 0) : (w - 2 * inset) / 2
     }
     /// Circular corners at half the width make the bands' capsule; the watch's corners are continuous.
-    private var cornerStyle: RoundedCornerStyle { model == .redmiWatch5Active ? .continuous : .circular }
-    /// Frame ring around the glass: thicker, metal, on the Pro.
-    private var frame: CGFloat { w * (model == .band10Pro ? 0.085 : 0.06) }
+    private var cornerStyle: RoundedCornerStyle { isSquareWatch ? .continuous : .circular }
+    /// Frame ring around the glass: thicker, metal, on the Pro; a wide bezel on the round watch.
+    private var frame: CGFloat { w * (model == .band10Pro ? 0.085 : isRoundWatch ? 0.1 : 0.06) }
 
     var body: some View {
         ZStack(alignment: .top) {
             straps
+            if isRoundWatch { buttons }
             RoundedRectangle(cornerRadius: radius(0), style: cornerStyle)
                 .fill(Color(uiColor: model == .band10Pro ? FBUIColor.bandFramePro : FBUIColor.bandBody))
                 .frame(width: w, height: bodyHeight)
@@ -71,9 +79,10 @@ struct BandRender: View {
                 .fill(Color(uiColor: FBUIColor.bandScreen))
                 .frame(width: w - 2 * frame - lip * 2, height: bodyHeight - 2 * frame - lip * 2)
                 .offset(y: stubLength + frame + lip)
+            // The round screen narrows towards the top and bottom, so its overlay sits further in.
             screen
-                .frame(width: w * 0.72, height: bodyHeight * 0.76)
-                .offset(y: stubLength + bodyHeight * 0.12)
+                .frame(width: w * (isRoundWatch ? 0.6 : 0.72), height: bodyHeight * (isRoundWatch ? 0.68 : 0.76))
+                .offset(y: stubLength + bodyHeight * (isRoundWatch ? 0.16 : 0.12))
         }
         .frame(width: w, height: height, alignment: .top)
         .accessibilityElement(children: .ignore)
@@ -84,9 +93,28 @@ struct BandRender: View {
 
     private var lip: CGFloat { model == .band10Pro ? w * 0.025 : 0 }
 
+    /// The round watch's two buttons, at about 2 and 4 o'clock, standing out of the case's edge.
+    private var buttons: some View {
+        let length = w * 0.12
+        let thickness = w * 0.07
+        let reach = w / 2 + thickness * 0.15
+        return ZStack {
+            ForEach([-28.0, 28.0], id: \.self) { degrees in
+                let angle = Angle.degrees(degrees)
+                Capsule()
+                    .fill(Color(uiColor: FBUIColor.bandBody))
+                    .frame(width: thickness, height: length)
+                    .rotationEffect(angle)
+                    .offset(x: reach * cos(angle.radians), y: reach * sin(angle.radians))
+            }
+        }
+        .frame(width: w, height: w)
+        .offset(y: stubLength)
+    }
+
     private var straps: some View {
         let strap = Color(uiColor: FBUIColor.bandStrap)
-        let width = w * (model == .redmiWatch5Active ? 0.6 : 0.8)
+        let width = w * (isSquareWatch ? 0.6 : isRoundWatch ? 0.47 : 0.8)
         let overlap = w * 0.5
         let radius = w * 0.16
         return ZStack(alignment: .top) {
@@ -105,7 +133,7 @@ struct BandRender: View {
     private var screen: some View {
         // Hour stacks over minute, so the height bounds the type on the wide watch screen; on the
         // narrow band the width does.
-        let s = model == .redmiWatch5Active ? bodyHeight * 0.45 : w * 0.72
+        let s = isWatch ? bodyHeight * 0.45 : w * 0.72
         let text = Color(uiColor: FBUIColor.bandScreenText)
         let dim = Color(uiColor: FBUIColor.bandScreenDim)
         return VStack(spacing: 0) {
@@ -201,6 +229,7 @@ struct BandSilhouette: Shape {
             BandRender(model: .band10Pro, state: .init(time: .now, battery: 82, charging: true, heartRate: 72))
             BandRender(model: .band10, state: .init(time: .now, battery: 41, worn: false))
             BandRender(model: .redmiWatch5Active, state: .init(time: .now, battery: 39, heartRate: 64))
+            BandRender(model: .watchS1Active, state: .init(time: .now, battery: 30, heartRate: 52))
         }
         .frame(maxWidth: .infinity)
     }

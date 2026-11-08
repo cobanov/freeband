@@ -298,6 +298,22 @@ func run() async {
     equal("variant parsing", [DemoData.variant(["app", "-freeband-demo"]), DemoData.variant(["app", "-freeband-demo", "empty"]),
                               DemoData.variant(["app", "-freeband-demo", "calibrating"]), DemoData.variant(["app"])],
           [.full, .empty, .calibrating, nil])
+
+    section("band names")
+    // Mi Fitness names and Bluetooth names, as the bands and watches give them.
+    let bandNames: [(String, Band.Family, String)] = [
+        ("Xiaomi Smart Band 10", .band10, "band10"),
+        ("Xiaomi Smart Band 10 Pro D9B9", .band10Pro, "band10pro"),
+        ("Redmi Watch 5 Active D3DD", .redmiWatch5Active, "band10"),
+        ("Xiaomi Watch S1 Active", .watchS1Active, "band10"),
+        ("XiaomiWatchS1Active 6373", .watchS1Active, "band10"),
+    ]
+    for (name, family, code) in bandNames {
+        equal(name, Band.family(name: name), family)
+        equal("\(name) model code", Band.modelCode(for: name), code)
+    }
+    equal("short name", Band(name: "XiaomiWatchS1Active 6373", mac: nil).shortName, "Watch S1 Active")
+    equal("display name", Band.displayName(name: "Xiaomi Watch S1 Active", mac: "D0:62:2C:4A:63:73"), "Watch S1 Active (6373)")
 }
 
 Task { @MainActor in
