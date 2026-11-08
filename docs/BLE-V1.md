@@ -129,6 +129,7 @@ Xiaomi Watch S1 Active, model `M2116W1`, firmware `1.4.174`, 2026-11-08. iOS rep
 | Commands | device info, live stats and both file lists answer; the clock command gets no reply [MEASURED] |
 | Activity files | arrive on `0053` and pass the CRC: daily details v3, daily summary v4, sleep details v2, manual samples v2, and subtype 10 v1 (14 bytes; unknown to Gadgetbridge too) [MEASURED] |
 | Empty files | a day without manual readings gives a 12-byte manual-samples file: id, pad and CRC only (`docs/ACTIVITY.md`) [MEASURED] |
+| Sleep | a sleep details v2 file covering the second of the night's two sessions (the first had no file on the watch), with no summary or stages; the session is in the fell-asleep/woke-up events, not the header (`docs/ACTIVITY.md`) [MEASURED] |
 | Command 13/2 | about ten during each file fetch; AstroBox calls it Factory `DUMP_FILE` [MEASURED], meaning [UNVERIFIED] |
 
 Still open:

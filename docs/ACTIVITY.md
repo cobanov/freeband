@@ -403,6 +403,8 @@ Akış, 17 baytlık başlığı olan paketlerden oluşur. Başlık **sihirli de�
 - **Gece birden çok kez gönderiliyor** [GERÇEK, v6]: aynı `ts` (`bedTime`) ile bir ara tip-16/17 çifti (gece ortasında, o ana kadarki evreler) ve uyanınca son çift geliyor; son tip-17, ilkini önek olarak içeriyor. Evreler birleştirilirse çakışır. Freeband her `ts` için **son** tip-17 paketini kullanıyor (`nightStages`), dakikalar son tip-16'dan.
 - Bilinen tipler: 0 `acc_unk`, 1 `ppg_unk` (RR aralıkları), 2 `fall_asleep`, 3 `wake_up`, 12/13 `switch_ts_unk`, 16 özet, 17 evreler. (`:211-219`)
 - `ts` birimi karışık: "sometimes in seconds and other times in nanoseconds. Message types 16 and 17 are in seconds" (`:204-205`). Tip 1 için Gadgetbridge `ts`'i **milisaniye** gibi kullanıyor (`:235-240`). [TAHMİN: tip 1'in birimi kesin değil]
+- **Xiaomi Watch S1 Active, v2** [ÖLÇÜM, 2026-11-08]: tip 1, 2, 3 ve 101'de `ts` **milisaniye**, tip 0, 9 ve 10'da **nanosaniye**. Freeband birimi büyüklükten çıkarıyor (`SleepDetails.packetSeconds`).
+- **Uykuya dalma / uyanma olayları** [ÖLÇÜM, S1 Active v2]: dosyada tip-16 özet ve tip-17 evre yok; başlık 09:52-12:38 diyor, ama tip 2/3 çiftleri 08:52-09:24, 09:52-11:48, 11:50-12:38. Saat aynı oturumu 08:52-12:38, 3 sa 16 dk uyku olarak gösteriyor: olaylar doğru, başlığın yatış saati sonraki bir dalışa denk geliyor. Gadgetbridge 2/3'ü atlıyor ve başlığı kullanıyor. Freeband özet ve evre olmayan dosyada oturumu olaylardan kuruyor: ilk dalıştan son uyanışa, aralar uyanık dakika (`sessionFromSpans`).
 
 Tip 17, evreler (`:284-299`): `dataLen / 2` tane u16 BE kelime. Her kelime:
 

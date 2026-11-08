@@ -303,6 +303,7 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
             "hr": blockJSON(s.heartRate) { jInt($0) }, "spo2": blockJSON(s.spo2) { jInt($0) },
             "snore": blockJSON(s.snore) { .double(Double($0)) },
             "skipped_bytes": jInt(s.skippedBytes), "trailing_bytes": jInt(s.trailingBytes),
+            "sleep_spans": .array(s.sleepSpans.map { .array([jTime($0.start), jTime($0.end)]) }),
             "packets": .array(s.packets.map { p -> JSON in
                 var x: [String: JSON] = ["type": jInt(p.type), "ts": .int(p.tsRaw), "parity": jInt(p.parity), "header_len": jInt(p.headerLength)]
                 if let f = p.flags { x["flags"] = jInt(f) }
@@ -938,6 +939,62 @@ check("daily summary accessors (v5 all bits set)") {
         + expect(s.hrMaxTs == Date(timeIntervalSince1970: 1_700_001_000) && s.spo2MinTs == Date(timeIntervalSince1970: 1_700_004_000), "times")
         + expect(s.standingHours == [0, 8, 16] && s.vitalityCurrent == 280 && s.slots.count == 32, "standing \(String(describing: s.standingHours))")
         + expect(s.day == fid(summaryV5)?.ts && s.tzQuarterHours == 4, "day")
+}
+
+/// A sleep packet: magic | header length 17 | ts i64 LE | parity | type | length u16 BE | payload.
+func sleepPacket(_ type: UInt8, ts: Int64, payload: [UInt8] = []) -> [UInt8] {
+    [0xFB, 0xFA, 0xFC, 0xFF, 17] + (0 ..< 8).map { UInt8(truncatingIfNeeded: ts >> Int64(8 * $0)) }
+        + [0, type, UInt8(payload.count >> 8), UInt8(payload.count & 0xFF)] + payload
+}
+
+/// A Xiaomi Watch S1 Active sleep details v2 file as it came on 2026-11-08 (UTC+1), packets
+/// thinned out: header 09:52-12:38, no summary, no stages, fell-asleep/woke-up events in ms
+/// at 08:52/09:24, 09:52/11:48, 11:50/12:38, a type-10 packet in ns. The watch showed this
+/// session as 08:52-12:38, 3 h 16 min asleep. `extra` goes after the events.
+func s1ActiveSleep(extra: [UInt8] = []) -> Data {
+    let id = ActivityFileID(timestamp: 1_794_137_880, tzQuarterHours: 4, version: 2, type: 0, subtype: 8, detailType: 0)
+    var body: [UInt8] = [0x00, 1] + le32(1_794_127_920) + le32(1_794_137_880)
+    body += sleepPacket(10, ts: 1_794_123_302_347_000_000, payload: [0x59, 0x07, 0x92, 0x00])
+    for (type, ms) in [(2, 1_794_124_320_000), (3, 1_794_126_240_000), (2, 1_794_127_920_000),
+                       (3, 1_794_134_880_000), (2, 1_794_135_000_000), (3, 1_794_137_880_000)] as [(UInt8, Int64)] {
+        body += sleepPacket(type, ts: ms)
+    }
+    return makeFile(id, body: body + extra)
+}
+
+check("packet timestamps in s, ms, µs and ns all become Unix seconds") {
+    let s: Int64 = 1_794_124_320
+    return expect([s, s * 1000 + 999, s * 1_000_000, s * 1_000_000_000 + 347].map(SleepDetails.packetSeconds) == [s, s, s, s], "units")
+}
+
+check("S1 Active sleep v2: no summary or stages, so the session comes from the fell-asleep/woke-up events") {
+    guard case let .sleepDetails(s) = parsed(s1ActiveSleep()).payload, let session = s.session else { return ["parse"] }
+    let at = { (t: Int) in Date(timeIntervalSince1970: TimeInterval(t)) }
+    return expect(s.sleepSpans.map { [$0.start, $0.end] } == [[at(1_794_124_320), at(1_794_126_240)],
+                                                             [at(1_794_127_920), at(1_794_134_880)],
+                                                             [at(1_794_135_000), at(1_794_137_880)]], "spans \(s.sleepSpans)")
+        + expect(s.sessionFromSpans && s.bedTime == at(1_794_127_920), "header bed time stays 09:52")
+        + expect(session.bedTime == at(1_794_124_320) && session.wakeTime == at(1_794_137_880), "08:52-12:38: \(session)")
+        + expect(session.awakeMinutes == 30 && session.deepMinutes == nil && session.lightMinutes == nil && session.remMinutes == nil,
+                 "30 min awake, no stages: \(session)")
+}
+
+check("a type-16 summary keeps the header session even when events are present") {
+    // b0, sleep, awake, light, rem, deep (u16 BE), flags, unknown
+    let summary: [UInt8] = [0x12, 0, 166, 0, 0, 0, 166, 0, 0, 0, 0, 0, 0]
+    guard case let .sleepDetails(s) = parsed(s1ActiveSleep(extra: sleepPacket(16, ts: 1_794_137_880, payload: summary))).payload,
+          let session = s.session else { return ["parse"] }
+    return expect(!s.sessionFromSpans && session.bedTime == s.bedTime && session.lightMinutes == 166, "\(session)")
+}
+
+check("unpaired events: a lone wake-up is dropped, a second fall-asleep keeps the first") {
+    let base: Int64 = 1_794_124_320
+    let packets = [(3, 100), (2, 200), (2, 300), (3, 400), (2, 500)].map { (type, t) in
+        SleepPacket(type: UInt8(type), tsRaw: (base + Int64(t)) * 1000, parity: 0, headerLength: 17, flags: 0, length: nil, payload: nil)
+    }
+    let spans = SleepDetails.sleepSpans(packets)
+    return expect(spans.map { [$0.start.timeIntervalSince1970, $0.end.timeIntervalSince1970] } == [[Double(base + 200), Double(base + 400)]],
+                  "\(spans)")
 }
 
 check("sleep details v5: session minutes from the type-16 summary, stages with durations") {

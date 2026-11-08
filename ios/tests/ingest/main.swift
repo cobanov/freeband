@@ -261,6 +261,32 @@ if let (_, out) = output("sleep stages v2 with no data") {
     check("no data, no sleep", out.sleeps.isEmpty)
     equal("still parsed", out.status, .parsed)
 }
+do {
+    // Xiaomi Watch S1 Active, 2026-11-08: sleep details v2 with no summary or stages, header
+    // 09:52-12:38, fell-asleep/woke-up events (ms) 08:52/09:24, 09:52/11:48, 11:50/12:38. The
+    // watch showed 08:52-12:38 and 3 h 16 min asleep.
+    func le32(_ v: UInt32) -> [UInt8] { (0 ..< 4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }
+    func packet(_ type: UInt8, _ ms: Int64) -> [UInt8] {
+        [0xFB, 0xFA, 0xFC, 0xFF, 17] + (0 ..< 8).map { UInt8(truncatingIfNeeded: ms >> Int64(8 * $0)) } + [0, type, 0, 0]
+    }
+    let id = ActivityFileID(timestamp: 1_794_137_880, tzQuarterHours: 4, version: 2, type: 0, subtype: 8, detailType: 0)
+    var bytes = id.bytes + [0, 0x00, 1] + le32(1_794_127_920) + le32(1_794_137_880)
+    for (type, ms) in [(2, 1_794_124_320_000), (3, 1_794_126_240_000), (2, 1_794_127_920_000),
+                       (3, 1_794_134_880_000), (2, 1_794_135_000_000), (3, 1_794_137_880_000)] as [(UInt8, Int64)] {
+        bytes += packet(type, ms)
+    }
+    bytes += le32(ActivityCRC32.checksum(bytes))
+    let out = IngestMapper.map(ActivityParser.parse(Data(bytes)))
+    equal("S1 Active: one sleep", out.sleeps.count, 1)
+    if let s = out.sleeps.first {
+        equal("S1 Active: 08:52-12:38", [s.bedTime, s.wakeTime].map { Int($0.timeIntervalSince1970) }, [1_794_124_320, 1_794_137_880])
+        equal("S1 Active: two wakings", s.wakeCount, 2)
+        equal("S1 Active: not a nap", s.isNap, false)
+        let m = SleepMetricsCalc.compute(s.input, minutes: [], awakeHRMean: nil)
+        equal("S1 Active: asleep and in bed", [m.totalSleepMinutes, m.inBedMinutes], [196, 226])
+        check("S1 Active: efficiency 196/226", abs((m.efficiency ?? 0) - 196.0 / 226.0) < 1e-9, "\(m.efficiency ?? -1)")
+    }
+}
 
 section("naps")
 let noonUTC = DayKey(string: "2026-10-14")!.start(offsetMinutes: 0)

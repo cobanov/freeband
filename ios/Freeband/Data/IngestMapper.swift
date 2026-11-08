@@ -307,7 +307,8 @@ enum IngestMapper {
             hrValues: d.heartRate?.values ?? [],
             spo2Start: d.spo2?.firstTs, spo2IntervalSeconds: d.spo2.map { max($0.unit, 1) } ?? 60,
             spo2Values: d.spo2?.values ?? [],
-            wakeCount: d.summaries.last?.wakeCount, sleepQuality: d.sleepQuality,
+            wakeCount: d.summaries.last?.wakeCount ?? (d.sessionFromSpans ? d.sleepSpans.count - 1 : nil),
+            sleepQuality: d.sleepQuality,
             isNap: isNap(bedTime: session.bedTime, wakeTime: session.wakeTime, tzOffsetMinutes: tz),
             rr: d.rrIntervals.filter { !$0.intervalsMs.isEmpty }.map { RRSegment(tsRaw: $0.tsRaw, intervalsMs: $0.intervalsMs) }
         )

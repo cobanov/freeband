@@ -835,7 +835,8 @@ struct SleepSampleBlock<Value: Equatable & Sendable>: Equatable, Sendable {
 /// One packet of the magic-synchronised stream at the end of a sleep details file.
 struct SleepPacket: Equatable, Sendable {
     let type: UInt8
-    /// i64; seconds for types 16 and 17, unit unclear for others (type 1 looks like ms).
+    /// i64 in a unit that depends on the type: seconds for 16 and 17; in a Xiaomi Watch S1 Active
+    /// file, ms for 1, 2, 3 and 101 and ns for 0, 9 and 10 (SleepDetails.packetSeconds).
     let tsRaw: Int64
     let parity: UInt8
     let headerLength: UInt8
@@ -905,6 +906,8 @@ struct SleepDetails: Equatable, Sendable {
     let nightStages: [SleepStageSample]
     let summaries: [SleepSummaryPacket]
     let rrIntervals: [SleepRRPacket]
+    /// Fell-asleep (type 2) and woke-up (type 3) events paired into spans of sleep, in time order.
+    let sleepSpans: [DateInterval]
     /// Bytes skipped while looking for the packet magic.
     let skippedBytes: Int
     /// Bytes after the last packet (too few for a header, or no magic found).
@@ -912,10 +915,24 @@ struct SleepDetails: Equatable, Sendable {
     /// Set when a packet ran past the end of the file; packets before it are kept.
     let streamError: String?
 
-    /// Minutes come from the last type-16 summary (several can appear; the last one wins), else
-    /// from summing the type-17 stage durations, else nil. Nil when bed or wake time is 0 or
-    /// the wake time precedes the bed time.
+    /// A file with neither a summary nor stages but with fell-asleep/woke-up events takes its
+    /// session from the events. A Xiaomi Watch S1 Active writes such files, and their header can
+    /// start at a later fall-asleep than the session (header 09:52-12:38, events 08:52-09:24,
+    /// 09:52-11:48 and 11:50-12:38, which the watch shows as 08:52-12:38, 3 h 16 min asleep).
+    var sessionFromSpans: Bool { summaries.isEmpty && nightStages.isEmpty && !sleepSpans.isEmpty }
+
+    /// From the events (`sessionFromSpans`): first fall-asleep to last wake-up, with the gaps
+    /// between spans as awake minutes and no stages. Otherwise from the header: minutes from the
+    /// last type-16 summary (several can appear; the last one wins), else from summing the
+    /// type-17 stage durations, else nil; nil when bed or wake time is 0 or the wake time
+    /// precedes the bed time.
     var session: SleepSession? {
+        if sessionFromSpans, let first = sleepSpans.first, let last = sleepSpans.last {
+            let asleep = sleepSpans.reduce(0.0) { $0 + $1.duration }
+            let awake = Int(((last.end.timeIntervalSince(first.start) - asleep) / 60).rounded())
+            return SleepSession(bedTime: first.start, wakeTime: last.end, deepMinutes: nil, lightMinutes: nil,
+                                remMinutes: nil, awakeMinutes: awake, stages: [])
+        }
         guard bedTime.timeIntervalSince1970 > 0, wakeTime.timeIntervalSince1970 > 0, wakeTime >= bedTime else { return nil }
         var deep: Int?, light: Int?, rem: Int?, awake: Int?
         if let s = summaries.last {
@@ -1012,9 +1029,40 @@ struct SleepDetails: Equatable, Sendable {
             heartRate: hr, spo2: spo2, snore: snore, blocksError: blocksError,
             packets: stream.packets, stages: stream.stages,
             nightStages: stream.lastStagesByTs.keys.sorted().flatMap { stream.lastStagesByTs[$0] ?? [] },
-            summaries: stream.summaries, rrIntervals: stream.rr,
+            summaries: stream.summaries, rrIntervals: stream.rr, sleepSpans: sleepSpans(stream.packets),
             skippedBytes: stream.skipped, trailingBytes: stream.trailing, streamError: stream.error
         )
+    }
+
+    /// Packet timestamps to Unix seconds. They come in several units: in a Xiaomi Watch S1 Active
+    /// file, types 1, 2, 3 and 101 are in milliseconds and types 0, 9 and 10 in nanoseconds;
+    /// type 17 is read as seconds, as Gadgetbridge does. The unit is told by the magnitude.
+    static func packetSeconds(_ raw: Int64) -> Int64 {
+        switch raw.magnitude {
+        case 100_000_000_000_000_000...: return raw / 1_000_000_000
+        case 100_000_000_000_000...: return raw / 1_000_000
+        case 100_000_000_000...: return raw / 1_000
+        default: return raw
+        }
+    }
+
+    /// Fell-asleep (type 2) and woke-up (type 3) events paired in time order. A second fall-asleep
+    /// before a wake-up keeps the first; a wake-up with no open span is dropped.
+    static func sleepSpans(_ packets: [SleepPacket]) -> [DateInterval] {
+        let events = packets.filter { $0.type == 2 || $0.type == 3 }
+            .map { (seconds: packetSeconds($0.tsRaw), type: $0.type) }
+            .sorted { ($0.seconds, $0.type) < ($1.seconds, $1.type) }
+        var spans: [DateInterval] = []
+        var start: Int64?
+        for event in events {
+            if event.type == 2 {
+                if start == nil { start = event.seconds }
+            } else if let open = start {
+                if event.seconds > open { spans.append(DateInterval(start: unixDate(open), end: unixDate(event.seconds))) }
+                start = nil
+            }
+        }
+        return spans
     }
 
     private struct Stream {
