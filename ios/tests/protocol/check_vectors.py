@@ -54,7 +54,42 @@ ctr_in = bytes((i * 7) & 0xFF for i in range(40))
 enc = Cipher(algorithms.AES(key), modes.CTR(key)).encryptor()
 start = bytes([1, 1, 3, 0, 1, 0, 0, 2, 2, 0, 0, 0xFC, 3, 2, 0, 0x20, 0, 4, 2, 0, 0x10, 0x27])
 
+# BLE V1 (docs/BLE-V1.md): AES-CCM, nonce = nonce4 | 0 u32 | counter u32 LE; the phone counts from 1,
+# the watch always uses 0. Every value starts with a u16 chunk field; 0 means a control message.
+dec_nonce = okm[32:36]
+def v1_nonce(base, ctr): return base + bytes(4) + ctr.to_bytes(4, "little")
+def to_watch(pt, ctr): return AESCCM(enc_key, tag_length=4).encrypt(v1_nonce(enc_nonce, ctr), pt, None)
+def from_watch(pt): return AESCCM(dec_key, tag_length=4).encrypt(v1_nonce(dec_nonce, 0), pt, None)
+def u16(v): return v.to_bytes(2, "little")
+def w(b): return "w:" + b.hex()
+def slices(body, size): return [w(u16(i // size + 1) + body[i:i + size]) for i in range(0, len(body), size)]
+nonce_cmd = f_varint(1, 1) + f_varint(2, 26) + f_bytes(3, f_bytes(30, f_bytes(1, phone)))
+battery_cmd = f_varint(1, 2) + f_varint(2, 1)
+big, plain30, in_plain = bytes(range(40)), bytes(range(0x80, 0x9E)), b"watch says hi"
+in_big = bytes(255 - i for i in range(41))
+enc_big = u16(1) + to_watch(big, 1)  # chunked and encrypted: the counter goes in front
+in_ct = from_watch(in_big)
+in_slices = [u16(1) + in_ct[:18], u16(2) + in_ct[18:36], u16(3) + in_ct[36:]]
+PLAIN, ENC = b"\0\0\x02\x02", b"\0\0\x02\x01"
+ACK, READY, DONE = w(b"\0\0\x03\0"), w(b"\0\0\x01\x01"), w(b"\0\0\x01\0")
+
 want = {
+    "ccm_decrypt": b"BandProbe companion device test vector!".hex(),
+    "ccm_decrypt_empty": "",
+    "ccm_decrypt_rejects": [True, True],
+    "v1_nonce": "01020304" + "00000000" + "0d0c0b0a",
+    "v1_plain_queue": [[w(PLAIN + nonce_cmd)], [], [w(PLAIN + battery_cmd), "ack:true"]],
+    "v1_enc_single": [[w(ENC + u16(1) + to_watch(battery_cmd, 1))], ["ack:true"],
+                      [w(ENC + u16(2) + to_watch(battery_cmd, 2))]],
+    "v1_enc_chunked": [[w(b"\0\0\0\x01" + u16(3))], slices(enc_big, 18), [slices(enc_big, 18)[1]], ["ack:true"]],
+    "v1_plain_chunked": [[w(b"\0\0\0\0" + u16(2))], slices(plain30, 18), ["ack:false"]],
+    "v1_in_single": [[ACK, "msg:" + in_plain.hex()], [ACK, "msg:" + in_plain.hex()], [ACK, "bad:8"]],
+    "v1_in_enc_frame": (ENC + from_watch(in_plain)).hex(),
+    "v1_in_slices": [s.hex() for s in in_slices],
+    "v1_in_chunked": [[READY], [], ["receiving:true"], [w(b"\0\0\x01\x05" + u16(1) + u16(3))], [],
+                      [DONE, "msg:" + in_big.hex()], ["receiving:false"], []],
+    "v1_unexpected": [["?"], ["?"], ["?"], ["?"]],
+    "v1_auth_reset": [[w(PLAIN + nonce_cmd)], [w(ENC + u16(1) + to_watch(battery_cmd, 1))]],
     "crc_123456789": "bb3d",
     "okm": okm.hex(),
     "ccm_short": AESCCM(key, tag_length=4).encrypt(ccm_nonce, b"hello", None).hex(),
