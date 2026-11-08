@@ -219,6 +219,7 @@ Kurallar [KOD]:
 ```
 
 - Minimum uzunluk 13 bayt (7 + 1 + en az 1 + 4); daha kısası atılır. [KOD] `X/activity/XiaomiActivityFileFetcher.java:114-119`
+- Freeband 12 baytı da kabul ediyor: gövdesi olmayan ve CRC'si tutan dosya **boş** dosyadır (o türden kayıt yok), alınmış sayılır ve `empty` olarak ayrıştırılır. CRC'siz bir girdide boş gövde, kesilmiş dosyadan ayırt edilemediği için hâlâ hata. [ÖLÇÜM] Xiaomi Watch S1 Active, 2026-11-08: manuel ölçüm yapılmayan günün manuel ölçüm dosyası (v2) 12 bayt geldi; bir SpO2 ölçümünden sonra aynı dosya 18 bayt ve 1 kayıt.
 - CRC, **son 4 bayt hariç bütün dosya** üzerinden (id ve pad dahil) hesaplanır ve son 4 bayttaki u32 LE değerle karşılaştırılır. [KOD] `:121-133`, `GB/service/btle/BLETypeConversions.java:229-231`
 - Algoritma `java.util.zip.CRC32`, yani standart CRC-32 (ISO-HDLC / IEEE 802.3 / zlib): polinom `0x04C11DB7`, yansıtılmış hâli `0xEDB88320`, başlangıç `0xFFFFFFFF`, giriş ve çıkış yansıtılmış, son XOR `0xFFFFFFFF`. Kontrol değeri: `"123456789"` → `CBF43926`. [KOD] `GB/util/CheckSums.java:36`, `:105-109`
 - 13 gerçek antrenman dosyası ve 3 gerçek manuel ölçüm paketi bu tanımla doğrulandı (bölüm 11). [TEST]

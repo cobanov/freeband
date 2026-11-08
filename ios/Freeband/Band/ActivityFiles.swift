@@ -136,7 +136,7 @@ struct ActivityByteReader {
 // MARK: - Errors
 
 enum ActivityParseError: Error, Equatable, Sendable, CustomStringConvertible {
-    /// Fewer bytes than id + pad (+ 1 + CRC when the file carries one).
+    /// Fewer bytes than id + pad (+ CRC when the file carries one).
     case fileTooShort(length: Int, minimum: Int)
     case crcMismatch(stored: UInt32, computed: UInt32)
     /// A read ran past the end of the payload; offset is relative to the payload start.
@@ -440,7 +440,7 @@ enum ActivityAssemblyError: Error, Equatable, Sendable, CustomStringConvertible 
     /// The total changed in the middle of a file.
     case totalChanged(num: Int, total: Int, expectedTotal: Int)
     case fileTooLarge(limit: Int)
-    /// Assembled file below id(7) + pad(1) + 1 + CRC(4).
+    /// Assembled file below id(7) + pad(1) + CRC(4).
     case fileTooShort(length: Int)
     case crcMismatch(stored: UInt32, computed: UInt32)
 
@@ -457,7 +457,7 @@ enum ActivityAssemblyError: Error, Equatable, Sendable, CustomStringConvertible 
         case let .fileTooLarge(limit):
             return "file grew past \(limit) bytes"
         case let .fileTooShort(length):
-            return "file of \(length) bytes is shorter than the 13-byte minimum"
+            return "file of \(length) bytes is shorter than the \(ActivityAssembler.minimumFileLength)-byte minimum"
         case let .crcMismatch(stored, computed):
             return "crc stored \(String(stored, radix: 16)) computed \(String(computed, radix: 16))"
         }
@@ -469,7 +469,10 @@ enum ActivityAssemblyError: Error, Equatable, Sendable, CustomStringConvertible 
 /// Stricter than the band requires: any chunk other than the expected next one, or a change of
 /// total, drops the buffer and fails the file. A num == 1 chunk always starts a new file.
 struct ActivityAssembler {
-    static let minimumFileLength = 13
+    /// id(7) + pad(1) + CRC(4). A file with nothing between the pad and the CRC is empty: the band
+    /// has no records of its kind (a Xiaomi Watch S1 Active sends a 12-byte manual-readings file
+    /// for a day without manual readings). Gadgetbridge drops files under 13 bytes.
+    static let minimumFileLength = 12
     static let defaultMaxFileSize = 16 << 20
 
     let maxFileSize: Int
@@ -1306,6 +1309,8 @@ enum ActivityPayload: Equatable, Sendable {
     case sleepDetails(SleepDetails)
     case sleepStages(SleepStages)
     case manualSamples(ManualSamples)
+    /// Nothing between the pad and a matching CRC: the band has no records of this kind.
+    case empty
     case unsupported(ActivityUnsupported)
     case error(ActivityParseError)
 }
@@ -1350,6 +1355,7 @@ struct ActivityParseResult: Sendable, CustomStringConvertible {
         case let .sleepDetails(d): body = "\(d.stages.count) stage(s), \(d.packets.count) packet(s)"
         case let .sleepStages(d): body = d.noData ? "no data" : "\(d.stages.count) phase change(s)"
         case let .manualSamples(d): body = "\(d.samples.count) sample(s)"
+        case .empty: body = "empty"
         case let .unsupported(u): body = u.description
         case let .error(e): body = "error: \(e)"
         }
@@ -1396,7 +1402,10 @@ enum ActivityParser {
 
         let kind = id.kind
         let payload: ActivityPayload
-        if kind.supportedVersions.isEmpty {
+        if body.isEmpty, crc?.ok == true {
+            // Only a checked CRC tells an empty file from one cut short after the pad.
+            payload = .empty
+        } else if kind.supportedVersions.isEmpty {
             payload = .unsupported(.kind(kind))
         } else if !kind.supportedVersions.contains(id.version) {
             payload = .unsupported(.version(kind, id.version))
