@@ -51,7 +51,9 @@ final class ActivityIngest {
     /// Bump when ActivityFiles.swift or IngestMapper changes what a file yields; stored files with
     /// an older version are parsed again at launch.
     /// 3: empty files (id, pad, CRC) parse as empty.
-    static let parserVersion = 3
+    /// 4: sleep details without a summary or stages take their session from the fell-asleep and
+    /// woke-up events (Xiaomi Watch S1 Active).
+    static let parserVersion = 4
 
     let context: ModelContext
 
