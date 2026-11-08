@@ -33,18 +33,37 @@ final class Band {
     var shortName: String { Self.shortName(name: name, model: model) }
     var displayName: String { Self.displayName(name: name, mac: mac) }
 
-    /// A Redmi Watch 5 Active gets band10 too: the hub accepts only band10 and band10pro
-    /// (hub/src/lib/validate.ts), so its pages call it Band 10.
+    /// The watches get band10 too: the hub accepts only band10 and band10pro
+    /// (hub/src/lib/validate.ts), so its pages call them Band 10. `family` tells them apart.
     static func modelCode(for name: String) -> String {
         name.localizedCaseInsensitiveContains("pro") ? "band10pro" : "band10"
     }
 
-    /// The watch advertises as "Redmi Watch 5 Active D3DD". Other Xiaomi watches get the Band 10 name and drawing.
-    static let redmiWatch5Active = "Redmi Watch 5 Active"
+    /// What the band is, for its name and drawing.
+    enum Family: Sendable, CaseIterable {
+        case band10, band10Pro, redmiWatch5Active, watchS1Active
+
+        var shortName: String {
+            switch self {
+            case .band10: "Band 10"
+            case .band10Pro: "Band 10 Pro"
+            case .redmiWatch5Active: "Redmi Watch 5 Active"
+            case .watchS1Active: "Watch S1 Active"
+            }
+        }
+    }
+
+    /// From Mi Fitness's name or the Bluetooth one: "Redmi Watch 5 Active D3DD", "Xiaomi Watch S1
+    /// Active" or "XiaomiWatchS1Active 6373". Anything else is a Band 10 or 10 Pro by its model code.
+    static func family(name: String, model: String? = nil) -> Family {
+        let compact = name.lowercased().filter { !$0.isWhitespace }
+        if compact.contains("redmiwatch5active") { return .redmiWatch5Active }
+        if compact.contains("watchs1active") { return .watchS1Active }
+        return (model ?? modelCode(for: name)) == "band10pro" ? .band10Pro : .band10
+    }
 
     static func shortName(name: String, model: String) -> String {
-        if name.localizedCaseInsensitiveContains(redmiWatch5Active) { return redmiWatch5Active }
-        return model == "band10pro" ? "Band 10 Pro" : "Band 10"
+        family(name: name, model: model).shortName
     }
 
     /// "Band 10 Pro (D9B9)": the suffix is what the band shows in its own Bluetooth name.
