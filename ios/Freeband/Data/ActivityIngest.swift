@@ -50,7 +50,8 @@ struct IngestSummary {
 final class ActivityIngest {
     /// Bump when ActivityFiles.swift or IngestMapper changes what a file yields; stored files with
     /// an older version are parsed again at launch.
-    static let parserVersion = 2
+    /// 3: empty files (id, pad, CRC) parse as empty.
+    static let parserVersion = 3
 
     let context: ModelContext
 

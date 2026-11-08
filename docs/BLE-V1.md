@@ -128,6 +128,7 @@ Xiaomi Watch S1 Active, model `M2116W1`, firmware `1.4.174`, 2026-11-08. iOS rep
 | Where acknowledgements and replies arrive | acknowledgements on the characteristic written (`0052`), replies on `0051` [MEASURED] |
 | Commands | device info, live stats and both file lists answer; the clock command gets no reply [MEASURED] |
 | Activity files | arrive on `0053` and pass the CRC: daily details v3, daily summary v4, sleep details v2, manual samples v2, and subtype 10 v1 (14 bytes; unknown to Gadgetbridge too) [MEASURED] |
+| Empty files | a day without manual readings gives a 12-byte manual-samples file: id, pad and CRC only (`docs/ACTIVITY.md`) [MEASURED] |
 
 Still open:
 

@@ -358,7 +358,7 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
         }
         return .object(o)
 
-    case .unsupported, .error:
+    case .empty, .unsupported, .error:
         return .null
     }
 }
@@ -750,15 +750,19 @@ check("assembler: num 1 in the middle of a file starts over") {
     return expect(a == .success(nil) && b == .success(manualV1File), "\(a) \(b)")
 }
 
-check("assembler: total 0, packet without header, file under 13 bytes, CRC mismatch") {
+check("assembler: total 0, packet without header, empty file, file under 12 bytes, CRC mismatch") {
     var asm = ActivityAssembler()
     var e: [String] = []
     e += expect(asm.feed(chunk(0, 1, [1, 2])) == .failure(.zeroTotal), "zero total")
     _ = asm.feed(chunk(2, 1, [1]))
     e += expect(asm.feed(Data([2, 0, 2])) == .failure(.packetTooShort(length: 3)), "short packet")
     e += expect(!asm.isAssembling, "short packet drops the file")
-    let tiny = makeFile(ActivityFileID(timestamp: 1, version: 1, type: 0, subtype: 0, detailType: 0), body: [])
-    e += expect(asm.feed(chunk(1, 1, Array(tiny))) == .failure(.fileTooShort(length: 12)), "12-byte file")
+    let empty = makeFile(ActivityFileID(timestamp: 1, version: 1, type: 0, subtype: 0, detailType: 0), body: [])
+    e += expect(asm.feed(chunk(1, 1, Array(empty))) == .success(empty), "12-byte empty file")
+    e += expect(asm.feed(chunk(1, 1, Array(empty.prefix(11)))) == .failure(.fileTooShort(length: 11)), "11-byte file")
+    var badEmpty = [UInt8](empty)
+    badEmpty[11] ^= 0x01
+    if case .failure(.crcMismatch) = asm.feed(chunk(1, 1, badEmpty)) {} else { e.append("empty file with a bad CRC") }
     var bad = [UInt8](manualV1File)
     bad[10] ^= 0x01
     let crc = ActivityCRC32.trailer(of: bad)
@@ -823,13 +827,29 @@ check("CRC mismatch is an error and the result keeps the id") {
 
 check("files under the minimum length are errors, never traps") {
     var e: [String] = []
-    for n in 0 ..< 13 {
+    for n in 0 ..< 12 {
         let r = parsed(ddV4.prefix(n))
-        guard case .error(.fileTooShort(n, 13)) = r.payload else { e.append("length \(n): \(r.payload)"); continue }
+        guard case .error(.fileTooShort(n, 12)) = r.payload else { e.append("length \(n): \(r.payload)"); continue }
         e += expect((r.fileID == nil) == (n < 7), "length \(n) id")
     }
+    // 12 bytes cut from a longer file: the trailer isn't a CRC of the first 8
+    if case .error(.crcMismatch) = parsed(ddV4.prefix(12)).payload {} else { e.append("12-byte prefix: \(parsed(ddV4.prefix(12)).payload)") }
     let r = parsed(Data([1, 2, 3, 4, 5, 6, 7]), crc: false)
     e += expect(r.error == .fileTooShort(length: 7, minimum: 8), "no-CRC minimum")
+    return e
+}
+
+check("an empty file (id, pad, matching CRC) parses as empty, whatever its kind; without a CRC it doesn't") {
+    var e: [String] = []
+    let manual = ActivityFileID(timestamp: 1_794_092_412, tzQuarterHours: 4, version: 2, type: 0, subtype: 6, detailType: 0)
+    for id in [manual, fid(ddV4)!, ActivityFileID(timestamp: 1, version: 1, type: 0, subtype: 10, detailType: 0)] {
+        let r = parsed(makeFile(id, body: []))
+        e += expect(r.payload == .empty && r.isParsed && r.fileID == id && r.crc?.ok == true && r.payloadLength == 0,
+                    "\(id.hex): \(r.payload)")
+    }
+    e += expect(parsed(makeFile(manual, body: [])).description == "manual_samples v2: empty", "description")
+    // without a CRC, 8 bytes may be a file cut off after the pad
+    e += expect(parsed(makeFile(manual, body: [], crc: false), crc: false).payload != .empty, "no CRC")
     return e
 }
 
@@ -1090,7 +1110,7 @@ check("random packets into the assembler never trap; completions always pass the
         if case let .complete(file) = asm.add(packet) {
             completions += 1
             if let c = ActivityCRC32.trailer(of: file), c.stored != c.computed { e.append("bad CRC passed") }
-            if file.count < 13 { e.append("short file passed") }
+            if file.count < ActivityAssembler.minimumFileLength { e.append("short file passed") }
         }
     }
     return e + expect(completions > 0, "no completions")

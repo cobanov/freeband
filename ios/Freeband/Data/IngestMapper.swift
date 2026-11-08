@@ -180,7 +180,7 @@ enum IngestMapper {
                 ManualReadingDraft(sourceFileID: hex, ts: sample.ts, day: DayKey(date: sample.ts, offsetMinutes: tz),
                                    kind: sample.kind.rawValue, value: sample.value, celsius: sample.celsius)
             }
-        case .unsupported, .error:
+        case .empty, .unsupported, .error:
             break
         }
         return out

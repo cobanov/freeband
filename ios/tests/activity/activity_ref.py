@@ -230,8 +230,9 @@ def open_file(data: bytes, has_crc: bool = True):
     crc = None
     end = len(data)
     if has_crc:
-        if len(data) < 13:
-            raise FormatError(f"file of {len(data)} bytes is shorter than the 13-byte minimum")
+        # 12 = id + pad + CRC: an empty file (no records of its kind); Gadgetbridge drops under 13
+        if len(data) < 12:
+            raise FormatError(f"file of {len(data)} bytes is shorter than the 12-byte minimum")
         stored = int.from_bytes(data[-4:], "little")
         computed = crc32(data[:-4])
         crc = {"stored": f"{stored:08x}", "computed": f"{computed:08x}", "ok": stored == computed}
@@ -638,7 +639,10 @@ def parse_file(data: bytes, has_crc: bool = True) -> dict:
     fid, pad, body, crc = open_file(data, has_crc)
     kind = kind_of(fid)
     out = {"file_id": fid.to_json(), "kind": kind, "pad": pad, "crc": crc, "payload_len": len(body)}
-    if kind == "daily_details":
+    if not body and crc is not None:
+        # empty file (no records of its kind); only a checked CRC tells it from a cut-off one
+        out["data"] = None
+    elif kind == "daily_details":
         out["data"] = parse_daily_details(fid, body)
     elif kind == "daily_summary":
         out["data"] = parse_daily_summary(fid, body)
