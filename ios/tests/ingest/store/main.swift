@@ -319,6 +319,10 @@ func run() async {
     equal("short names", [Band(name: "XiaomiWatchS1Active 6373", mac: nil).shortName, Band(name: "Xiaomi Smart Band 8", mac: nil).shortName],
           ["Watch S1 Active", "Band 8"])
     equal("display name", Band.displayName(name: "Xiaomi Watch S1 Active", mac: "D0:62:2C:4A:63:73"), "Watch S1 Active (6373)")
+    // The Watch S1 Active accepts Find and doesn't vibrate (firmware 1.4.174).
+    equal("no Find", Band.Family.allCases.filter { !$0.supportsFind }, [.watchS1Active])
+    equal("no Find by name", [Band(name: "XiaomiWatchS1Active 6373", mac: nil).supportsFind, Band(name: "Xiaomi Smart Band 10 Pro", mac: nil).supportsFind],
+          [false, true])
 }
 
 Task { @MainActor in

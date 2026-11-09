@@ -131,8 +131,10 @@ Xiaomi Watch S1 Active, model `M2116W1`, firmware `1.4.174`, 2026-11-08. iOS rep
 | Empty files | a day without manual readings gives a 12-byte manual-samples file: id, pad and CRC only (`docs/ACTIVITY.md`) [MEASURED] |
 | Sleep | a sleep details v2 file covering the second of the night's two sessions (the first had no file on the watch), with no summary or stages; the session is in the fell-asleep/woke-up events, not the header (`docs/ACTIVITY.md`) [MEASURED] |
 | Command 13/2 | about ten during each file fetch; AstroBox calls it Factory `DUMP_FILE` [MEASURED], meaning [UNVERIFIED] |
+| Notifications (Command 7/0) | shown on the watch [MEASURED, 2026-11-09] |
+| Find (Command 2/18) | acknowledged, but the watch doesn't vibrate; Gadgetbridge marks Find unsupported on it [CODE] `W/XiaomiWatchS1ActiveCoordinator.java:51-54`. Freeband hides Find for this watch [MEASURED, 2026-11-09] |
+| Before the login | right after the notifications come on, the watch can send an encrypted single-write message on `0051`, still under the previous session's keys. It can't be decrypted (logged as "didn't decrypt"); it is acknowledged and dropped, and the login goes on normally [MEASURED, 2026-11-09] |
 
 Still open:
 
 1. A write near the 509-byte maximum: so far every outgoing message was a short single write.
-2. Find band: Gadgetbridge marks it unsupported on the S1 Active. [CODE] `W/XiaomiWatchS1ActiveCoordinator.java:51-54`

@@ -91,9 +91,11 @@ private struct BandPage: View {
                     QuickActionButton(title: String(localized: "Sync"), systemImage: "arrow.triangle.2.circlepath",
                                       isBusy: BandPresentation.isSyncing(link, band)) { model.start(band, .sync) }
                         .disabled(link.phase.isBusy)
-                    QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
-                                      isOn: router.isFinding) {
-                        if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
+                    if band.supportsFind {
+                        QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
+                                          isOn: router.isFinding) {
+                            if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
+                        }
                     }
                     QuickActionButton(title: String(localized: "Notify"), systemImage: "text.bubble") { notifying = true }
                     QuickActionButton(title: String(localized: "Live HR"), systemImage: "heart",

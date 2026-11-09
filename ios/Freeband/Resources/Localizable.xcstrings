@@ -31,6 +31,16 @@
         }
       }
     },
+    "%@ can't vibrate on request.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ istek üzerine titreyemez."
+          }
+        }
+      }
+    },
     "%@ day: %lld min in heart-rate zones, most of it in zone %lld.": {
       "localizations": {
         "tr": {
