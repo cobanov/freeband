@@ -112,8 +112,9 @@ final class AppModel: ObservableObject {
         start(band, .send([MiAuth.notificationCommand(id: notificationID, appName: "Freeband", title: title, body: body)]))
     }
 
-    /// Starts or stops the band vibrating so it can be found.
+    /// Starts or stops the band vibrating so it can be found; nothing for a band that ignores it.
     func findBand(_ band: Band, start vibrating: Bool) {
+        guard band.supportsFind else { return }
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
     }
 
