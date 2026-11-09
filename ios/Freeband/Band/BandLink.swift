@@ -233,6 +233,8 @@ final class BandLink: NSObject, ObservableObject {
     private var fileListMissing = false
     /// Factory file dumps (13/2) already logged in this session, by name.
     private var factoryDumps: Set<String> = []
+    /// The command being handled, so a reply nobody handles can be logged with its bytes.
+    private var lastCommandBody = Data()
 
     override init() {
         super.init()
@@ -505,7 +507,7 @@ final class BandLink: NSObject, ObservableObject {
             if factoryDumps.insert(label).inserted { note("← 13/2 factory file dump \(label), not used") }
 
         default:
-            note("← \(type)/\(subtype) not handled")
+            note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 40))")
         }
     }
 
@@ -817,6 +819,7 @@ final class BandLink: NSObject, ObservableObject {
     /// One protobuf Command from the band, over either channel.
     private func handleCommandBytes(_ body: Data) {
         guard let command = PBMessage(body) else { return }
+        lastCommandBody = body
         if command.varints[1] == 2, command.varints[2] == 110 {
             // Unknown everywhere (docs/CAPABILITIES.md §16); keep the bytes for decoding later.
             note("← 2/110 \(body.count) bytes: \(body.map { String(format: "%02x", $0) }.joined())")
