@@ -13,6 +13,7 @@ const EN = (): Safe =>
 <div class="topics">
 <section class="split"><h2>Apple Health</h2><div>
 <p>Apple Health export is optional and runs on the iPhone. If enabled, Freeband writes eligible steps, heart rate and sleep stages; it never reads Health data. It can update or remove its own entries when band data is corrected. Turning it off, deleting Freeband data or deleting the hub account does not delete Health entries. Health-side deletions cannot be detected. Use one exporting iPhone per band; reinstalling or switching phones can cause duplicates.</p>
+<p>The export also supports the band's daily resting-heart-rate estimate and individually timed oxygen readings. It uses a daily step summary when minute data is incomplete, without inventing minute-level steps.</p>
 </div></section>
 <section class="split"><h2>Optional</h2><div>
 <p>The Freeband app keeps your data on your phone. Nothing comes here unless you turn on Web access in the app. When you do, the app creates an account and sends your band's data here after every sync. Turning Web access off stops new uploads; to delete what is already here, delete the account.</p>
@@ -62,6 +63,7 @@ const TR = (): Safe =>
 <div class="topics">
 <section class="split"><h2>Apple Health</h2><div>
 <p>Apple Health aktarımı isteğe bağlıdır ve iPhone'da çalışır. Açıldığında Freeband uygun adım, nabız ve uyku evrelerini yazar; Sağlık verilerini asla okumaz. Bileklik verisi düzeltildiğinde kendi kayıtlarını güncelleyebilir veya silebilir. Aktarımı kapatmak, Freeband verilerini ya da hub hesabını silmek Sağlık kayıtlarını silmez. Sağlık'taki silmeler algılanamaz. Her bileklik için tek aktarım yapan iPhone kullan; yeniden yükleme veya telefon değiştirme yinelenen kayıtlar oluşturabilir.</p>
+<p>Aktarım ayrıca bilekliğin günlük dinlenik nabız tahminini ve zamanı bilinen oksijen ölçümlerini destekler. Dakikalık veriler eksikse dakika verisi uydurulmadan günlük adım özeti kullanılır.</p>
 </div></section>
 <section class="split"><h2>İsteğe bağlı</h2><div>
 <p>Freeband uygulaması verini telefonda tutar. Uygulamada Web erişimini açmadıkça buraya hiçbir şey gelmez. Açtığında uygulama bir hesap oluşturur ve her senkronizasyonda bandının verisini buraya gönderir. Web erişimini kapatmak yeni gönderimi durdurur; buradaki veriyi silmek için hesabı silmen gerekir.</p>

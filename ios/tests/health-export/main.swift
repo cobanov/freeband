@@ -37,14 +37,16 @@ check(!sample(10).identifier.contains(":"), "identifier contains no MAC address"
 var minutes = MinuteSeries(day: DayKey(index: 20_000), tzOffsetMinutes: 120)
 minutes.steps[0] = 15
 minutes.heartRate[0] = 75
+minutes.spo2[0] = 97
 minutes.steps[1] = 0
 minutes.heartRate[1] = 255
 check(HealthExportMapping.minutes(minutes, namespace: namespace, eligible: false).isEmpty, "ineligible or demo input")
 let mapped = HealthExportMapping.minutes(minutes, namespace: namespace, eligible: true)
-check(mapped.count == 2, "only valid nonzero values are mapped")
+check(mapped.count == 3, "only valid nonzero values are mapped")
 check(mapped[0].start == DayKey(index: 20_000).start(offsetMinutes: 120), "source offset determines instant")
 check(mapped[0].end.timeIntervalSince(mapped[0].start) == 60, "steps cover one minute")
-check(mapped[1].kind == .heartRate && mapped[1].start == mapped[1].end, "heart rate is a point sample")
+check(mapped.contains { $0.kind == .heartRate && $0.start == $0.end }, "heart rate is a point sample")
+check(mapped.contains { $0.kind == .oxygen && $0.start == $0.end && $0.value == 97 }, "oxygen is a point sample")
 let stages = [StageSegment(start: start, minutes: 2, stage: .light),
               StageSegment(start: start.addingTimeInterval(120), minutes: 1, stage: .unknown)]
 let sleep = HealthExportMapping.sleep(stages, bed: start, wake: start.addingTimeInterval(180),

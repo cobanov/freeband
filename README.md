@@ -73,6 +73,15 @@ Turning export off, removing a band, deleting local data or deleting a hub accou
 Health entries. Health-side deletions cannot be detected. Deleting local data also prevents older
 history from being automatically exported again on that phone.
 
+The export also supports the band's daily resting-heart-rate estimate and individually timed
+blood-oxygen readings. A daily step summary is exported as one cumulative interval when detailed
+steps are incomplete; it is replaced by minute records only when a complete day is available.
+Daily oxygen averages lack an exact measurement time and are not exported. RMSSD is not written
+as SDNN, and Freeband's recovery, sleep and strain scores are not mapped to unrelated Health types.
+If historical sleep is missing, Diagnostics shows which file lists arrived and which file kinds
+the band reported. An empty list does not establish why the files are absent; another app may
+have acknowledged files previously, but Freeband cannot determine that from an empty list.
+
 ## Repository
 
 | Path | What |

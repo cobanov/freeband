@@ -13,7 +13,7 @@ private struct AppleHealthDetails: View {
     var body: some View {
         Form {
             Section {
-                Text("Freeband can write eligible band steps, heart rate and sleep stages to Apple Health. It never reads Apple Health.")
+                Text("Freeband can write eligible band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. It never reads Apple Health.")
                 Text("Turning on exports eligible history stored on this phone and later syncs while Freeband is open. Corrections can update or remove entries Freeband previously wrote.")
                 Text("Use one exporting iPhone per band. Reinstalling or using another phone can create duplicates. Health-side deletions cannot be detected.")
                 Text("Deleting Freeband data or removing a band does not delete Health entries. Older history on this phone will not be exported again.")
@@ -24,6 +24,8 @@ private struct AppleHealthDetails: View {
                 } else {
                     LabeledContent(String(localized: "Steps"), value: permission(.steps))
                     LabeledContent(String(localized: "Heart rate"), value: permission(.heartRate))
+                    LabeledContent(String(localized: "Resting heart rate"), value: permission(.restingHeartRate))
+                    LabeledContent(String(localized: "Blood oxygen"), value: permission(.oxygen))
                     LabeledContent(String(localized: "Sleep stages"), value: permission(.sleep))
                     if let last = service.lastSuccess {
                         LabeledContent(String(localized: "Last successful sync"), value: last.formatted(date: .abbreviated, time: .shortened))
@@ -32,6 +34,7 @@ private struct AppleHealthDetails: View {
                     if service.enabled && !service.busy && service.status == nil { Text("Ready to sync") }
                     if let status = service.status { Text(status) }
                     if service.enabled {
+                        Button(String(localized: "Request write access")) { Task { await service.enable() } }.disabled(service.busy)
                         Button(String(localized: "Sync now")) { service.schedule() }.disabled(service.busy)
                         Button(String(localized: "Turn off Apple Health"), role: .destructive) { service.disable() }
                     } else {

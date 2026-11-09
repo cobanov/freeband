@@ -549,6 +549,22 @@
         }
       }
     },
+    "A file list was missing or malformed. Sync again; available files are still processed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A file list was missing or malformed. Sync again; available files are still processed."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir dosya listesi gelmedi veya bozuktu. Yeniden eşzamanla; mevcut dosyalar yine de işlenir."
+          }
+        }
+      }
+    },
     "A good night" : {
       "localizations" : {
         "tr" : {
@@ -778,6 +794,22 @@
         }
       }
     },
+    "ambiguous minute or sleep data" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ambiguous minute or sleep data"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "belirsiz dakika veya uyku verileri"
+          }
+        }
+      }
+    },
     "An estimate: only %@ of 100 weight points had data." : {
       "localizations" : {
         "tr" : {
@@ -917,6 +949,22 @@
         }
       }
     },
+    "Apple Health is up to date; no new records." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health is up to date; no new records."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health güncel; yeni kayıt yok."
+          }
+        }
+      }
+    },
     "Apple Health permission request failed." : {
       "localizations" : {
         "en" : {
@@ -949,7 +997,24 @@
         }
       }
     },
+    "Apple Health sync finished: %lld records written, %lld removed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health sync finished: %lld records written, %lld removed."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health eşzamanlaması bitti: %1$lld kayıt yazıldı, %2$lld silindi."
+          }
+        }
+      }
+    },
     "Apple Health sync finished." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -961,6 +1026,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple Health eşzamanlaması tamamlandı."
+          }
+        }
+      }
+    },
+    "Apple Health sync incomplete: %lld records written, %lld removed. Bands with matching identifiers need attention." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health sync incomplete: %lld records written, %lld removed. Bands with matching identifiers need attention."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health eşzamanlaması eksik: %1$lld kayıt yazıldı, %2$lld silindi. Kimlikleri eşleşen bileklikleri kontrol et."
           }
         }
       }
@@ -1135,6 +1216,7 @@
       }
     },
     "Bands with matching identifiers need attention; Apple Health sync is paused for them." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1291,7 +1373,24 @@
         }
       }
     },
+    "Calibrating · %lld of 3 days" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calibrating · %lld of 3 days"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kalibre ediliyor · 3 günden %lld"
+          }
+        }
+      }
+    },
     "Calibrating · %lld of 3 nights" : {
+      "extractionState" : "stale",
       "localizations" : {
         "tr" : {
           "stringUnit" : {
@@ -1638,6 +1737,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Günlük ayrıntı"
+          }
+        }
+      }
+    },
+    "daily summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "daily summary"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "günlük özet"
           }
         }
       }
@@ -2044,6 +2159,7 @@
       }
     },
     "Freeband can write eligible band steps, heart rate and sleep stages to Apple Health. It never reads Apple Health." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2055,6 +2171,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Freeband, uygun bileklik adımlarını, nabzı ve uyku evrelerini Apple Health’e yazabilir. Apple Health verilerini asla okumaz."
+          }
+        }
+      }
+    },
+    "Freeband can write eligible band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. It never reads Apple Health." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband can write eligible band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. It never reads Apple Health."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband, uygun bileklik adımlarını, nabzı, dinlenik nabzı, kandaki oksijeni ve uyku evrelerini Apple Health’e yazabilir. Apple Health verilerini asla okumaz."
           }
         }
       }
@@ -2949,6 +3081,22 @@
         }
       }
     },
+    "manual readings" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "manual readings"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "manuel ölçümler"
+          }
+        }
+      }
+    },
     "Max" : {
       "localizations" : {
         "tr" : {
@@ -3035,6 +3183,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "min. %1$@ · ort. %2$@"
+          }
+        }
+      }
+    },
+    "minute data" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "minute data"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dakika verileri"
           }
         }
       }
@@ -3242,6 +3406,22 @@
         }
       }
     },
+    "No exportable band data is available yet. Sync the band and try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No exportable band data is available yet. Sync the band and try again."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz aktarılabilir bileklik verisi yok. Bilekliği eşzamanlayıp yeniden dene."
+          }
+        }
+      }
+    },
     "No files yet. After a sync the band's records are listed here." : {
       "localizations" : {
         "tr" : {
@@ -3332,6 +3512,22 @@
         }
       }
     },
+    "No response" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No response"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yanıt yok"
+          }
+        }
+      }
+    },
     "No score" : {
       "localizations" : {
         "tr" : {
@@ -3348,6 +3544,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Henüz oturum yok."
+          }
+        }
+      }
+    },
+    "No sleep history is stored in Freeband yet. Sync the band and check Diagnostics for the files it returned. History available only in Mi Fitness cannot be imported." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sleep history is stored in Freeband yet. Sync the band and check Diagnostics for the files it returned. History available only in Mi Fitness cannot be imported."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband’de henüz uyku geçmişi yok. Bilekliği eşzamanla ve gelen dosyalar için Tanılama bölümünü kontrol et. Yalnızca Mi Fitness’ta bulunan geçmiş içe aktarılamaz."
           }
         }
       }
@@ -3625,6 +3837,103 @@
         }
       }
     },
+    "Partial Apple Health sync: %lld records written. A Health write or removal failed; try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partial Apple Health sync: %lld records written. A Health write or removal failed; try again."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health kısmen eşzamanlandı: %lld kayıt yazıldı. Bir yazma veya silme işlemi başarısız oldu; yeniden dene."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. Check %@ in Diagnostics." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partial Apple Health sync: %lld records written. Check %@ in Diagnostics."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health kısmen eşzamanlandı: %1$lld kayıt yazıldı. Tanılama bölümünde %2$@ kontrol et."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. Minute, sleep or summary files are incomplete or ambiguous; check Diagnostics." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partial Apple Health sync: %lld records written. Minute, sleep or summary files are incomplete or ambiguous; check Diagnostics."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health kısmen eşzamanlandı: %lld kayıt yazıldı. Dakika, uyku veya özet dosyaları eksik ya da belirsiz; Tanılama bölümünü kontrol et."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. Some data needs attention." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partial Apple Health sync: %lld records written. Some data needs attention."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health kısmen eşzamanlandı: %lld kayıt yazıldı. Bazı veriler için işlem gerekiyor."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. Some write permissions are missing." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partial Apple Health sync: %lld records written. Some write permissions are missing."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Health kısmen eşzamanlandı: %lld kayıt yazıldı. Bazı yazma izinleri eksik."
+          }
+        }
+      }
+    },
+    "Past list" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Past list"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçmiş listesi"
+          }
+        }
+      }
+    },
     "Peak heart rate" : {
       "localizations" : {
         "tr" : {
@@ -3811,6 +4120,7 @@
       }
     },
     "Recovery appears once the band knows your normal: it needs three nights of resting heart rate." : {
+      "extractionState" : "stale",
       "localizations" : {
         "tr" : {
           "stringUnit" : {
@@ -3821,6 +4131,7 @@
       }
     },
     "Recovery compares each morning with your normal. Wear the band tonight; it needs three nights to learn it." : {
+      "extractionState" : "stale",
       "localizations" : {
         "tr" : {
           "stringUnit" : {
@@ -3836,6 +4147,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toparlanma bu sabahı kendi normalinle karşılaştırır: önceki 14 geçerli gününün ortancası."
+          }
+        }
+      }
+    },
+    "Recovery needs at least three earlier valid days of resting heart rate or HRV. Freeband uses history available on the band and this phone; history only in Mi Fitness is not accessible. Keep wearing and syncing the band to build a baseline." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery needs at least three earlier valid days of resting heart rate or HRV. Freeband uses history available on the band and this phone; history only in Mi Fitness is not accessible. Keep wearing and syncing the band to build a baseline."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toparlanma için önceki en az üç geçerli güne ait dinlenik nabız veya HRV gerekir. Freeband bileklikte ve bu telefonda bulunan geçmişi kullanır; yalnızca Mi Fitness’taki geçmişe erişemez. Baz çizgisini oluşturmak için bilekliği takıp eşzamanlamaya devam et."
+          }
+        }
+      }
+    },
+    "Recovery needs enough previous valid resting heart rate or HRV data in Freeband. Sync available band history; data held only by Mi Fitness is not available here." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery needs enough previous valid resting heart rate or HRV data in Freeband. Sync available band history; data held only by Mi Fitness is not available here."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toparlanma için Freeband’de önceki geçerli dinlenik nabız veya HRV verileri gerekir. Bileklikteki geçmişi eşzamanla; yalnızca Mi Fitness’ta bulunan veriler burada kullanılamaz."
           }
         }
       }
@@ -3907,6 +4250,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rapor"
+          }
+        }
+      }
+    },
+    "Request write access" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request write access"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazma izni iste"
+          }
+        }
+      }
+    },
+    "Requested / received / failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requested / received / failed"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İstenen / alınan / başarısız"
           }
         }
       }
@@ -4282,6 +4657,22 @@
         }
       }
     },
+    "sleep" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sleep"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "uyku"
+          }
+        }
+      }
+    },
     "Sleep" : {
       "comment" : "Activity file kind\nScore name",
       "localizations" : {
@@ -4366,6 +4757,7 @@
       }
     },
     "Some data is waiting for permission or a complete, unambiguous band sync." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4891,6 +5283,22 @@
         }
       }
     },
+    "The past list was empty. Some devices report older files in today's list; see the session log for file kinds." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The past list was empty. Some devices report older files in today's list; see the session log for file kinds."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçmiş listesi boştu. Bazı cihazlar eski dosyaları bugün listesinde bildirir; dosya türleri için oturum kaydına bak."
+          }
+        }
+      }
+    },
     "The server answered %lld: %@" : {
       "localizations" : {
         "tr" : {
@@ -5094,6 +5502,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bugün"
+          }
+        }
+      }
+    },
+    "Today list" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today list"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bugün listesi"
           }
         }
       }
@@ -5362,6 +5786,7 @@
       }
     },
     "Wear the band to sleep and sync in the morning. The band stages the night itself." : {
+      "extractionState" : "stale",
       "localizations" : {
         "tr" : {
           "stringUnit" : {
@@ -5583,6 +6008,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Yazma izni verilmedi"
+          }
+        }
+      }
+    },
+    "Written: steps %lld, heart rate %lld, resting heart rate %lld, oxygen %lld, sleep %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written: steps %lld, heart rate %lld, resting heart rate %lld, oxygen %lld, sleep %lld."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazılanlar: adım %1$lld, nabız %2$lld, dinlenik nabız %3$lld, oksijen %4$lld, uyku %5$lld."
           }
         }
       }

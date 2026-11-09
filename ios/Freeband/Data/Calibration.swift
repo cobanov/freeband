@@ -1,5 +1,17 @@
 import Foundation
 
+/// Transport counts only: no health measurements or file identifiers.
+struct BandHistoryDiagnostics: Codable, Equatable, Sendable {
+    var todayCount: Int?
+    var pastCount: Int?
+    var todayKinds: [String: Int] = [:]
+    var pastKinds: [String: Int] = [:]
+    var requested: Int = 0
+    var received: Int = 0
+    var failed: Int = 0
+    var listIncomplete: Bool = false
+}
+
 // Phase 0 calibration (plan section 4, "Kalibrasyon"): after a sync, one report with every file
 // (kind, version, size, CRC, parse status, warnings) and plausibility checks against the band's
 // own numbers. Foundation only; the store side (AppModel) only saves and shares it.
@@ -42,6 +54,7 @@ struct CalibrationReport: Codable, Equatable, Sendable {
     var algoVersion: Int
     var files: [FileEntry]
     var checks: [Check]
+    var history: BandHistoryDiagnostics? = nil
 
     var counts: [String: Int] {
         var out: [String: Int] = [:]

@@ -161,8 +161,11 @@ final class AppModel: ObservableObject {
             let parsed = sessionIngest
             sessionIngest = IngestSummary()
             runPendingRollups()
-            if !parsed.isEmpty {
-                setCalibration(makeReport(parsed, bandID: id, outcome: outcome.label))
+            healthExport.schedule()
+            if !parsed.isEmpty || link.historyDiagnostics != nil {
+                var report = makeReport(parsed, bandID: id, outcome: outcome.label)
+                report.history = link.historyDiagnostics
+                setCalibration(report)
             }
             if case .failed = outcome { return }
             let records = healthRecords(bandID: id, parsed)

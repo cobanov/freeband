@@ -3,7 +3,7 @@ import Foundation
 // This file contains no HealthKit calls. In particular, a missing source value is only
 // evidence of deletion when its entire reconciliation scope was successfully rebuilt.
 enum HealthExportKind: String, Codable, CaseIterable {
-    case steps, heartRate, sleep
+    case steps, heartRate, restingHeartRate, oxygen, sleep
 }
 
 struct HealthExportSample: Codable, Equatable {

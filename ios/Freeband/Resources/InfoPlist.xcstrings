@@ -55,19 +55,36 @@
         }
       }
     },
+    "NSHealthShareUsageDescription" : {
+      "comment" : "HealthKit usage description required for distribution; Freeband requests no read access.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband uses HealthKit to export your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. Freeband does not read health data."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeband, bilekliğinin adım, nabız, dinlenik nabız, kandaki oksijen ve uyku evresi verilerini Apple Health’e aktarmak için HealthKit kullanır. Freeband sağlık verilerini okumaz."
+          }
+        }
+      }
+    },
     "NSHealthUpdateUsageDescription" : {
       "comment" : "Privacy - Health Update Usage Description",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Freeband writes your band steps, heart rate and sleep stages to Apple Health when you choose to export them."
+            "value" : "Freeband writes your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health when you choose to export them."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Freeband, aktarmayı seçtiğinde bilekliğinin adım, nabız ve uyku evresi verilerini Apple Health’e yazar."
+            "value" : "Freeband, aktarmayı seçtiğinde bilekliğinin adım, nabız, dinlenik nabız, kandaki oksijen ve uyku evresi verilerini Apple Health’e yazar."
           }
         }
       }

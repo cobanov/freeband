@@ -27,7 +27,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>dev.cobanov.freeband</string>
+			<string>com.rfivesix.freeband</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>freeband</string>
@@ -42,8 +42,10 @@
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Freeband uses Bluetooth to talk directly to the band on your wrist.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Freeband uses HealthKit to export your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. Freeband does not read health data.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Freeband writes your band steps, heart rate and sleep stages to Apple Health when you choose to export them.</string>
+	<string>Freeband writes your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health when you choose to export them.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>OpenSauceSans-Regular.otf</string>

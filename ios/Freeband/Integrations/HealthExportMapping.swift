@@ -17,6 +17,9 @@ enum HealthExportMapping {
                 samples.append(.init(namespace: namespace, kind: .heartRate, start: time,
                                      end: time, value: heartRate))
             }
+            if let oxygen = ValidRange.spo2(series.spo2[index]) {
+                samples.append(.init(namespace: namespace, kind: .oxygen, start: time, end: time, value: oxygen))
+            }
         }
         return samples
     }

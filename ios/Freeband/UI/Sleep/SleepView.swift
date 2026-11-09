@@ -47,7 +47,7 @@ struct SleepNightScreen: View {
                     content(day: day, night: night)
                 } else {
                     EmptyState(systemImage: "moon", title: String(localized: "No nights yet"),
-                               message: String(localized: "Wear the band to sleep and sync in the morning. The band stages the night itself."))
+                               message: String(localized: "No sleep history is stored in Freeband yet. Sync the band and check Diagnostics for the files it returned. History available only in Mi Fitness cannot be imported."))
                 }
             }
             .padding(.horizontal, FBSpace.gutter)

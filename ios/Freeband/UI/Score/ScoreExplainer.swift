@@ -26,7 +26,7 @@ enum ScoreExplainer {
 
     private static func recovery(_ r: RecoveryResult?) -> String {
         guard let r, let score = r.score else {
-            return String(localized: "Recovery appears once the band knows your normal: it needs three nights of resting heart rate.")
+            return String(localized: "Recovery needs enough previous valid resting heart rate or HRV data in Freeband. Sync available band history; data held only by Mi Fitness is not available here.")
         }
         let lead = switch ScoreBand.recovery(Double(score)) {
         case .good: String(localized: "Higher than usual")

@@ -171,6 +171,7 @@ final class BandLink: NSObject, ObservableObject {
 
     /// Activity files fetched / requested in this sync.
     @Published private(set) var fileProgress: (done: Int, total: Int)?
+    @Published private(set) var historyDiagnostics: BandHistoryDiagnostics?
 
     private var central: CBCentralManager!
     private var target: BandTarget?
@@ -245,6 +246,7 @@ final class BandLink: NSObject, ObservableObject {
         fileQueue = []
         currentFile = nil
         fileProgress = nil
+        historyDiagnostics = purpose == .sync ? BandHistoryDiagnostics() : nil
         receivedFiles = []
         requestedFiles = []
         fileListMissing = false
@@ -376,11 +378,11 @@ final class BandLink: NSObject, ObservableObject {
             sendCommand(MiAuth.activityListCommand(today: true), encrypted: true)
             let listRun = run
             after(10, listRun) { [weak self] in
-                guard let self, self.fileStage == .listingToday || self.fileStage == .listingPast else { return }
-                self.note("no file list, continuing without files")
+                guard let self, self.fileStage == .listingToday else { return }
+                self.note("today list timed out; requesting past list")
                 self.fileListMissing = true
-                self.fileStage = .done
-                self.finishSyncIfDone()
+                self.historyDiagnostics?.listIncomplete = true
+                self.requestPastList()
             }
         }
         let thisRun = run
@@ -437,24 +439,23 @@ final class BandLink: NSObject, ObservableObject {
             }
 
         case (8, 1) where fileStage == .listingToday:
-            todayIDs = ActivityFileID.list(MiAuth.activityFileIDBytes(command))
+            let bytes = MiAuth.activityFileIDBytes(command)
+            if bytes.count % 7 != 0 { fileListMissing = true; historyDiagnostics?.listIncomplete = true; note("today list malformed") }
+            todayIDs = ActivityFileID.list(bytes)
+            historyDiagnostics?.todayCount = todayIDs.count
+            historyDiagnostics?.todayKinds = Dictionary(grouping: todayIDs, by: { $0.kind.rawValue }).mapValues(\.count)
             note("← today \(todayIDs.count) file(s); → past list")
-            fileStage = .listingPast
-            sendCommand(MiAuth.activityListCommand(today: false), encrypted: true)
+            noteFileKinds("today", todayIDs)
+            requestPastList()
 
         case (8, 2) where fileStage == .listingPast:
-            let past = ActivityFileID.list(MiAuth.activityFileIDBytes(command))
-            let id = target?.id
-            let wanted = past.filter { file in
-                guard let id, let has = hasActivityFile else { return true }
-                return !has(id, file.hex)
-            }
-            requestedFiles = Set(todayIDs + wanted)
-            fileQueue = requestedFiles.sorted()
-            note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")
-            fileProgress = (0, fileQueue.count)
-            fileStage = .fetching
-            fetchNextFile()
+            let bytes = MiAuth.activityFileIDBytes(command)
+            if bytes.count % 7 != 0 { fileListMissing = true; historyDiagnostics?.listIncomplete = true; note("past list malformed") }
+            let past = ActivityFileID.list(bytes)
+            historyDiagnostics?.pastCount = past.count
+            historyDiagnostics?.pastKinds = Dictionary(grouping: past, by: { $0.kind.rawValue }).mapValues(\.count)
+            noteFileKinds("past", past)
+            beginFileFetch(past)
 
         case (8, 3), (8, 5):
             break
@@ -477,6 +478,44 @@ final class BandLink: NSObject, ObservableObject {
     }
 
     // MARK: activity files
+
+    private func requestPastList() {
+        fileStage = .listingPast
+        note("→ past file list")
+        sendCommand(MiAuth.activityListCommand(today: false), encrypted: true)
+        let listRun = run
+        after(10, listRun) { [weak self] in
+            guard let self, self.fileStage == .listingPast else { return }
+            self.fileListMissing = true
+            self.historyDiagnostics?.listIncomplete = true
+            self.note("past list timed out; fetching available today files")
+            self.beginFileFetch([])
+        }
+    }
+
+    private func beginFileFetch(_ past: [ActivityFileID]) {
+        let id = target?.id
+        let queue = ActivitySyncPlan.queue(today: todayIDs, past: past) { file in
+            guard let id, let has = hasActivityFile else { return false }
+            return has(id, file.hex)
+        }
+        let wantedCount = past.filter { file in
+            guard let id, let has = hasActivityFile else { return true }
+            return !has(id, file.hex)
+        }.count
+        requestedFiles = Set(queue)
+        historyDiagnostics?.requested = requestedFiles.count
+        fileQueue = queue
+        note("← past \(past.count) file(s), \(wantedCount) new; \(fileQueue.count) to request")
+        fileProgress = (0, fileQueue.count)
+        fileStage = .fetching
+        fetchNextFile()
+    }
+
+    private func noteFileKinds(_ list: String, _ files: [ActivityFileID]) {
+        let counts = Dictionary(grouping: files, by: { $0.kind.rawValue }).map { "\($0.key):\($0.value.count)" }.sorted()
+        note("\(list) kinds: \(counts.isEmpty ? "none" : counts.joined(separator: ", "))")
+    }
 
     private func fetchNextFile() {
         guard active, fileStage == .fetching else { return }
@@ -514,6 +553,7 @@ final class BandLink: NSObject, ObservableObject {
                 return
             }
             self.note("file \(file.hex) skipped")
+            self.historyDiagnostics?.failed += 1
             self.advanceFileProgress()
             if self.fileQueue.isEmpty {
                 self.fetchNextFile()
@@ -538,6 +578,8 @@ final class BandLink: NSObject, ObservableObject {
             let queued = fileQueue.contains(got)
             fileQueue.removeAll { $0 == got }
             if receivedFiles.insert(got).inserted, let id = target?.id {
+                historyDiagnostics?.received = receivedFiles.intersection(requestedFiles).count
+                note("← received \(got.kind.rawValue) file")
                 onActivityFile?(id, got, data, todayIDs.contains(got))
             }
             if got == file || queued { advanceFileProgress() }
@@ -550,6 +592,7 @@ final class BandLink: NSObject, ObservableObject {
             }
         case .failed(let reason):
             fileToken += 1
+            historyDiagnostics?.failed += 1
             note("file \(file.hex) corrupt: \(reason)")
             advanceFileProgress()
             fetchNextFile()

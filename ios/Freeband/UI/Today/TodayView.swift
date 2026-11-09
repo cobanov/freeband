@@ -235,14 +235,16 @@ private struct TodayContent: View {
                 .disabled(link.phase.isBusy)
         } else if isToday, history.score(.recovery, day) == nil, calibratingNights < 3 {
             EmptyState(systemImage: "hourglass",
-                       title: String(localized: "Calibrating · \(calibratingNights) of 3 nights"),
-                       message: String(localized: "Recovery compares each morning with your normal. Wear the band tonight; it needs three nights to learn it."))
+                       title: String(localized: "Calibrating · \(calibratingNights) of 3 days"),
+                       message: String(localized: "Recovery needs at least three earlier valid days of resting heart rate or HRV. Freeband uses history available on the band and this phone; history only in Mi Fitness is not accessible. Keep wearing and syncing the band to build a baseline."))
         }
     }
 
-    /// Nights with a resting heart rate so far, the recovery baseline's minimum is three.
+    /// Use the same previous-day baseline as the score, including older valid days in its lookback.
     private var calibratingNights: Int {
-        min(3, history.baselineDays(.restingHeartRate, before: day.adding(days: 1)))
+        let counts = history.result(day)?.recovery.contributors.filter { $0.name == .restingHR || $0.name == .hrv }
+            .compactMap { $0.baseline?.count } ?? []
+        return min(3, counts.max() ?? history.baselineDays(.restingHeartRate, before: day))
     }
 
     // MARK: scores

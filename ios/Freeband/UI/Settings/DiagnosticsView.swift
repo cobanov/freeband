@@ -76,6 +76,16 @@ struct DiagnosticsView: View {
                 LabeledContent(String(localized: "Report"), value: report.generatedAt.formatted(date: .abbreviated, time: .shortened))
                 if let outcome = report.outcome { LabeledContent(String(localized: "Outcome"), value: outcome) }
                 LabeledContent(String(localized: "Files"), value: FBFormat.number(report.files.count))
+                if let history = report.history {
+                    LabeledContent(String(localized: "Today list"), value: history.todayCount.map(FBFormat.number) ?? String(localized: "No response"))
+                    LabeledContent(String(localized: "Past list"), value: history.pastCount.map(FBFormat.number) ?? String(localized: "No response"))
+                    LabeledContent(String(localized: "Requested / received / failed"), value: "\(history.requested) / \(history.received) / \(history.failed)")
+                    if history.listIncomplete {
+                        Text("A file list was missing or malformed. Sync again; available files are still processed.")
+                    } else if history.pastCount == 0 {
+                        Text("The past list was empty. Some devices report older files in today's list; see the session log for file kinds.")
+                    }
+                }
                 LabeledContent(String(localized: "Checks"), value: ["pass", "warn", "fail", "skip"]
                     .compactMap { k in report.counts[k].map { "\(k) \($0)" } }.joined(separator: " · "))
                 ForEach(Array(report.checks.enumerated()), id: \.offset) { _, check in

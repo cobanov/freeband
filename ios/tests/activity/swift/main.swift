@@ -1096,6 +1096,15 @@ check("random packets into the assembler never trap; completions always pass the
     return e + expect(completions > 0, "no completions")
 }
 
+check("available file list is fetched when the other list is missing") {
+    let today = ActivityFileID(timestamp: 100, version: 4, type: 0, subtype: 0, detailType: 0)
+    let past = ActivityFileID(timestamp: 200, version: 6, type: 0, subtype: 8, detailType: 1)
+    var errors = expect(ActivitySyncPlan.queue(today: [today], past: [], hasFile: { _ in false }) == [today], "missing past list lost today files")
+    errors += expect(ActivitySyncPlan.queue(today: [], past: [past], hasFile: { _ in false }) == [past], "missing today list lost past files")
+    errors += expect(ActivitySyncPlan.queue(today: [today], past: [today, past], hasFile: { $0 == past }) == [today], "duplicate or already stored file")
+    return errors
+}
+
 // MARK: - Summary
 
 print("")

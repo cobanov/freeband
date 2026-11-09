@@ -1,5 +1,13 @@
 import Foundation
 
+/// Merge whichever file lists arrived. Today's files may still grow; past files already stored
+/// need not be fetched again. List timeouts are tracked separately by the transport.
+enum ActivitySyncPlan {
+    static func queue(today: [ActivityFileID], past: [ActivityFileID], hasFile: (ActivityFileID) -> Bool) -> [ActivityFileID] {
+        Array(Set(today + past.filter { !hasFile($0) })).sorted()
+    }
+}
+
 // Activity files of the Xiaomi Smart Band 10 / 10 Pro: the 7-byte file id, reassembly of the
 // decrypted channel-5 packets, the CRC-32 trailer and the payload parsers.
 //

@@ -383,6 +383,14 @@ equal("record checks pass", report.checks.filter { $0.name == "records_vs_elapse
 let decoded = CalibrationReport.decode(report.json())
 check("JSON round trip", decoded?.files == report.files && decoded?.checks == report.checks)
 check("JSON is an object", (try? JSONSerialization.jsonObject(with: report.json())) is [String: Any])
+var withHistory = report
+withHistory.history = BandHistoryDiagnostics(todayCount: 1, pastCount: 0, todayKinds: ["daily_summary": 1],
+                                             pastKinds: [:], requested: 1, received: 1, failed: 0, listIncomplete: false)
+check("history diagnostics preserve an empty past list", CalibrationReport.decode(withHistory.json())?.history?.pastCount == 0)
+withHistory.history?.pastCount = nil
+withHistory.history?.listIncomplete = true
+let missingHistory = CalibrationReport.decode(withHistory.json())?.history
+check("missing past list differs from an empty list", missingHistory?.pastCount == nil && missingHistory?.listIncomplete == true)
 
 // MARK: - Into analytics
 
