@@ -4,10 +4,14 @@ import SwiftUI
 
 @main
 struct FreebandApp: App {
-    @StateObject private var session = AppSession()
+    @StateObject private var session = AppSession.shared
 
     init() {
         FBAppearance.configureNavigationBars()
+        // Created now, not with the first window: when iOS relaunches the app in the background for
+        // the held session there is no window, and the Bluetooth manager must exist at launch
+        // (docs/STAY-CONNECTED.md section 3).
+        _ = AppSession.shared
     }
 
     var body: some Scene {
@@ -81,11 +85,20 @@ struct RootView: View {
         .onOpenURL { model.handle($0) }
         .onChange(of: scenePhase) { _, phase in
             // Live mode keeps the band measuring; never leave it running in the background.
-            if phase == .background { model.stop() }
-            if phase == .active { autoSync() }
+            if phase == .background { model.enterBackground() }
+            if phase == .active {
+                autoSync()
+                // A held session waiting out a retry opens now (after the sync, if one started).
+                model.updateHold()
+            }
         }
         .onChange(of: link.bluetooth) { _, state in
             if state == .poweredOn { autoSync() }
+        }
+        .onChange(of: selectedBand) { model.updateHold() }
+        .onChange(of: bands.count) { model.updateHold() }
+        .fullScreenCover(isPresented: Binding(get: { model.phoneRinging }, set: { if !$0 { model.stopFindPhone() } })) {
+            FindPhoneView()
         }
         .onChange(of: link.phase) { old, new in
             if new == .live, old != .live { router.liveEndsAt = Date().addingTimeInterval(BandLink.liveLimit) }

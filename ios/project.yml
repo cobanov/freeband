@@ -38,6 +38,8 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [bluetooth-le]
+        # Stay connected (docs/STAY-CONNECTED.md): Bluetooth events in the background, and ringing for Find Phone.
+        UIBackgroundModes: [bluetooth-central, audio]
         CFBundleURLTypes:
           - CFBundleURLName: dev.cobanov.freeband
             CFBundleURLSchemes: [freeband]

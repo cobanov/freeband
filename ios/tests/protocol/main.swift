@@ -116,6 +116,19 @@ var authReset = [fmt(chH.send(nonceCmd))]
 chH.authenticated()
 authReset.append(fmt(chH.send(batteryCmd)))
 
+// Find Phone (docs/STAY-CONNECTED.md section 1): start, stop, a missing value, no system field, another subtype
+func findPhone(_ build: (inout PBWriter) -> Void, subtype: UInt64 = 17) -> String {
+    var command = PBWriter(); command.varint(1, 2); command.varint(2, subtype); build(&command)
+    return MiAuth.findPhoneRequest(PBMessage(command.data)!).map { "\($0)" } ?? "nil"
+}
+let findPhoneParsed = [
+    findPhone { var s = PBWriter(); s.varint(5, 0); $0.message(4, s) },
+    findPhone { var s = PBWriter(); s.varint(5, 1); $0.message(4, s) },
+    findPhone { $0.message(4, PBWriter()) },
+    findPhone { _ in },
+    findPhone({ var s = PBWriter(); s.varint(5, 0); $0.message(4, s) }, subtype: 18),
+]
+
 let v1: [String: Any] = [
     "ccm_decrypt": hex(MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: longCipher) ?? Data()),
     "ccm_decrypt_empty": MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce,
@@ -154,6 +167,8 @@ let out: [String: Any] = [
     "notify_cmd": hex(MiAuth.notificationCommand(id: 42, appName: "Freeband", title: "Başlık", body: "Merhaba", date: Date(timeIntervalSince1970: 1_760_000_000))),
     "find_start": hex(MiAuth.findBandCommand(start: true)),
     "find_stop": hex(MiAuth.findBandCommand(start: false)),
+    "find_phone_stop": hex(MiAuth.findPhoneStopCommand()),
+    "find_phone_parsed": findPhoneParsed,
     "activity_today": hex(MiAuth.activityListCommand(today: true)),
     "activity_past": hex(MiAuth.activityListCommand(today: false)),
     "activity_fetch": hex(MiAuth.activityFetchCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
