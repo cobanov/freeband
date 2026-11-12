@@ -1,7 +1,7 @@
 # BLE V1: the older Xiaomi channel
 
 Status: protocol notes for Freeband's V1 transport, written from Gadgetbridge before the first test. Sections 2 and 10 record what the watch showed; Freeband now logs in and syncs over V1.
-Measured device: Xiaomi Watch S1 Active, Bluetooth name `XiaomiWatchS1Active 6373`, 2026-11-08.
+Measured device: Xiaomi Watch S1 Active, Bluetooth name `XiaomiWatchS1Active XXXX` (`XXXX` is the last four hex digits of its address, left out here), 2026-11-08.
 Source: Gadgetbridge `master`, commit `db008768` (2026-11-07).
 
 Citations are `file:line`. Paths are shortened as in [`findings.md`](../findings.md) (`X/`, `XD/`, `W/`), plus:

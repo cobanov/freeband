@@ -300,13 +300,14 @@ func run() async {
           [.full, .empty, .calibrating, nil])
 
     section("band names")
-    // Mi Fitness names and Bluetooth names, as the bands and watches give them.
+    // Mi Fitness names and Bluetooth names, in the form the bands and watches give them. The
+    // suffixes and addresses are made up (AGENTS.md).
     let bandNames: [(String, Band.Family, String)] = [
         ("Xiaomi Smart Band 10", .band10, "band10"),
         ("Xiaomi Smart Band 10 Pro D9B9", .band10Pro, "band10pro"),
         ("Redmi Watch 5 Active D3DD", .redmiWatch5Active, "band10"),
         ("Xiaomi Watch S1 Active", .watchS1Active, "band10"),
-        ("XiaomiWatchS1Active 6373", .watchS1Active, "band10"),
+        ("XiaomiWatchS1Active 5E6F", .watchS1Active, "band10"),
         ("Xiaomi Smart Band 8", .band8, "band10"),
         ("Xiaomi Smart Band 8 A1B2", .band8, "band10"),
         ("Xiaomi Smart Band 8 Pro 1C2D", .band10Pro, "band10pro"),  // Bluetooth Classic only: not a Band 8 here
@@ -316,12 +317,12 @@ func run() async {
         equal(name, Band.family(name: name), family)
         equal("\(name) model code", Band.modelCode(for: name), code)
     }
-    equal("short names", [Band(name: "XiaomiWatchS1Active 6373", mac: nil).shortName, Band(name: "Xiaomi Smart Band 8", mac: nil).shortName],
+    equal("short names", [Band(name: "XiaomiWatchS1Active 5E6F", mac: nil).shortName, Band(name: "Xiaomi Smart Band 8", mac: nil).shortName],
           ["Watch S1 Active", "Band 8"])
-    equal("display name", Band.displayName(name: "Xiaomi Watch S1 Active", mac: "D0:62:2C:4A:63:73"), "Watch S1 Active (6373)")
+    equal("display name", Band.displayName(name: "Xiaomi Watch S1 Active", mac: "AA:BB:CC:DD:5E:6F"), "Watch S1 Active (5E6F)")
     // The Watch S1 Active accepts Find and doesn't vibrate (firmware 1.4.174).
     equal("no Find", Band.Family.allCases.filter { !$0.supportsFind }, [.watchS1Active])
-    equal("no Find by name", [Band(name: "XiaomiWatchS1Active 6373", mac: nil).supportsFind, Band(name: "Xiaomi Smart Band 10 Pro", mac: nil).supportsFind],
+    equal("no Find by name", [Band(name: "XiaomiWatchS1Active 5E6F", mac: nil).supportsFind, Band(name: "Xiaomi Smart Band 10 Pro", mac: nil).supportsFind],
           [false, true])
 }
 
