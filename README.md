@@ -25,6 +25,7 @@ Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1
 | Listing and fetching the band's activity files | verified |
 | Redmi Watch 5 Active: authentication, battery, live stats, and fetching and parsing its daily summary, per-minute and sleep files | verified on firmware 2.2.105 |
 | Xiaomi Watch S1 Active, on the older BLE V1 channel: authentication, battery, live stats, notifications, its activity files, and sleep sessions from the watch's fell-asleep and woke-up events. The watch ignores Find, so Freeband hides it | verified on firmware 1.4.174 |
+| Find Phone: with Stay connected on (Band tab), Freeband keeps a session open in the background, and the watch's Find Phone rings the iPhone, also locked and on silent. Mi Fitness can't connect while it's on ([docs/STAY-CONNECTED.md](docs/STAY-CONNECTED.md)) | verified on a Xiaomi Watch S1 Active, firmware 1.4.174; a whole night idle not tested yet |
 | Mi Band 8, on BLE V1 | expected to work: Gadgetbridge puts it on the same channel as the Watch S1 Active. Not tested on a band yet ([#4](https://github.com/cobanov/freeband/issues/4)) |
 | Parsing them: per-minute data, daily summary, sleep and sleep stages, manual readings | implemented and tested against fixtures; not yet checked with real files from a Band 10 |
 | Sleep, Recovery and Strain scores with contributors and confidence | implemented (algorithm v1) |
@@ -56,8 +57,9 @@ The full write-up, with source references:
 - [`docs/ACTIVITY.md`](docs/ACTIVITY.md): activity file formats.
 - [`docs/PLAN.md`](docs/PLAN.md): product plan and score formulas.
 - [`docs/BLE-V1.md`](docs/BLE-V1.md): the older BLE V1 channel, and what the Watch S1 Active showed.
+- [`docs/STAY-CONNECTED.md`](docs/STAY-CONNECTED.md): Stay connected (the held session) and Find Phone.
 
-The docs are in Turkish, except `docs/BLE-V1.md`.
+The docs are in Turkish, except `docs/BLE-V1.md` and `docs/STAY-CONNECTED.md`.
 
 ## Repository
 

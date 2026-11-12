@@ -430,6 +430,25 @@ extension MiAuth {
         command.message(4, system)
         return command.data
     }
+
+    /// Command{2, 17, system(4).findDevice(5) = 1}: the phone stopped ringing on its own
+    /// (docs/STAY-CONNECTED.md section 1).
+    static func findPhoneStopCommand() -> Data {
+        var system = PBWriter()
+        system.varint(5, 1)
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, 17)
+        command.message(4, system)
+        return command.data
+    }
+
+    /// The band's Find Phone (Command{2, 17}): true to start ringing (findDevice 0 or missing),
+    /// false to stop (any other value), nil without a system field.
+    static func findPhoneRequest(_ command: PBMessage) -> Bool? {
+        guard command.varints[1] == 2, command.varints[2] == 17, let system = command.message(4) else { return nil }
+        return (system.varints[5] ?? 0) == 0
+    }
 }
 
 extension MiAuth {

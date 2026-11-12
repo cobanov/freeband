@@ -16,9 +16,29 @@ struct BandTarget {
 /// authenticate as an iOS companion, read battery and live stats, then always hand the channel
 /// back (unsubscribe, release the connection) so Mi Fitness keeps working. Protocol details:
 /// findings.md, sections 4–6; V1: docs/BLE-V1.md.
+///
+/// Stay connected (`hold`, docs/STAY-CONNECTED.md) is the exception: a held session stays open
+/// whenever no other session runs, so the band can reach the phone (Find Phone). It never touches
+/// `phase`, `lastOutcome` or `onFinish`; other sessions pause it and it comes back after them.
 final class BandLink: NSObject, ObservableObject {
     /// `send` authenticates, sends the given protobuf commands encrypted, then lets go.
-    enum Purpose: Equatable { case check, sync, live, send([Data]) }
+    /// `hold` is the held session; it starts only through `hold(_:)`.
+    enum Purpose: Equatable {
+        case check, sync, live, send([Data]), hold
+
+        var label: String {
+            switch self {
+            case .check: return "check"
+            case .sync: return "sync"
+            case .live: return "live"
+            case .send: return "send"
+            case .hold: return "hold"
+            }
+        }
+    }
+
+    /// The held session: off, on but not open at the moment, or open.
+    enum HoldState: Equatable { case off, connecting, connected }
 
     /// How a session ended. A sync is complete only when every listed file arrived; anything
     /// less is partial (what arrived is kept) and does not count as a successful sync.
@@ -152,8 +172,16 @@ final class BandLink: NSObject, ObservableObject {
     static let syncWindow: TimeInterval = 12
     /// Upper bound for a sync that also fetches activity files.
     static let fileSyncLimit: TimeInterval = 120
+    /// iOS relaunches the app for the held session's Bluetooth events under this name.
+    static let restoreIdentifier = "freeband.central"
+    /// Diagnostics keeps this many log lines across sessions.
+    static let logLimit = 600
+    /// Waits before the held session opens again after a failure; the last one repeats.
+    static let holdRetryDelays: [TimeInterval] = [10, 30, 60, 120, 300]
 
+    /// The state of the session the user started; a held session leaves it alone.
     @Published private(set) var phase: Phase = .idle
+    @Published private(set) var holdState = HoldState.off
     @Published private(set) var bandID: UUID?
     @Published private(set) var stats: MiAuth.LiveStats?
     @Published private(set) var battery: Int?
@@ -179,6 +207,8 @@ final class BandLink: NSObject, ObservableObject {
     var onDeviceInfo: ((UUID, MiAuth.DeviceInfo) -> Void)?
     /// Worn / charging / asleep, read after authentication and pushed by the band when it changes.
     @Published private(set) var deviceState: MiAuth.DeviceState?
+    /// The band's Find Phone (Command{2,17}): true to start ringing, false to stop.
+    var onFindPhone: ((UUID, Bool) -> Void)?
 
     /// Activity files fetched / requested in this sync.
     @Published private(set) var fileProgress: (done: Int, total: Int)?
@@ -186,6 +216,14 @@ final class BandLink: NSObject, ObservableObject {
     private var central: CBCentralManager!
     private var target: BandTarget?
     private var purpose = Purpose.sync
+    /// Where the running session is; `phase` follows it except on a held session.
+    private var stage = Phase.idle {
+        didSet { if purpose != .hold { phase = stage } }
+    }
+    /// The band to hold a session with (Stay connected), nil when the setting is off.
+    private var holdTarget: BandTarget?
+    /// Held-session failures since it was last open, for the retry delay.
+    private var holdFailures = 0
     private var peripheral: CBPeripheral?
     private var rx: CBCharacteristic?
     private var tx: CBCharacteristic?
@@ -236,30 +274,77 @@ final class BandLink: NSObject, ObservableObject {
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
     private var lastCommandBody = Data()
 
-    override init() {
+    /// `restoresState`: let iOS relaunch the app for the held session's Bluetooth events. Needs the
+    /// `bluetooth-central` background mode, and one such manager per process.
+    init(restoresState: Bool = false) {
         super.init()
-        central = CBCentralManager(delegate: self, queue: .main)
+        let options: [String: Any]? = restoresState ? [CBCentralManagerOptionRestoreIdentifierKey: Self.restoreIdentifier] : nil
+        central = CBCentralManager(delegate: self, queue: .main, options: options)
     }
 
     // MARK: control
 
+    /// Starts a session. A held session gives way (it comes back when this one ends).
     func start(_ target: BandTarget, purpose: Purpose) {
-        guard !phase.isBusy else { return }
+        guard !phase.isBusy, purpose != .hold else { return }
+        var delay: TimeInterval = 0
+        if active, self.purpose == .hold {
+            endHold()
+            holdState = .connecting
+            // As in reconnect(): give iOS a moment to drop the old connection.
+            delay = 1
+        }
+        begin(target, purpose, delay: delay)
+    }
+
+    /// Stay connected (docs/STAY-CONNECTED.md): keeps an authenticated session with this band open
+    /// whenever no other session runs, so the band can reach the phone. nil lets go.
+    func hold(_ target: BandTarget?) {
+        let holding = active && purpose == .hold
+        holdTarget = target
+        holdFailures = 0
+        guard let target else {
+            holdState = .off
+            if holding { endHold() }
+            return
+        }
+        if holding, self.target?.id == target.id { return }
+        holdState = .connecting
+        if holding {
+            endHold()
+            begin(target, .hold, delay: 1)
+        } else if !active {
+            begin(target, .hold)
+        }
+        // Another session is running: the hold opens when it ends (resumeHold).
+    }
+
+    /// The phone stopped ringing on its own: tells the band, so it can close its Find Phone screen.
+    func stopFindPhone() {
+        guard active, authed else { return }
+        let command = MiAuth.findPhoneStopCommand()
+        note("→ find phone: stop \(Self.hexPrefix(command))")
+        sendCommand(command, encrypted: true)
+    }
+
+    private func begin(_ target: BandTarget, _ purpose: Purpose, delay: TimeInterval = 0) {
         run += 1
         let thisRun = run
         self.target = target
         self.purpose = purpose
         bandID = target.id
-        stats = nil
-        battery = nil
-        log = []
+        if purpose != .hold {
+            // A held session leaves what the screens show as it was.
+            stats = nil
+            battery = nil
+            deviceState = nil
+        }
         peripheral = nil
         resetConnection()
         authed = false
         finishing = false
         realtimeOn = false
         keyIndex = 0
-        deviceState = nil
         fileStage = .idle
         todayIDs = []
         fileQueue = []
@@ -270,29 +355,100 @@ final class BandLink: NSObject, ObservableObject {
         fileListMissing = false
         factoryDumps = []
         active = true
-        note("start: \(target.name), \(target.keys.count) key(s)")
+        note("— \(purpose.label): \(target.name), \(target.keys.count) key(s)")
 
-        after(25, thisRun) { [weak self] in
-            guard let self, self.active, !self.authed else { return }
-            self.fail(.timeout)
+        // A held session's time limit starts when it connects: it may wait for the band (locate).
+        if purpose != .hold {
+            after(25, thisRun) { [weak self] in
+                guard let self, self.active, !self.authed else { return }
+                self.fail(.timeout)
+            }
         }
 
+        // Busy at once, so callers waiting on `phase` see the session even during the delay.
+        stage = .searching
+        if delay > 0 {
+            after(delay, thisRun) { [weak self] in self?.locateWhenReady(thisRun) }
+        } else {
+            locateWhenReady(thisRun)
+        }
+    }
+
+    private func locateWhenReady(_ thisRun: Int) {
         switch central.state {
         case .poweredOn:
             locate(thisRun)
         case .unknown, .resetting:
-            phase = .searching
             pendingStart = { [weak self] in self?.locate(thisRun) }
         default:
             fail(.bluetooth(central.state))
         }
     }
 
-    /// Ends live or sync early; what was read so far is kept.
+    /// Ends live or sync early; what was read so far is kept. A held session stays.
     func stop() {
-        guard active else { return }
+        guard active, purpose != .hold else { return }
         note("stopped by user")
         finish()
+    }
+
+    // MARK: held session (docs/STAY-CONNECTED.md section 4)
+
+    /// Lets go of the held session; its timers die with the run.
+    private func endHold() {
+        note("hold: letting go")
+        release()
+        run += 1
+    }
+
+    /// After another session, or when Bluetooth comes back: open the held session again.
+    private func resumeHold() {
+        guard holdTarget != nil, !active else { return }
+        holdState = .connecting
+        scheduleHold(in: 2)
+    }
+
+    private func scheduleHold(in delay: TimeInterval) {
+        guard holdTarget != nil else { return }
+        after(delay, run) { [weak self] in
+            guard let self, !self.active, let target = self.holdTarget else { return }
+            self.begin(target, .hold)
+        }
+    }
+
+    /// A held session failed: open it again after a wait that fits the error, or, with Bluetooth
+    /// off, when it comes back on (centralManagerDidUpdateState).
+    private func holdFailed(_ error: LinkError) {
+        let wasOpen = authed
+        release()
+        run += 1
+        guard holdTarget != nil else { return }
+        holdState = .connecting
+        let delay: TimeInterval
+        switch error {
+        case .bluetoothOff, .unauthorized, .bluetoothUnsupported:
+            note("hold: waiting for Bluetooth")
+            return
+        case .disconnected where wasOpen:
+            // Out of range, most likely: locate leaves a pending connection, so this doesn't poll.
+            delay = 1
+        case .wrongKey:
+            delay = 300
+        default:
+            delay = Self.holdRetryDelays[min(holdFailures, Self.holdRetryDelays.count - 1)]
+            holdFailures += 1
+        }
+        note("hold: again in \(Int(delay)) s")
+        scheduleHold(in: delay)
+    }
+
+    /// The band this phone connected to before, by its CoreBluetooth identifier, for a pending
+    /// connection while iOS has no connection to it.
+    private func knownPeripheral() -> CBPeripheral? {
+        guard let id = target?.id,
+              let stored = UserDefaults.standard.string(forKey: "peripheral.\(id.uuidString)"),
+              let uuid = UUID(uuidString: stored) else { return nil }
+        return central.retrievePeripherals(withIdentifiers: [uuid]).first
     }
 
     /// Cheap check, no session: which of these bands is connected to the phone at the moment.
@@ -312,17 +468,24 @@ final class BandLink: NSObject, ObservableObject {
 
     private func locate(_ thisRun: Int) {
         guard run == thisRun, active else { return }
-        phase = .searching
+        stage = .searching
         let connected = central.retrieveConnectedPeripherals(withServices: [Self.fe95])
         if let match = connected.first(where: { nameMatches($0.name) }) {
             note("connected in iOS: \(match.name ?? "?")")
             connect(match)
             return
         }
+        if purpose == .hold, let known = knownPeripheral() {
+            // A pending connection has no time limit: iOS connects when the band is back in range
+            // and wakes the app (docs/STAY-CONNECTED.md section 3).
+            note("hold: waiting for the band to come back")
+            connect(known)
+            return
+        }
         note("not connected in iOS, scanning for adverts")
         central.scanForPeripherals(withServices: nil, options: nil)
         after(12, thisRun) { [weak self] in
-            guard let self, self.phase == .searching else { return }
+            guard let self, self.stage == .searching else { return }
             self.central.stopScan()
             self.fail(.notFound)
         }
@@ -344,14 +507,17 @@ final class BandLink: NSObject, ObservableObject {
         central.stopScan()
         peripheral = p
         p.delegate = self
-        phase = .connecting
+        stage = .connecting
+        if let id = target?.id {
+            UserDefaults.standard.set(p.identifier.uuidString, forKey: "peripheral.\(id.uuidString)")
+        }
         central.connect(p, options: nil)
     }
 
     // MARK: session
 
     private func startSession() {
-        phase = .authenticating
+        stage = .authenticating
         note("→ SessionConfig")
         send(MiFrame.encode(kind: MiFrame.kindSessionConfig, seq: 0, payload: MiFrame.startSessionPayload))
     }
@@ -372,15 +538,23 @@ final class BandLink: NSObject, ObservableObject {
         sendCommand(MiAuth.clockCommand(is24Hour: MiAuth.phoneUses24Hour), encrypted: true)
         sendCommand(MiAuth.systemGet(2), encrypted: true)
         sendCommand(MiAuth.systemGet(78), encrypted: true)
+        if purpose == .hold {
+            // No battery, live stats or time limit: the session just stays open for the band.
+            stage = .reading
+            holdState = .connected
+            holdFailures = 0
+            note("auth ok → holding the session")
+            return
+        }
         if case .send(let commands) = purpose {
-            phase = .reading
+            stage = .reading
             note("auth ok → sending \(commands.count) command(s)")
             for command in commands { sendCommand(command, encrypted: true) }
             let thisRun = run
             after(2.0, thisRun) { [weak self] in self?.finish() }
             return
         }
-        phase = purpose == .live ? .live : .reading
+        stage = purpose == .live ? .live : .reading
         // A sync that reconnected for its next file (reconnectForNextFile) carries on fetching.
         let resuming = purpose == .sync && fileStage == .fetching
         note(resuming ? "auth ok → next file" : "auth ok → battery + live stats")
@@ -505,6 +679,12 @@ final class BandLink: NSObject, ObservableObject {
             let name = command.message(15)?.message(3)?.blobs[1].map { String(decoding: $0, as: UTF8.self) }
             let label = name.map { "\"\($0)\"" } ?? "fields \(command.fieldNumbers)"
             if factoryDumps.insert(label).inserted { note("← 13/2 factory file dump \(label), not used") }
+
+        case (2, 17):
+            // Find Phone from the band (docs/STAY-CONNECTED.md section 1).
+            guard let ring = MiAuth.findPhoneRequest(command) else { return }
+            note("← find phone: \(ring ? "ring" : "stop") \(Self.hexPrefix(lastCommandBody))")
+            if let id = target?.id { onFindPhone?(id, ring) }
 
         default:
             note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 40))")
@@ -661,13 +841,14 @@ final class BandLink: NSObject, ObservableObject {
             let outcome = self.authed ? self.completion() : .failed(.notRead)
             self.release()
             switch outcome {
-            case .complete: self.phase = .done
-            case .partial(let reason): self.phase = .partial(reason)
-            case .failed(let error): self.phase = .failed(error.message)
+            case .complete: self.stage = .done
+            case .partial(let reason): self.stage = .partial(reason)
+            case .failed(let error): self.stage = .failed(error.message)
             }
             self.note("result: \(outcome.label)")
             self.lastOutcome = outcome
             if let id = self.target?.id { self.onFinish?(id, outcome) }
+            self.resumeHold()
         }
     }
 
@@ -689,6 +870,10 @@ final class BandLink: NSObject, ObservableObject {
     private func fail(_ error: LinkError) {
         guard active else { return }
         note("error: \(error.code)")
+        if purpose == .hold {
+            holdFailed(error)
+            return
+        }
         if authed, purpose == .sync {
             // Files already stored still need their records sent, so end as a partial sync.
             realtimeOn = false
@@ -696,9 +881,10 @@ final class BandLink: NSObject, ObservableObject {
             return
         }
         release()
-        phase = .failed(error.message)
+        stage = .failed(error.message)
         lastOutcome = .failed(error)
         if let id = target?.id { onFinish?(id, .failed(error)) }
+        resumeHold()
     }
 
     /// Hands the channel back to Mi Fitness.
@@ -820,6 +1006,10 @@ final class BandLink: NSObject, ObservableObject {
     private func handleCommandBytes(_ body: Data) {
         guard let command = PBMessage(body) else { return }
         lastCommandBody = body
+        if purpose == .hold, authed {
+            // What the band sends on its own while the session is idle (docs/STAY-CONNECTED.md section 6).
+            note("← held \(command.varints[1] ?? 0)/\(command.varints[2] ?? 0), \(body.count) bytes")
+        }
         if command.varints[1] == 2, command.varints[2] == 110 {
             // Unknown everywhere (docs/CAPABILITIES.md §16); keep the bytes for decoding later.
             note("← 2/110 \(body.count) bytes: \(body.map { String(format: "%02x", $0) }.joined())")
@@ -855,7 +1045,12 @@ final class BandLink: NSObject, ObservableObject {
             default: note("← \(uuid.uuidString) \(body.count) bytes, not used")
             }
         case .acknowledged(let accepted):
-            if !accepted { note("← \(uuid.uuidString) refused a message") }
+            if !accepted {
+                note("← \(uuid.uuidString) refused a message")
+            } else if purpose == .hold, authed {
+                // Whether the band took what the phone sent on the held session (docs/STAY-CONNECTED.md section 7).
+                note("← \(uuid.uuidString) acknowledged")
+            }
         case .undecryptable(let count):
             note("← \(uuid.uuidString) \(count) bytes didn't decrypt")
         case .unexpected(let what):
@@ -895,8 +1090,11 @@ final class BandLink: NSObject, ObservableObject {
         }
     }
 
-    private func note(_ text: String) {
+    /// Adds a line to the log Diagnostics shows. It runs across sessions (a held session's lines
+    /// stay after a sync), newest last.
+    func note(_ text: String) {
         log.append("\(Date().formatted(date: .omitted, time: .standard))  \(text)")
+        if log.count > Self.logLimit { log.removeFirst(log.count - Self.logLimit) }
     }
 
     /// "write-without-response, notify": what a characteristic allows, for the log.
@@ -929,12 +1127,23 @@ extension BandLink: CBCentralManagerDelegate {
             start()
         } else if active, central.state != .poweredOn, central.state != .unknown, central.state != .resetting {
             fail(.bluetooth(central.state))
+        } else if central.state == .poweredOn {
+            // Bluetooth is back on: a held session waiting for it opens again.
+            resumeHold()
         }
+    }
+
+    /// iOS relaunched the app in the background for the held session (docs/STAY-CONNECTED.md
+    /// section 3). The session keys died with the old process, so the hold starts over when
+    /// AppModel sets it again at launch.
+    func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        let restored = (dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral]) ?? []
+        note("restored by iOS with \(restored.count) band(s)")
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        guard phase == .searching, let target else { return }
+        guard stage == .searching, let target else { return }
         let serviceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data]
         let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name
         var match = nameMatches(advertisedName)
@@ -950,6 +1159,14 @@ extension BandLink: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         guard active, peripheral == self.peripheral else { return }
         note("connected")
+        if purpose == .hold {
+            // The held session's time limit, from the connection (begin explains why).
+            let thisRun = run
+            after(25, thisRun) { [weak self] in
+                guard let self, self.active, !self.authed else { return }
+                self.fail(.timeout)
+            }
+        }
         peripheral.discoverServices([Self.fe95])
     }
 
@@ -1035,7 +1252,7 @@ extension BandLink: CBPeripheralDelegate {
             }
             if v1Characteristics.values.allSatisfy(\.isNotifying), keys == nil, phoneNonce.isEmpty {
                 // V1 has no SessionConfig: authentication starts once every subscription is on.
-                phase = .authenticating
+                stage = .authenticating
                 startAuth()
             }
         }

@@ -271,7 +271,7 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 - **Yön:** bant → telefon (başlat/durdur), telefon → bant (telefonda durdurulunca bantı susturmak).
 - **Mesaj:** bant → `Command{2,17}` `system(4).findDevice(5)`: 0 başlat, diğer değer durdur [KOD] `X/services/XiaomiSystemService.java:189-200`. Telefon kendi tarafında durdurunca `Command{2,17}` `findDevice(5) = 1` (`:917-931`).
 - **Beyan:** statik (`supportsFindDevice`).
-- **iOS:** tutulan oturum şart. Ses çalmak için seçenekler [iOS]:
+- **iOS:** tutulan oturum şart. **Freeband'de var, saatte henüz denenmedi**: "Bağlı kal" ayarı ve çalma, ayrıntılar ve denenecekler `docs/STAY-CONNECTED.md`'de. Ses çalmak için seçenekler [iOS]:
   - yerel bildirim + ses: kolay, ama sessiz anahtar ve Odak modlarına takılır;
   - `audio` arka plan modu + `AVAudioSession` `.playback`: sessiz anahtarı yok sayar, ama arka planda sıfırdan çalmaya başlamak ve App Store incelemesi riskli;
   - Critical Alerts: Apple'dan özel yetki ister.

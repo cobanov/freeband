@@ -10,7 +10,7 @@ import UIKit
 /// and, if web access is on, unsent samples go to the hub.
 @MainActor
 final class AppModel: ObservableObject {
-    let link = BandLink()
+    let link: BandLink
     let context: ModelContext
     let ingest: ActivityIngest
 
@@ -67,6 +67,9 @@ final class AppModel: ObservableObject {
     init(context: ModelContext, isDemo: Bool = false) {
         self.context = context
         self.isDemo = isDemo
+        // Only the real store's link may be relaunched by iOS for a held session; the demo has no band.
+        link = BandLink(restoresState: !isDemo)
+        findPhoneAlert = isDemo ? nil : FindPhoneAlert()
         ingest = ActivityIngest(context: context)
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
@@ -79,11 +82,19 @@ final class AppModel: ObservableObject {
             try? self.context.save()
         }
         link.onActivityFile = { [weak self] id, file, data, today in self?.storeActivityFile(id, file, data, today: today) }
+        link.onFindPhone = { [weak self] id, ring in self?.findPhone(id, ring) }
+        findPhoneAlert?.onStop = { [weak self] in self?.stopFindPhone() }
         calibration = Self.loadCalibration()
         mergeDuplicateBands()
         observeDayChanges()
         AppModel.shared = self
-        if !isDemo { Task { await self.launchMaintenance() } }
+        if !isDemo {
+            // At launch, also when iOS relaunches the app in the background for the held session.
+            // The log line marks a new process: what came before it in the log is gone.
+            link.note("— app started")
+            updateHold()
+            Task { await self.launchMaintenance() }
+        }
     }
 
     // MARK: band sessions
@@ -116,6 +127,113 @@ final class AppModel: ObservableObject {
     func findBand(_ band: Band, start vibrating: Bool) {
         guard band.supportsFind else { return }
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
+    }
+
+    // MARK: Stay connected and Find Phone (docs/STAY-CONNECTED.md)
+
+    static let stayConnectedKey = "stayConnected"
+    /// Ringing stops by itself after this long.
+    static let ringLimit: TimeInterval = 120
+
+    /// The band that made the phone ring (Find Phone), by its short name; nil when quiet.
+    @Published private(set) var ringingFor: String?
+    var phoneRinging: Bool { ringingFor != nil }
+    private let ringer = PhoneRinger()
+    private let findPhoneAlert: FindPhoneAlert?
+    private var ringSerial = 0
+
+    /// Holds a session with the selected band while Stay connected is on; lets go otherwise.
+    func updateHold() {
+        guard !isDemo, UserDefaults.standard.bool(forKey: Self.stayConnectedKey) else {
+            link.hold(nil)
+            return
+        }
+        guard let band = selectedBand() else {
+            link.note("stay connected: no band")
+            link.hold(nil)
+            return
+        }
+        guard let target = target(for: band) else {
+            link.note("stay connected: no key for \(band.shortName)")
+            link.hold(nil)
+            return
+        }
+        link.hold(target)
+    }
+
+    private var backgroundTask = UIBackgroundTaskIdentifier.invalid
+
+    /// The app is going to the background. A session the user started ends (Live would keep the
+    /// band measuring). With Stay connected on, the app asks iOS for a few seconds more, so the
+    /// held session can open again before the app is suspended: its retry is a timer, and timers
+    /// don't run in a suspended app. Once it is open, Bluetooth events wake the app
+    /// (docs/STAY-CONNECTED.md section 3).
+    func enterBackground() {
+        stop()
+        guard !isDemo, UserDefaults.standard.bool(forKey: Self.stayConnectedKey) else { return }
+        endBackgroundTask()
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Stay connected") { [weak self] in
+            self?.endBackgroundTask()
+        }
+        updateHold()
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.backgroundGrace) { [weak self] in self?.endBackgroundTask() }
+    }
+
+    /// Enough for a session to wind down (0.4 s), the wait before the hold (2 s), and a login.
+    static let backgroundGrace: TimeInterval = 20
+
+    private func endBackgroundTask() {
+        guard backgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
+    }
+
+    /// The Stay connected switch. Turning it on asks for notifications, which Find Phone shows.
+    func setStayConnected(_ on: Bool) {
+        UserDefaults.standard.set(on, forKey: Self.stayConnectedKey)
+        if on { findPhoneAlert?.requestPermission() }
+        updateHold()
+    }
+
+    /// The band on the Band tab: the one picked there, else the first added.
+    private func selectedBand() -> Band? {
+        let bands = (try? context.fetch(FetchDescriptor<Band>(sortBy: [SortDescriptor(\.addedAt)]))) ?? []
+        let selected = UserDefaults.standard.string(forKey: "selectedBand") ?? ""
+        return bands.first { $0.id.uuidString == selected } ?? bands.first
+    }
+
+    /// The band asked the phone to ring, or to stop.
+    private func findPhone(_ id: UUID, _ ring: Bool) {
+        guard ring else {
+            endRinging(tellBand: false)
+            return
+        }
+        guard !phoneRinging else { return }
+        let name = band(id)?.shortName ?? String(localized: "Your band")
+        ringingFor = name
+        link.note(ringer.start() ? "ringing" : "ringing: the audio session refused, notification only")
+        findPhoneAlert?.post(bandName: name)
+        ringSerial += 1
+        let serial = ringSerial
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.ringLimit) { [weak self] in
+            guard let self, self.ringSerial == serial, self.phoneRinging else { return }
+            self.link.note("ringing: stopped after \(Int(Self.ringLimit)) s")
+            self.endRinging(tellBand: true)
+        }
+    }
+
+    /// Stop from the app or the notification: the phone goes quiet and tells the band.
+    func stopFindPhone() {
+        endRinging(tellBand: true)
+    }
+
+    private func endRinging(tellBand: Bool) {
+        guard phoneRinging else { return }
+        ringingFor = nil
+        ringSerial += 1
+        ringer.stop()
+        findPhoneAlert?.clear()
+        if tellBand { link.stopFindPhone() }
     }
 
     /// Plan section 4 ("daily open"): when the app comes to the front, sync if the last sync is
@@ -469,6 +587,7 @@ final class AppModel: ObservableObject {
         pendingHubRecords[id] = nil
         context.delete(band)
         try? context.save()
+        updateHold()
     }
 
     /// Deletes every observation, raw file, derived row and score; bands, keys and webhooks stay.
