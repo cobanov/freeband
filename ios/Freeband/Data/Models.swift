@@ -61,7 +61,7 @@ final class Band {
     var supportsFind: Bool { Self.family(name: name, model: model).supportsFind }
 
     /// From Mi Fitness's name or the Bluetooth one: "Redmi Watch 5 Active D3DD", "Xiaomi Watch S1
-    /// Active" or "XiaomiWatchS1Active 6373", "Xiaomi Smart Band 8 A1B2" (not the 8 Pro, which
+    /// Active" or "XiaomiWatchS1Active 5E6F", "Xiaomi Smart Band 8 A1B2" (not the 8 Pro, which
     /// speaks only Bluetooth Classic, nor the 8 Active). Anything else is a Band 10 or 10 Pro by
     /// its model code.
     static func family(name: String, model: String? = nil) -> Family {
