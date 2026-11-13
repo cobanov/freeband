@@ -200,13 +200,10 @@ struct SampleDraft: Equatable {
     var heartRate = 0
     var standingHours = 0
     var level = 0
-    /// The band's own count of moving minutes so far today (live readings only).
-    var movingMinutes: Int?
 
     static func live(_ stats: MiAuth.LiveStats, at ts: Date = Date()) -> SampleDraft {
         SampleDraft(kind: "live", ts: ts, steps: Int(stats.steps), calories: Int(stats.calories),
-                    heartRate: Int(stats.heartRate), standingHours: Int(stats.standingHours),
-                    movingMinutes: stats.movingMinutes.map(Int.init))
+                    heartRate: Int(stats.heartRate), standingHours: Int(stats.standingHours))
     }
 
     static func battery(_ level: Int, at ts: Date = Date()) -> SampleDraft {

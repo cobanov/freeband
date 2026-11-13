@@ -198,6 +198,7 @@ enum IngestMapper {
             var s = days[day] ?? MinuteSeries(day: day, tzOffsetMinutes: tz)
             s.steps[m] = rec.steps
             s.kcal[m] = rec.activeCalories
+            s.activityLevel[m] = rec.activityLevel
             s.distance[m] = rec.distanceMeters
             s.heartRate[m] = rec.heartRate.flatMap { $0 > 0 && $0 < 255 ? $0 : nil }
             s.energy[m] = rec.energy.flatMap { $0 > 0 && $0 < 255 ? $0 : nil }
@@ -229,6 +230,7 @@ enum IngestMapper {
                 if let v = s.kcal[i] { merged.kcal[i] = v }
                 if let v = s.distance[i] { merged.distance[i] = v }
                 if let v = s.energy[i] { merged.energy[i] = v }
+                if let v = s.activityLevel[i] { merged.activityLevel[i] = v }
             }
             for id in part.sourceFileIDs where !sources.contains(id) { sources.append(id) }
         }

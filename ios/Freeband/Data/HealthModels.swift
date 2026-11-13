@@ -30,6 +30,8 @@ final class MinuteDay {
     /// Metres per minute.
     var distance: Data = Data()
     var energy: Data = Data()
+    /// Activity level per minute, packed like the others (added with parser version 5).
+    var activity: Data = Data()
     /// The minute files merged into this day, in file order.
     var sourceFileIDs: [String] = []
     var recordCount: Int = 0
@@ -52,6 +54,7 @@ final class MinuteDay {
         kcal = Packed.pack8(s.kcal)
         distance = Packed.pack16(s.distance)
         energy = Packed.pack8(s.energy)
+        activity = Packed.pack8(s.activityLevel)
         sourceFileIDs = draft.sourceFileIDs
         recordCount = draft.recordCount
         updatedAt = Date()
@@ -69,6 +72,7 @@ final class MinuteDay {
         s.kcal = Packed.unpack8(kcal, count: n)
         s.distance = Packed.unpack16(distance, count: n)
         s.energy = Packed.unpack8(energy, count: n)
+        s.activityLevel = Packed.unpack8(activity, count: n)
         return s
     }
 

@@ -639,6 +639,10 @@ struct DailyDetails: Equatable, Sendable {
         var steps: Int?
         /// Raw value; [spec: probably kcal].
         var activeCalories: Int?
+        /// How hard the minute was, by the band: 0 quiet, 1 light, 2 low, 3 middle, 4 high,
+        /// 5 severe; a still wrist reports 7. Minutes at 3...5 are the band's "Moving" minutes
+        /// (docs/ACTIVITY.md section 6.1).
+        var activityLevel: Int?
         var distanceMeters: Int?
         /// Raw bpm; 0 likely means not measured (the app should keep 10...250).
         var heartRate: Int?
@@ -703,7 +707,7 @@ struct DailyDetails: Equatable, Sendable {
             if x.valid(2) { rec.steps = x.bits(2, 14) }
         }
         if let x = try g.next(8, &r), x.valid(1) { rec.activeCalories = x.bits(2, 6) }  // g1
-        _ = try g.next(8, &r)  // g2: unknown
+        if let x = try g.next(8, &r), x.valid(0) { rec.activityLevel = x.bits(0, 3) }  // g2: [7..5] level | [4..0] sport type
         if let x = try g.next(16, &r), x.valid(0) { rec.distanceMeters = Int(x.raw) }  // g3
         if let x = try g.next(8, &r), x.valid(0) { rec.heartRate = Int(x.raw) }  // g4
         if let x = try g.next(8, &r), x.valid(0) { rec.energy = Int(x.raw) }  // g5

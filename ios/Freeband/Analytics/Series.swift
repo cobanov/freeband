@@ -296,6 +296,8 @@ struct MinuteSeries: Equatable, Sendable {
     var kcal: [Int?]
     var distance: [Int?]
     var energy: [Int?]
+    /// The band's activity level per minute (0 quiet ... 5 severe, 7 on a still wrist).
+    var activityLevel: [Int?]
 
     init(day: DayKey, tzOffsetMinutes: Int) {
         self.day = day
@@ -308,6 +310,14 @@ struct MinuteSeries: Equatable, Sendable {
         kcal = empty
         distance = empty
         energy = empty
+        activityLevel = empty
+    }
+
+    /// The band's "Moving" minutes as Mi Fitness counts them: minutes at activity level 3...5.
+    /// Nil when no minute of the day carries a level (files parsed before the level was read).
+    var movingMinutes: Int? {
+        guard activityLevel.contains(where: { $0 != nil }) else { return nil }
+        return activityLevel.filter { ($0 ?? 0) >= 3 && ($0 ?? 0) <= 5 }.count
     }
 
     var start: Date { day.start(offsetMinutes: tzOffsetMinutes) }

@@ -227,7 +227,7 @@ let out: [String: Any] = [
     "clock_istanbul": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "Europe/Istanbul")!, is24Hour: true)),
     "clock_newyork_12h": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "America/New_York")!, is24Hour: false)),
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
-    "live_moving": live.movingMinutes.map { Int($0) } ?? -1,
+    "live_intensity": live.intensity.map { Int($0) } ?? -1,
     "resend_seqs": [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)].map { MiFrame.resendSeqs(next: $0.0, nack: $0.1) },
 ]
 print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }.merging(bandState) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)

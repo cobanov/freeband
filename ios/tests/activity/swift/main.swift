@@ -266,7 +266,7 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
             "records": .array(d.records.map { r -> JSON in
                 var x: [String: JSON] = [
                     "ts": jTime(r.ts), "steps": jInt(r.steps), "active_calories": jInt(r.activeCalories),
-                    "distance_m": jInt(r.distanceMeters), "heart_rate": jInt(r.heartRate), "energy": jInt(r.energy),
+                    "activity_level": jInt(r.activityLevel), "distance_m": jInt(r.distanceMeters), "heart_rate": jInt(r.heartRate), "energy": jInt(r.energy),
                     "spo2": jInt(r.spo2), "stress": jInt(r.stress),
                 ]
                 if let v = r.extraByte { x["extra_byte"] = jInt(v) }
@@ -894,6 +894,14 @@ check("unknown versions of every parsed kind are .unsupported(.version)") {
         }
     }
     return e
+}
+
+// Two v4 records in the shape a Band 10 Pro sends (header ff ff f8 cf ff ff). Group 2 is 0x83 in
+// the first (level 100b = 4, sport type 3) and 0xe0 in the second (level 7, a still wrist).
+check("daily details: activity level is the top three bits of group 2") {
+    guard case let .dailyDetails(d) = parsed(hexData("00f153650c040000fffff8cfffff3100038321005a64e40c000000000000000000e000000064e40c000000000000cf4fe1ae")).payload else { return ["parse"] }
+    let got = d.records.map { "\($0.steps ?? -1)/\($0.activityLevel ?? -1)/\($0.heartRate ?? -1)" }
+    return got == ["49/4/90", "0/7/0"] ? [] : ["got \(got)"]
 }
 
 check("daily details: every prefix keeps the whole records before the cut") {

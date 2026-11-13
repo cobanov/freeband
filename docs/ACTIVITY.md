@@ -271,18 +271,20 @@ Kayıt (her biri bir dakika) — grupları sırayla, yalnız nibble'ında `0x8` 
 | Grup | Genişlik | Sürüm | İçerik | Geçerlilik | Birim |
 |---|---|---|---|---|---|
 | g0 | 16 | ≥1 | bit 15: bilinmiyor; bit 14: **ek bayt bayrağı**; bit 13–0: **adım** | slot 1 → bayrak, slot 2 → adım | adım/dakika (en fazla 16383) |
-| g1 | 8 | ≥1 | bit 7–6: bilinmiyor ("activity type?"); bit 5–0: **aktif kalori** | slot 1 | [TAHMİN] kcal/dakika |
-| g2 | 8 | ≥1 | bilinmiyor | — | — |
+| g1 | 8 | ≥1 | bit 7–6: **etkinlik türü** (`activityType`, okunmuyor) [MF]; bit 5–0: **aktif kalori** | slot 0 → tür, slot 1 → kalori | kcal/dakika |
+| g2 | 8 | ≥1 | bit 7–5: **etkinlik düzeyi** (`activityHILevel`): 0 sakin, 1 hafif, 2 düşük, 3 orta, 4 yüksek, 5 şiddetli [MF]; bit 4–0: spor türü (`sportType`, okunmuyor) | slot 0 → düzey, slot 1 → spor türü | Mi Fitness düzeyi yalnız sürüm ≥ 3'te kullanıyor |
 | g3 | 16 | ≥1 | **mesafe** (tüm 16 bit) | slot 0 | metre (Gadgetbridge ×100 ile cm saklar, `:122`) |
 | g4 | 8 | ≥1 | **nabız** | slot 0 | bpm |
 | g5 | 8 | ≥1 | **energy** (body energy) | slot 0 | [TAHMİN] 0–100 |
-| g6 | 16 | ≥1 | bilinmiyor | — | — |
+| g6 | 16 | ≥1 | bit 15–10: toplam kalori (`totalCal`); bit 9–8: enerji durumu; bit 7–0: enerji durumu değeri (bit 7 işaret) [MF]; Freeband okumuyor | — | — |
 | g7 | 8 | ≥3 | **SpO2** | slot 0 | % |
 | g8 | 8 | ≥3 | **stres**; `255` = değer yok (`:155`) | slot 0 | 0–100 |
 | ek | 8 | ≥1 | g0'daki bayrak 1 ise **tam bu noktada** 1 bayt; anlamı bilinmiyor (`:162-165`) | — | — |
 | g9 | 16 | ≥4 | "light value" (Gadgetbridge parse etmiyor, `:167-169`) | [TAHMİN] slot 0 | bilinmiyor |
 | g10 | 16 | ≥4 | "body momentum" (Gadgetbridge parse etmiyor, `:171-172`) | [TAHMİN] slot 0 | bilinmiyor |
 
+- **[MF] = Mi Fitness Android 9.8.348i'nin (com.xiaomi.wearable) jadx ile açılmış kodunda okundu**, 2026-11-13: `com.xiaomi.fit.fitness.parser.daily.DailyRecordParser` (grup tablosu `v2DataInfoArray`, alan türleri `DataItemType`) ve `...device.mi.parse.utils.MiParsedDataRecorder.recordDailyRecord`. Kod kopyalanmadı; alan yerleri ve anlamları buraya yazıldı.
+- **Bandın "Hareket" (Moving) dakikası bir dosyada ya da komutta gelmiyor; telefonda sayılıyor** [MF]: Mi Fitness, etkinlik düzeyi 3–5 olan her dakika için bir kayıt üretiyor (`MHStrengthItem`), halka bunların sayısı. Freeband aynı sayımı yapıyor (`MinuteSeries.movingMinutes`). [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: bilek hareketsizken 47 dakikanın hepsinde g2 = `0xE0`, yani düzey **7** (enum'da yok; "hesaplanmadı" gibi) ve bandın Hareket sayısı o sürede değişmedi. Düzey 3–5'in bandın sayısıyla birebir arttığı henüz ölçülmedi.
 - Ek bayt **v1/v2'de g6'dan sonra, v3/v4'te g8'den sonra ve g9'dan önce** gelir. Bayrak yalnız g0 varsa ve slot 1 geçerliyse okunur; yoksa 0 sayılır. (`:97-103`, `:162-165`)
 - Tüm gruplar varken kayıt boyu: v1/v2 10, v3 12, v4 16 bayt; ek bayt varsa +1.
 - Zaman: kayıt `i`'nin zamanı `fileId.ts + 60·i` saniye. (`:84-85`, `:92`, `:177`)

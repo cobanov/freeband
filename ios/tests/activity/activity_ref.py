@@ -291,7 +291,7 @@ class _GroupWalker:
 def _daily_details_record(version: int, header: bytes, cur: Cursor) -> dict:
     g = _GroupWalker(header, cur)
     rec = {
-        "steps": None, "active_calories": None, "distance_m": None, "heart_rate": None,
+        "steps": None, "active_calories": None, "activity_level": None, "distance_m": None, "heart_rate": None,
         "energy": None, "spo2": None, "stress": None,
     }
     extra = 0
@@ -301,10 +301,12 @@ def _daily_details_record(version: int, header: bytes, cur: Cursor) -> dict:
             extra = x.bits(1, 1)
         if x.valid(2):
             rec["steps"] = x.bits(2, 14)
-    x = g.next(8)  # g1: [7..6] unknown | [5..0] active calories
+    x = g.next(8)  # g1: [7..6] activity type (not read) | [5..0] active calories
     if x is not None and x.valid(1):
         rec["active_calories"] = x.bits(2, 6)
-    g.next(8)  # g2: unknown
+    x = g.next(8)  # g2: [7..5] activity level, 0 quiet .. 5 severe | [4..0] sport type (not read)
+    if x is not None and x.valid(0):
+        rec["activity_level"] = x.bits(0, 3)
     x = g.next(16)  # g3: distance in metres
     if x is not None and x.valid(0):
         rec["distance_m"] = x.raw

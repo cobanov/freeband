@@ -391,11 +391,9 @@ private struct TodayContent: View {
                          unit: String(localized: "kcal"),
                          trend: (0..<7).reversed().map { history.summary(day.adding(days: -$0))?.activeCalories.map(Double.init) },
                          color: .activity)
-                // The band's own count when it has sent one for the day; else minutes in the heart rate zones.
-                if let moving = model.movingMinutes(band, day) {
-                    StatTile(title: String(localized: "Moving"), value: FBFormat.number(moving), unit: String(localized: "min"),
-                             trend: (0..<7).reversed().map { model.movingMinutes(band, day.adding(days: -$0)).map(Double.init) },
-                             color: .activity)
+                // The band's Moving minutes when the day's minute files carry the level; else our own count.
+                if let moving = minutes?.movingMinutes {
+                    StatTile(title: String(localized: "Moving"), value: FBFormat.number(moving), unit: String(localized: "min"), color: .activity)
                 } else {
                     tile(.activeMinutes)
                 }

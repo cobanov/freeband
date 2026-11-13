@@ -380,9 +380,9 @@ extension MiAuth {
         let calories: UInt64
         let heartRate: UInt64
         let standingHours: UInt64
-        /// The band's "Moving" minutes: the third of its goals after calories and steps
-        /// (AstroBox calls the field `intensity`; the goals reply names calorie, step, intensity).
-        var movingMinutes: UInt64?
+        /// Field 5, `intensity` in AstroBox's BasicData. Not the band's Moving minutes: it read 7
+        /// while the band showed 49 (those are counted from the minute files, ActivityFiles).
+        var intensity: UInt64?
     }
 
     /// Command{type 8 (Health), subtype 45 start | 46 stop}: the band then sends subtype 47
@@ -399,7 +399,7 @@ extension MiAuth {
         guard let stats = command.message(10)?.message(39) else { return nil }
         return LiveStats(steps: stats.varints[1] ?? 0, calories: stats.varints[2] ?? 0,
                          heartRate: stats.varints[4] ?? 0, standingHours: stats.varints[6] ?? 0,
-                         movingMinutes: stats.varints[5])
+                         intensity: stats.varints[5])
     }
 }
 

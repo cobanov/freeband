@@ -424,18 +424,7 @@ final class AppModel: ObservableObject {
         sessionDrafts.append(draft)
         context.insert(Sample(bandID: id, draft: draft))
         if draft.kind == "battery", let band = band(id) { band.lastBattery = draft.level }
-        if let minutes = draft.movingMinutes { movingMinutes["\(id.uuidString).\(DayKey.current(draft.ts).index)"] = minutes }
         try? context.save()
-    }
-
-    /// The band's own moving minutes by day, keyed "<band id>.<day index>": the last value a live
-    /// reading carried that day. It is in no file, so it is kept here.
-    @Published private(set) var movingMinutes = (UserDefaults.standard.dictionary(forKey: "movingMinutes") as? [String: Int]) ?? [:] {
-        didSet { if !isDemo, movingMinutes != oldValue { UserDefaults.standard.set(movingMinutes, forKey: "movingMinutes") } }
-    }
-
-    func movingMinutes(_ band: Band, _ day: DayKey) -> Int? {
-        movingMinutes["\(band.id.uuidString).\(day.index)"]
     }
 
     /// `lastSyncAt` moves only on a complete session. Files that arrived are parsed whatever the
@@ -764,7 +753,6 @@ final class AppModel: ObservableObject {
         pendingRollup[id] = nil
         pendingHubRecords[id] = nil
         monitoring = monitoring.filter { !$0.key.hasPrefix(id.uuidString) }
-        movingMinutes = movingMinutes.filter { !$0.key.hasPrefix(id.uuidString) }
         context.delete(band)
         try? context.save()
         updateHold()

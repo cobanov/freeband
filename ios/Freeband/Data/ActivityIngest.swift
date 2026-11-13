@@ -53,7 +53,8 @@ final class ActivityIngest {
     /// 3: empty files (id, pad, CRC) parse as empty.
     /// 4: sleep details without a summary or stages take their session from the fell-asleep and
     /// woke-up events (Xiaomi Watch S1 Active).
-    static let parserVersion = 4
+    /// 5: daily details carry the per-minute activity level (the band's Moving minutes).
+    static let parserVersion = 5
 
     let context: ModelContext
 
