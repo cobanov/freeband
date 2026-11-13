@@ -58,7 +58,7 @@ private struct BandPage: View {
     /// What Stay connected does, and while it's on, whether the session is open right now.
     private var stayConnectedSubtitle: String {
         guard stayConnected else {
-            return String(localized: "Lets \(band.shortName) find this phone. Mi Fitness can't connect while it's on.")
+            return String(localized: "Lets \(band.shortName) find this phone and sync on its own. Mi Fitness can't connect while it's on.")
         }
         switch link.holdState {
         case .connected where link.bandID == band.id: return String(localized: "Connected. \(band.shortName) can find this phone.")

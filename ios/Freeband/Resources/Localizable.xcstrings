@@ -2231,16 +2231,6 @@
         }
       }
     },
-    "Lets %@ find this phone. Mi Fitness can't connect while it's on.": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ bu telefonu bulabilsin. Açıkken Mi Fitness bağlanamaz."
-          }
-        }
-      }
-    },
     "Light": {
       "comment": "Sleep stage / Strain band word",
       "localizations": {
@@ -5525,6 +5515,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Normalinin üstünde yükle geçen %2$lld günün ardından toparlanma %1$lld."
+          }
+        }
+      }
+    },
+    "Lets %@ find this phone and sync on its own. Mi Fitness can't connect while it's on.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ bu telefonu bulabilir ve kendiliğinden senkron olur. Açıkken Mi Fitness bağlanamaz."
+          }
+        }
+      }
+    },
+    "Heart rate, %lld–%lld bpm": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nabız, %1$lld–%2$lld bpm"
+          }
+        }
+      }
+    },
+    "The day, hour by hour": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gün, saat saat"
           }
         }
       }

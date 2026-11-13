@@ -111,6 +111,25 @@ private struct TodayContent: View {
         return [.steps: totals.reduce(0, +) / Double(totals.count)]
     }
 
+    /// The shown day's minute file, for the day trace.
+    private var dayMinutes: MinuteSeries? {
+        let id = band.id
+        let index = day.index
+        return (try? context.fetch(FetchDescriptor<MinuteDay>(predicate: #Predicate { $0.bandID == id && $0.dayIndex == index })))?.first?.series
+    }
+
+    /// Every sleep that touches the shown day: the night that ended on it, its naps, and the
+    /// night that began on it. A session without stages is drawn as one stretch of light sleep.
+    private var daySleep: [StageSegment] {
+        let next = day.adding(days: 1)
+        let records = [history.mainSleep(day), history.mainSleep(next)].compactMap { $0 } + history.naps(day) + history.naps(next)
+        return records.flatMap { record -> [StageSegment] in
+            let stages = StageSegment.unpack(record.stageTimeline)
+            guard stages.isEmpty else { return stages }
+            return [StageSegment(start: record.bedTime, minutes: Int(record.wakeTime.timeIntervalSince(record.bedTime) / 60), stage: .light)]
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.l) {
@@ -135,33 +154,12 @@ private struct TodayContent: View {
                 }
 
                 if !isFirstSync {
+                    DayTrace(minutes: dayMinutes, sleep: daySleep, dayStart: day.date, now: isToday ? Date() : nil)
                     InsightList(insights: history.insights(day, sleepNeedMinutes: Profile.load().sleepNeed), day: day)
                 }
                 if isToday {
                     BandContextCard(band: band)
                 }
-
-                QuickActionRow {
-                    QuickActionButton(title: String(localized: "Sync"), systemImage: "arrow.triangle.2.circlepath",
-                                      isBusy: BandPresentation.isSyncing(link, band)) {
-                        model.start(band, .sync)
-                    }
-                    .disabled(link.phase.isBusy)
-                    QuickActionButton(title: String(localized: "Live HR"), systemImage: "heart",
-                                      isOn: BandPresentation.isLive(link, band)) {
-                        router.startLive(band, model: model)
-                    }
-                    if band.supportsFind {
-                        QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
-                                          isOn: router.isFinding) {
-                            if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
-                        }
-                    }
-                    if BandFeatures.controls {
-                        QuickActionButton(title: String(localized: "Alarms"), systemImage: "alarm") {}
-                    }
-                }
-
                 if !isFirstSync {
                     metrics
                         .opacity(syncing ? 0.5 : 1)

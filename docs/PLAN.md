@@ -193,7 +193,7 @@ Bugün ekranında, skorların altında, en çok üç satır; önce uyarılar. He
 **Bileşenler** (`UI/Design/Components/`): ScoreArc (270° yay, eşik çentikleri), MetricRow (sparkline + fark), ContributorRow, Hypnogram, ZoneBar, TrendChart (7/30/90, seçimde değer), StatusLine ("Band 10 Pro · %82 · 2 dk önce senkron"), QuickActionButton (56 pt daire, ince ikon), ListCard/ListRow, SegmentedPicker, SnapSlider, sayfa stilleri, EmptyState, ContextCard (canlı/şarj/bulma/uyarı), BandRender (düz vektör bant çizimi, ekranında canlı saat ve pil).
 
 **Ekranlar:**
-- Bugün: hüküm başlığı, StatusLine, üç ScoreArc, bağlamsal kart, dört hızlı aksiyon, "Bugün" metrik listesi.
+- Bugün: hüküm başlığı, StatusLine, üç ScoreArc, **günün izi** (`DayTrace`: gece yarısından gece yarısına nabız çizgisi, çeyrek saatlik adım çubukları, evre renkleriyle uyku bandı; bugün için "şimdi" çizgisi; kartsız, sayfanın kendi figürü), dikkat çekenler, bağlamsal kart, "Bugün" metrik listesi. Hızlı aksiyonlar (Senkron, Canlı, Bul) yalnız Bant sekmesinde; Bugün'de aşağı çekince senkron.
 - Skor detayı (üç skor için tek şablon).
 - Uyku (gece kaydırıcı, hipnogram, evre tablosu, nabız, SpO2).
 - Trendler (kartlar → detay).
