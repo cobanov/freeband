@@ -208,6 +208,18 @@ Bugün ekranında, skorların altında, en çok üç satır; önce uyarılar. He
 
 **Skill'ler (okuma referansı olarak):** `ios-hig-design`, `swiftui-expert-skill`, `swiftui-pro`, `swift-charts`; yerelde `dataviz` ve `checklist-design` (son tasarım denetimi).
 
+### 8.1 Tasarım v4 (2026-11-13): gece gösterge paneli
+
+Kullanıcı "tamamen yeni, çok daha profesyonel, en az WHOOP kalitesinde" bir arayüz istedi. v3'ün ince çizgili, kartsız sadeliği bırakıldı; bileşen adları ve belirteç hattı (`design/tokens.json` → `gen_tokens.py`) aynı kaldı, bu yüzden değişiklik bütün ekranlara birden yansıdı.
+
+- **Zemin:** koyu öncelikli, soğuk mürekkep siyahı: canvas `#07090D`, surface `#11151C`, raised `#1A202A`, hairline `#1F2632`. Açık tema: canvas `#F3F5F8`, beyaz kartlar.
+- **Renk veride:** iyi `#35E0A1`, orta `#FFC043`, düşük `#FF5A5F`; uyku `#8E7BFF`, yük ve adım `#3BA7FF`, nabız `#FF5C93`. Aksiyon rengi artık mavi değil, temanın mürekkebi (koyuda beyaz düğme); açık anahtarlar "iyi" yeşili.
+- **Halka:** 1 pt iz ve 3 pt yay yerine kalın halka (ana 9, kahraman 12, detay 14 pt), yuvarlak uçlu; iz, skorun kendi renginin %20'si; bant eşikleri halkadan kesilmiş çentikler.
+- **Yazı:** Open Sauce Sans kaldı; rakamlar, başlıklar ve düğmeler 600 (önceden en çok 500). Büyük rakam 64 pt.
+- **Şekil:** kart yarıçapı 20, ince kenar çizgili; düğme yarıçapı 14.
+- **Bugün:** kahraman kart (Toparlanma halkası ve yanında dinlenik nabız, HRV, uyku), yan yana Uyku ve Yük kartları, kart içinde günün izi, dikkat çekenler, sayı ızgarası (Adım geniş, diğerleri ikili; her karoda değer, 7 günlük ortalamaya göre değişim ve metriğin renginde çizgi).
+- Yapılmadı: Uyku, Trendler, Bant ve skor detayının düzeni v3'teki gibi (yalnız yeni renk, halka ve kartları aldılar); README ve App Store ekran görüntüleri eski tasarımda; hub'ın CSS belirteçleri üretildi ama site yayınlanmadı.
+
 ## 9. Fazlar ve yürütme (gece, otonom; kullanıcı 2026-10-14'te onay verdi)
 
 | Faz | İçerik | Kim | Durum |

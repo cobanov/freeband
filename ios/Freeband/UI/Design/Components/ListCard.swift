@@ -39,7 +39,7 @@ struct ListRow: View {
         Group {
             if case .toggle(let isOn) = accessory {
                 Toggle(isOn: isOn) { labels }
-                    .tint(.action)
+                    .tint(.good)
             } else {
                 HStack(spacing: FBSpace.s) {
                     labels
@@ -121,7 +121,7 @@ extension View {
     func fbFormStyle() -> some View {
         scrollContentBackground(.hidden)
             .background(.canvas)
-            .tint(.action)
+            .tint(.good)
     }
 
     /// Surface background for a row inside a themed `Form`.

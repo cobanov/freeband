@@ -148,13 +148,15 @@ private struct TodayContent: View {
                 emptyState
 
                 if !isFirstSync {
-                    triad
-                        .opacity(syncing ? 0.5 : 1)
-                        .fbStateAnimation(syncing)
-                }
-
-                if !isFirstSync {
-                    DayTrace(minutes: dayMinutes, sleep: daySleep, dayStart: day.date, now: isToday ? Date() : nil)
+                    VStack(spacing: FBSpace.xs) {
+                        hero
+                        pillars
+                        Card {
+                            DayTrace(minutes: dayMinutes, sleep: daySleep, dayStart: day.date, now: isToday ? Date() : nil)
+                        }
+                    }
+                    .opacity(syncing ? 0.5 : 1)
+                    .fbStateAnimation(syncing)
                     InsightList(insights: history.insights(day, sleepNeedMinutes: Profile.load().sleepNeed), day: day)
                 }
                 if isToday {
@@ -250,6 +252,66 @@ private struct TodayContent: View {
 
     // MARK: scores
 
+    /// Recovery leads the day: its ring, and beside it what it was made of.
+    private var hero: some View {
+        NavigationLink(value: Route.score(.recovery, day: day.index)) {
+            Card(padding: FBSpace.m) {
+                HStack(alignment: .center, spacing: FBSpace.m) {
+                    ScoreArc(kind: .recovery, value: history.score(.recovery, day), style: .hero)
+                    VStack(alignment: .leading, spacing: FBSpace.xs) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(ScoreKind.recovery.name)
+                                .textStyle(.headline)
+                                .foregroundStyle(.textPrimary)
+                            Text(history.score(.recovery, day).map { ScoreKind.recovery.band(for: $0).word } ?? String(localized: "No data"))
+                                .textStyle(.subhead)
+                                .foregroundStyle(.textSecondary)
+                        }
+                        VStack(spacing: FBSpace.xxs) {
+                            fact(TodayMetric.restingHeartRate.title, history.value(.restingHeartRate, on: day).map(FBFormat.bpm))
+                            fact(String(localized: "HRV"), history.score(day)?.hrv.map { String(localized: "\(Int($0.rounded())) ms") })
+                            fact(TodayMetric.sleep.title, history.sleepMinutes(day).map { FBFormat.duration(minutes: $0) })
+                        }
+                        confidenceMarker(.recovery)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func fact(_ label: String, _ value: String?) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .textStyle(.subhead)
+                .foregroundStyle(.textSecondary)
+            Spacer(minLength: FBSpace.xs)
+            Text(value ?? "–")
+                .textStyle(.figureS)
+                .foregroundStyle(value == nil ? Color.textTertiary : Color.textPrimary)
+        }
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Sleep and Strain, side by side; one under the other at large text sizes.
+    private var pillars: some View {
+        let layout = dynamicTypeSize >= .xxLarge ? AnyLayout(VStackLayout(spacing: FBSpace.xs)) : AnyLayout(HStackLayout(spacing: FBSpace.xs))
+        return layout {
+            ForEach([ScoreKind.sleep, .strain]) { kind in
+                NavigationLink(value: Route.score(kind, day: day.index)) {
+                    Card {
+                        VStack(alignment: .leading, spacing: FBSpace.xxs) {
+                            ScoreTile(kind: kind, value: history.score(kind, day), layout: .row)
+                            confidenceMarker(kind)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var triad: some View {
         let rows = dynamicTypeSize >= .xxLarge
         let layout = rows ? AnyLayout(VStackLayout(alignment: .leading, spacing: FBSpace.s))
@@ -285,22 +347,22 @@ private struct TodayContent: View {
     // MARK: metrics
 
     private var metrics: some View {
-        VStack(alignment: .leading, spacing: FBSpace.xs) {
-            SectionHeader(title: isToday ? String(localized: "Today") : FBFormat.shortDay(day.noon))
-            VStack(spacing: 0) {
-                let averages = isToday ? todayAverages : [:]
-                ForEach(TodayMetric.allCases) { metric in
-                    NavigationLink(value: Route.trend(metric.trend, day: day.index)) {
-                        let reading = metric.reading(history: history, day: day, overrides: metric == .steps ? overrides : [:],
-                                                     average: averages[metric], hidesDelta: isToday && hidesTodayDelta(metric, averages))
-                        MetricRow(title: metric.title, value: reading.value, unit: reading.unit,
-                                  trend: reading.trend, delta: reading.delta)
-                    }
-                    .buttonStyle(.fbRow)
-                }
+        let averages = isToday ? todayAverages : [:]
+        func tile(_ metric: TodayMetric, wide: Bool = false) -> some View {
+            let reading = metric.reading(history: history, day: day, overrides: metric == .steps ? overrides : [:],
+                                         average: averages[metric], hidesDelta: isToday && hidesTodayDelta(metric, averages))
+            return NavigationLink(value: Route.trend(metric.trend, day: day.index)) {
+                StatTile(title: metric.title, value: reading.value, unit: reading.unit, trend: reading.trend, delta: reading.delta,
+                         color: metric.color, wide: wide)
             }
-            .padding(.horizontal, FBSpace.s)
-            .fbCardBackground()
+            .buttonStyle(.plain)
+        }
+        return VStack(alignment: .leading, spacing: FBSpace.xs) {
+            SectionHeader(title: isToday ? String(localized: "Today") : FBFormat.shortDay(day.noon))
+            tile(.steps, wide: true)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: FBSpace.xs), GridItem(.flexible())], spacing: FBSpace.xs) {
+                ForEach(TodayMetric.allCases.filter { $0 != .steps }) { tile($0) }
+            }
             Footnote(String(localized: "Compared with your 7-day average."))
         }
     }
@@ -319,6 +381,16 @@ enum TodayMetric: String, CaseIterable, Identifiable {
         case .sleep: .sleepHours
         case .activeMinutes: .activeMinutes
         case .bloodOxygen: .bloodOxygen
+        }
+    }
+
+    /// The colour of the metric's line on its tile.
+    var color: Color {
+        switch self {
+        case .steps, .activeMinutes: .activity
+        case .restingHeartRate: .heart
+        case .sleep: .sleep
+        case .bloodOxygen: .textSecondary
         }
     }
 

@@ -5548,6 +5548,26 @@
           }
         }
       }
+    },
+    "%lld ms": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ms"
+          }
+        }
+      }
+    },
+    "HRV": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HRV"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

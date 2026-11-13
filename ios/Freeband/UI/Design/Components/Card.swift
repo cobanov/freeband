@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The one container: surface tone, radius 12, 16pt padding. No border, no shadow; separation
-/// comes from the step between canvas and surface.
+/// The one container: surface tone, radius 20, 16pt padding, and a hairline edge that keeps the
+/// card's shape on the dark canvas. No shadow.
 struct Card<Content: View>: View {
     var padding: CGFloat = FBSpace.cardPadding
     @ViewBuilder var content: Content
@@ -10,7 +10,7 @@ struct Card<Content: View>: View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(padding)
-            .background(.surface, in: RoundedRectangle(cornerRadius: FBRadius.card, style: .continuous))
+            .fbCardBackground()
     }
 }
 
@@ -18,6 +18,7 @@ extension View {
     /// Wraps a view in the card surface without padding (list cards, charts that bleed).
     func fbCardBackground() -> some View {
         background(.surface, in: RoundedRectangle(cornerRadius: FBRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: FBRadius.card, style: .continuous).strokeBorder(.hairline, lineWidth: FBStroke.hairline))
     }
 }
 
