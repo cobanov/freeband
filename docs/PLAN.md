@@ -95,7 +95,7 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
   1. Mi Fitness'ın arka plan yenilemesini kapat (ACK atıp dosyaları siliyor).
   2. Bir gece bandı tak.
   3. Sabah önce Freeband'i senkronize et.
-  4. Dosya başına rapor: tür, sürüm, CRC, çözüm durumu ve makullük kontrolleri. Kontroller: dakikalık adım toplamı günlük özetin ±%2'si içinde olmalı, nabız 30–220 arasında olmalı, kayıt sayısı geçen dakikalarla uyuşmalı, yatış ve kalkış saatleri makul olmalı, RR var mı yok mu.
+  4. Dosya başına rapor: tür, sürüm, CRC, çözüm durumu ve makullük kontrolleri. Kontroller: dakikalık adım toplamı günlük özetin ±%2'si içinde olmalı, nabız 30–220 arasında olmalı, nabız kayıtlı dakikaların kaçında var (bandın ölçüm aralığı; 2 dakikada birden seyrekse uyarı), kayıt sayısı geçen dakikalarla uyuşmalı, yatış ve kalkış saatleri makul olmalı, RR var mı yok mu.
   5. İstersen Mi Fitness'taki sayılarla karşılaştırma.
 - **Hatalar:** tipli `LinkError` ve yerelleştirilmiş tek cümle + tek aksiyon:
   - Mi Fitness bandı tutuyor → "Mi Fitness'ı kapatıp tekrar dene".

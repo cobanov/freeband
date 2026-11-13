@@ -111,6 +111,21 @@ enum Calibration {
                      detail: "\(values.count) readings, \(lo)-\(hi) bpm, \(outside) outside 30-220")
     }
 
+    /// How often the band really measured: the minutes that carry a heart rate, out of the
+    /// minutes on record. The band's measuring interval decides it (docs/CAPABILITIES.md §9.1),
+    /// and Strain and the daytime resting heart rate are only as good as this.
+    static func heartRateCoverageCheck(_ minutes: MinuteDayDraft) -> CalibrationReport.Check {
+        let recorded = minutes.recordCount
+        let measured = minutes.series.heartRate.compactMap { ValidRange.hr($0) }.count
+        guard recorded > 0, measured > 0 else {
+            return .init(name: "heart_rate_coverage", status: recorded > 0 ? .warn : .skip, subject: minutes.day.string,
+                         detail: "no heart rate in \(recorded) recorded minutes")
+        }
+        let every = Double(recorded) / Double(measured)
+        return .init(name: "heart_rate_coverage", status: every <= 2 ? .pass : .warn, subject: minutes.day.string,
+                     detail: String(format: "heart rate in %d of %d recorded minutes, about every %.0f min", measured, recorded, every))
+    }
+
     /// A minute file should hold one record per minute from its start to when it was fetched
     /// (or to the end of its local day, whichever comes first).
     static func recordCountCheck(fileID: ActivityFileID, records: Int, fetchedAt: Date) -> CalibrationReport.Check {
@@ -193,6 +208,9 @@ enum Calibration {
             }
         }
         checks.append(heartRateCheck(minuteDays: minuteDays, sleeps: sleeps))
+        for minutes in minuteDays.sorted(by: { $0.day < $1.day }) {
+            checks.append(heartRateCoverageCheck(minutes))
+        }
         for f in minuteFiles.sorted(by: { $0.fileID < $1.fileID }) {
             checks.append(recordCountCheck(fileID: f.fileID, records: f.records, fetchedAt: f.fetchedAt))
         }
