@@ -220,6 +220,71 @@
    }
   },
   {
+   "name": "sleep details v5, breathing rate in type-10 packets",
+   "kind": "file",
+   "hex": "70b0ee680c052100ff800160a2ee6870b0ee6850000000000000000000589bee6870b0ee68fbfafcff1100472ae4990100000065000401020704fbfafcff110030a9cc51726e18000a000c780e4d005a003c1083105020fbfafcff110030a9cc51726e18000b00020506fbfafcff11e7a3727fdd726e18000a00056429320009fbfafcff1100103c3269736e18000a000800010000002800012d67155b",
+   "synthetic": true,
+   "expect": {
+    "kind": "sleep_details",
+    "crc": {
+     "ok": true
+    },
+    "data": {
+     "bed_time": 1760469600,
+     "wakeup_time": 1760473200,
+     "sleep_quality": 80,
+     "hr": null,
+     "spo2": null,
+     "skipped_bytes": 0,
+     "trailing_bytes": 0,
+     "packets": [
+      {
+       "type": 101,
+       "payload_hex": "01020704"
+      },
+      {
+       "type": 10,
+       "length": 12,
+       "payload_hex": "780e4d005a003c1083105020"
+      },
+      {
+       "type": 11,
+       "payload_hex": "0506"
+      },
+      {
+       "type": 10,
+       "length": 5
+      },
+      {
+       "type": 10,
+       "length": 8
+      }
+     ],
+     "respiratory": [
+      {
+       "ts": 1760469750,
+       "brpm": 14
+      },
+      {
+       "ts": 1760470050,
+       "brpm": 16
+      },
+      {
+       "ts": 1760471000,
+       "brpm": 1
+      },
+      {
+       "ts": 1760471200,
+       "brpm": 40
+      }
+     ],
+     "rr": [],
+     "stages": [],
+     "summaries": []
+    }
+   }
+  },
+  {
    "name": "sleep details v6 (Band 10 Pro shape): 3-byte bitmap, 24 unknown bytes, u16 snore, night sent twice",
    "kind": "file",
    "hex": "1076cd6a0c062100dffffc011076cd6a40a0cd6a004efc0300002c2e00001472cd6a40a0cd6a202122232425262728292a2b2c2d2e2f30313233343536373c000500c476cd6a3e000040003c000500c476cd6a000060006158020200e078cd6a39002d00fbfafcff11802e9532a10100000165000401030120fbfafcff11802e9532a101000001130001fbfafcff11802e9532a101000001140000fbfafcff11009023002ceddd1800120001fbfafcff11802e9532a101000000020000fbfafcff11800b0333a101000000030001fbfafcff111076cd6a000000000010000d100064000000500005000f1500fbfafcff111076cd6a0000000000110008103c200f30051014fbfafcff1100fa3933a101000000030006fbfafcff111076cd6a000000000010000d1100a000140073000f001e1600fbfafcff111076cd6a000000000011000e103c200f300510230014200f300a119bf2b0",

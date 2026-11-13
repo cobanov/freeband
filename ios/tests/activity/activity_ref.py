@@ -472,7 +472,7 @@ def parse_sleep_details(fid: FileId, body: bytes) -> dict:
         out["hr"] = out["spo2"] = out["snore"] = None
         cur.pos = blocks_at
 
-    packets, stages, summaries, rr = [], [], [], []
+    packets, stages, summaries, rr, breaths = [], [], [], [], []
     out["skipped_bytes"] = 0
     data, pos, end = cur.data, cur.pos, cur.end
     while end - pos >= STAGE_PACKET_HEADER:
@@ -523,11 +523,21 @@ def parse_sleep_details(fid: FileId, body: bytes) -> dict:
             rr.append({"ts_raw": ts, "rr_ms": [10 * b for b in payload]})
         else:
             pkt["payload_hex"] = payload.hex()
+            if ptype == 10:
+                # 4-byte records, breaths per minute in byte 1; a packet's records share the
+                # 10 minutes that end at its ts, evenly (docs/ACTIVITY.md 6.3.2)
+                n = length // 4
+                first = packet_seconds(ts) - 600
+                for i in range(n):
+                    rate = payload[4 * i + 1]
+                    if 1 <= rate <= 40:
+                        breaths.append({"ts": first + (i + 1) * 600 // (n + 1), "brpm": rate})
     out["trailing_bytes"] = end - pos
     out["packets"] = packets
     out["stages"] = stages
     out["summaries"] = summaries
     out["rr"] = rr
+    out["respiratory"] = breaths
     out["sleep_spans"] = sleep_spans(packets)
     return out
 

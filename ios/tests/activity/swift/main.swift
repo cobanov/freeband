@@ -322,6 +322,7 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
                 ])
             }),
             "rr": .array(s.rrIntervals.map { .object(["ts_raw": .int($0.tsRaw), "rr_ms": .array($0.intervalsMs.map { jInt($0) })]) }),
+            "respiratory": .array(s.respiratoryRate.map { .object(["ts": jTime($0.ts), "brpm": jInt($0.breathsPerMinute)]) }),
         ]
         if s.version >= 5 {
             o["v5_unknown_hex"] = jHex(s.unknownV5 ?? [])
@@ -995,6 +996,18 @@ check("S1 Active sleep v2: no summary or stages, so the session comes from the f
         + expect(session.bedTime == at(1_794_124_320) && session.wakeTime == at(1_794_137_880), "08:52-12:38: \(session)")
         + expect(session.awakeMinutes == 30 && session.deepMinutes == nil && session.lightMinutes == nil && session.remMinutes == nil,
                  "30 min awake, no stages: \(session)")
+}
+
+check("type-10 packets: breaths per minute from byte 1, spread over the 10 minutes before the packet") {
+    let end: Int64 = 1_794_130_000
+    // three records: 14, none (0), 16; then a packet with an implausible 41 and a stray fifth byte
+    let extra = sleepPacket(10, ts: end * 1_000_000_000, payload: [120, 14, 77, 0, 90, 0, 60, 16, 131, 16, 80, 32])
+        + sleepPacket(10, ts: (end + 600) * 1_000_000_000, payload: [100, 41, 50, 0, 9])
+    guard case let .sleepDetails(s) = parsed(s1ActiveSleep(extra: extra)).payload else { return ["parse"] }
+    let got = s.respiratoryRate.map { [Int($0.ts.timeIntervalSince1970), $0.breathsPerMinute] }
+    // the file's own packet (1 record, 08:35:02 − 600 + 300), then 600·1/4 and 600·3/4 into the window
+    return expect(got == [[1_794_123_002, 7], [1_794_129_550, 14], [1_794_129_850, 16]], "breaths \(got)")
+        + expect(s.trailingBytes == 0 && s.skippedBytes == 0 && s.streamError == nil, "stream intact")
 }
 
 check("a type-16 summary keeps the header session even when events are present") {

@@ -364,6 +364,38 @@ def sd_v5() -> dict:
                 "rr": [{"ts_raw": bed * 1000, "rr_ms": [1000, 980, 1020, 950]}]}}}
 
 
+def sd_v5_breath() -> dict:
+    """Type-10 packets (docs/ACTIVITY.md 6.3.2): 4-byte records with breaths per minute in byte 1,
+    ts in nanoseconds, each packet's records spread evenly over the 10 minutes before its ts."""
+    bed = 1760469600
+    wake = bed + 3600
+    ns = 10**9
+    bitmap = bytes([0xFF, 0x80])  # idx 0..8 set; no HR, SpO2 or snore block
+    body = bytes([1]) + struct.pack("<II", bed, wake) + bytes([80])
+    body += bytes(9) + struct.pack("<II", bed - 1800, wake)
+    body += stage_packet(101, bed * 1000, bytes([1, 2, 7, 4]))
+    # 3 records at 150, 300 and 450 s into the window; the middle one has no reading
+    body += stage_packet(10, (bed + 600) * ns, bytes([120, 14, 77, 0, 90, 0, 60, 16, 131, 16, 80, 32]))
+    body += stage_packet(11, (bed + 600) * ns, bytes([5, 6]))  # unknown type: payload kept raw
+    # 1 record, 41 is out of range; the fifth byte is not a whole record
+    body += stage_packet(10, (bed + 1200) * ns + 999, bytes([100, 41, 50, 0, 9]))
+    # 2 records at 200 and 400 s, the lowest and highest accepted values
+    body += stage_packet(10, (bed + 1800) * ns, bytes([0, 1, 0, 0, 0, 40, 0, 1]))
+    data = with_crc(file_id(wake, 12, 5, 0, 8, 1) + b"\x00" + bitmap + body)
+    return {"name": "sleep details v5, breathing rate in type-10 packets",
+            "kind": "file", "hex": data.hex(), "synthetic": True,
+            "expect": {"kind": "sleep_details", "crc": {"ok": True}, "data": {
+                "bed_time": bed, "wakeup_time": wake, "sleep_quality": 80, "hr": None, "spo2": None,
+                "skipped_bytes": 0, "trailing_bytes": 0,
+                "packets": [{"type": 101, "payload_hex": "01020704"},
+                            {"type": 10, "length": 12, "payload_hex": "780e4d005a003c1083105020"},
+                            {"type": 11, "payload_hex": "0506"},
+                            {"type": 10, "length": 5}, {"type": 10, "length": 8}],
+                "respiratory": [{"ts": bed + 150, "brpm": 14}, {"ts": bed + 450, "brpm": 16},
+                                {"ts": bed + 1400, "brpm": 1}, {"ts": bed + 1600, "brpm": 40}],
+                "rr": [], "stages": [], "summaries": []}}}
+
+
 def sd_v6_body(bed: int, wake: int, snore_block: bool = True) -> bytes:
     """Shaped like the Band 10 Pro v6 file of 2026-10-14 (values made up): 3-byte bitmap, the v5
     fields, 24 unknown bytes, HR/SpO2 blocks with 0 for "no reading", u16 snore samples, then a
@@ -537,7 +569,7 @@ def main(argv):
           "Gadgetbridge d4bd8367 " + T + "impl/WorkoutSummaryParserTest.java (captured SUMMARY files; only the "
           "envelope is checked, the workout payload is not parsed by activity_ref.py)", gb_workouts(blobs))
     write("synthetic.json", "SYNTHETIC: built by make_fixtures.py from docs/ACTIVITY.md; not device data",
-          [dd_v4(), dd_v2(), dd_v3_tail(), sd_v5(), sd_v6(), sd_v6_misaligned(), sd_v2(), ss_v2(), ss_v2(empty=True),
+          [dd_v4(), dd_v2(), dd_v3_tail(), sd_v5(), sd_v5_breath(), sd_v6(), sd_v6_misaligned(), sd_v2(), ss_v2(), ss_v2(empty=True),
            ds_v5_short(), ms_v2()]
           + transport_cases(blobs))
 

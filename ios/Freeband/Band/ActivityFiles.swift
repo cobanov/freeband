@@ -892,6 +892,13 @@ struct SleepRRPacket: Equatable, Sendable {
     let intervalsMs: [Int]
 }
 
+/// One breathing-rate reading from a type-10 packet (spec section 6.3.2). The packet carries no
+/// time per record; `ts` spreads a packet's records evenly over the 10 minutes ending at its ts.
+struct SleepBreathSample: Equatable, Sendable {
+    let ts: Date
+    let breathsPerMinute: Int
+}
+
 /// ACTIVITY / SLEEP / any detail type.
 struct SleepDetails: Equatable, Sendable {
     static let bitmapLengths: [UInt8: Int] = [1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 6: 3]
@@ -900,6 +907,11 @@ struct SleepDetails: Equatable, Sendable {
     static let packetMagic: [UInt8] = [0xFB, 0xFA, 0xFC, 0xFF]
     static let packetHeaderLength = 17
     static let payloadlessPacketTypes: Set<UInt8> = [2, 3, 9, 12, 13, 14, 15, 18, 19]
+    /// Type 10: 4 bytes per record, breaths per minute in byte 1; a packet covers 10 minutes.
+    static let breathRecordLength = 4
+    static let breathWindowSeconds: Int64 = 600
+    /// Outside this a reading is "none" (0) or implausible; Gadgetbridge drops those too.
+    static let breathRange = 1 ... 40
 
     let version: UInt8
     let bitmap: [UInt8]
@@ -930,6 +942,9 @@ struct SleepDetails: Equatable, Sendable {
     let nightStages: [SleepStageSample]
     let summaries: [SleepSummaryPacket]
     let rrIntervals: [SleepRRPacket]
+    /// From type-10 packets, in stream order. Read in a source for v5 files only; v2 and v6 files
+    /// carry the packet too, but nobody has checked what their bytes mean.
+    let respiratoryRate: [SleepBreathSample]
     /// Fell-asleep (type 2) and woke-up (type 3) events paired into spans of sleep, in time order.
     let sleepSpans: [DateInterval]
     /// Bytes skipped while looking for the packet magic.
@@ -1053,7 +1068,7 @@ struct SleepDetails: Equatable, Sendable {
             heartRate: hr, spo2: spo2, snore: snore, blocksError: blocksError,
             packets: stream.packets, stages: stream.stages,
             nightStages: stream.lastStagesByTs.keys.sorted().flatMap { stream.lastStagesByTs[$0] ?? [] },
-            summaries: stream.summaries, rrIntervals: stream.rr, sleepSpans: sleepSpans(stream.packets),
+            summaries: stream.summaries, rrIntervals: stream.rr, respiratoryRate: stream.breaths, sleepSpans: sleepSpans(stream.packets),
             skippedBytes: stream.skipped, trailingBytes: stream.trailing, streamError: stream.error
         )
     }
@@ -1095,6 +1110,7 @@ struct SleepDetails: Equatable, Sendable {
         var lastStagesByTs: [Int64: [SleepStageSample]] = [:]
         var summaries: [SleepSummaryPacket] = []
         var rr: [SleepRRPacket] = []
+        var breaths: [SleepBreathSample] = []
         var skipped = 0
         var trailing = 0
         var error: String?
@@ -1170,6 +1186,15 @@ struct SleepDetails: Equatable, Sendable {
                     ))
                 case 1:  // RR intervals, 10 ms per unit
                     s.rr.append(SleepRRPacket(tsRaw: ts, intervalsMs: payload.map { Int($0) * 10 }))
+                case 10:  // breathing rate: 4-byte records, breaths per minute in byte 1
+                    let count = length / breathRecordLength
+                    let start = packetSeconds(ts) - breathWindowSeconds
+                    for i in 0 ..< count {
+                        let rate = Int(payload[i * breathRecordLength + 1])
+                        guard breathRange.contains(rate) else { continue }
+                        let offset = Int64(i + 1) * breathWindowSeconds / Int64(count + 1)
+                        s.breaths.append(SleepBreathSample(ts: unixDate(start + offset), breathsPerMinute: rate))
+                    }
                 default:
                     break
                 }

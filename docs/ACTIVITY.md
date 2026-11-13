@@ -408,12 +408,34 @@ Akış, 17 baytlık başlığı olan paketlerden oluşur. Başlık **sihirli de�
 | 17 | veri | `dataLen` bayt, içeriği **big-endian** (`:227-230`) |
 
 - Tip 2, 3, 9, 12, 13, 14, 15'te veri **yok**; `dataLen` alanı bayrak sayılıyor ve atlanmıyor. (`:221-225`)
-- **Tip 18 ve 19 da verisiz** [GERÇEK, v6]: `dataLen` 1 ama sıradaki paket hemen başlıyor. Bunlar listede olmasa bir sonraki paketin başı atlanır. Gerçek dosyada ayrıca 10, 11 ve 20 (veri uzunluğu `dataLen` kadar) ve 101 (4 bayt) tipleri var; anlamları bilinmiyor. Bu kuralla 231 paketlik dosyada atlanan ve artan bayt sıfır.
+- **Tip 18 ve 19 da verisiz** [GERÇEK, v6]: `dataLen` 1 ama sıradaki paket hemen başlıyor. Bunlar listede olmasa bir sonraki paketin başı atlanır. Gerçek dosyada ayrıca 10, 11 ve 20 (veri uzunluğu `dataLen` kadar) ve 101 (4 bayt) tipleri var. Bu kuralla 231 paketlik dosyada atlanan ve artan bayt sıfır.
+- **Tip 10, 11, 20 ve 101 için kaynaklar ne diyor** (Gadgetbridge master `83b2efe9`, 2026-11-13; satır numaraları o sürümün `SleepDetailsParser.java` dosyasından):
+  - **10 (`0x0A`)**: solunum hızı, aşağıda. [KOD] `:314-350`
+  - **101 (`0x65`)**: "Sentinel/manifest packet", dosyada bir kez; incelenen v5 dosyalarının hepsinde gövde `01 02 07 04`. Gadgetbridge yalnız logluyor, baytların anlamını söylemiyor. [KOD] `:351-355`. Band 10 Pro v6 dosyasında da 4 bayt [ÖLÇÜM]; baytların anlamı bilinmiyor.
+  - **11 ve 20**: hiçbir kaynakta yok. Gadgetbridge'in "Known types" listesinde (`:221-229`) ve dallarında (1, 16, 17, `0x0A`, `0x65`) geçmiyorlar; `dataLen` bayt okunup atılıyor (`:237-240`). AstroBox'ta aktivite dosyası parser'ı yok. Mi Fitness ham uyku baytlarını yerel kütüphaneye (`jni_xiaomi_sleep_algorithm`) veriyor, paket tipleri Java tarafında görünmüyor (`docs/MIFITNESS-2026-11-13.md` Q3). Anlamları bilinmiyor; Freeband gövdelerini ham saklıyor.
+  - Gadgetbridge master verisiz tipler listesine 18'i (`0x12`) eklemiş (`:231`), yukarıdaki ölçümle aynı; 19 hâlâ listesinde yok.
 - **Gece birden çok kez gönderiliyor** [GERÇEK, v6]: aynı `ts` (`bedTime`) ile bir ara tip-16/17 çifti (gece ortasında, o ana kadarki evreler) ve uyanınca son çift geliyor; son tip-17, ilkini önek olarak içeriyor. Evreler birleştirilirse çakışır. Freeband her `ts` için **son** tip-17 paketini kullanıyor (`nightStages`), dakikalar son tip-16'dan.
 - Bilinen tipler: 0 `acc_unk`, 1 `ppg_unk` (RR aralıkları), 2 `fall_asleep`, 3 `wake_up`, 12/13 `switch_ts_unk`, 16 özet, 17 evreler. (`:211-219`)
 - `ts` birimi karışık: "sometimes in seconds and other times in nanoseconds. Message types 16 and 17 are in seconds" (`:204-205`). Tip 1 için Gadgetbridge `ts`'i **milisaniye** gibi kullanıyor (`:235-240`). [TAHMİN: tip 1'in birimi kesin değil]
 - **Xiaomi Watch S1 Active, v2** [ÖLÇÜM, 2026-11-08]: tip 1, 2, 3 ve 101'de `ts` **milisaniye**, tip 0, 9 ve 10'da **nanosaniye**. Freeband birimi büyüklükten çıkarıyor (`SleepDetails.packetSeconds`).
 - **Uykuya dalma / uyanma olayları** [ÖLÇÜM, S1 Active v2]: dosyada tip-16 özet ve tip-17 evre yok; başlık 09:52-12:38 diyor, ama tip 2/3 çiftleri 08:52-09:24, 09:52-11:48, 11:50-12:38. Saat aynı oturumu 08:52-12:38, 3 sa 16 dk uyku olarak gösteriyor: olaylar doğru, başlığın yatış saati sonraki bir dalışa denk geliyor. Gadgetbridge 2/3'ü atlıyor ve başlığı kullanıyor. Freeband özet ve evre olmayan dosyada oturumu olaylardan kuruyor: ilk dalıştan son uyanışa, aralar uyanık dakika (`sessionFromSpans`).
+
+Tip 10 (`0x0A`), uykuda solunum hızı. Gadgetbridge master `83b2efe9` (2026-11-13) `SleepDetailsParser.java:314-350`; ekleyen commit `28cd9c60` (2026-10-22), v5 dosyalarından:
+
+| Ofset | Alan | Tür | Not |
+|---|---|---|---|
+| 0 | hareket şiddeti ya da PPG genliği | u8 | "range 0..254, mean ~116"; kullanılmıyor (`:316`) |
+| 1 | **solunum hızı**, dakikada nefes | u8 | "only slot used" (`:317`) |
+| 2 | gürültülü, PPG'den türetilmiş bir değer | u8 | kullanılmıyor (`:318-320`) |
+| 3 | kalite bayrağı | u8 | "0 dominant, 16 / 32 frequent, 1 / 17 rare"; kullanılmıyor (`:321`) |
+
+- Kayıt 4 bayt, kayıt sayısı `dataLen / 4` (artan bayt sayılmaz). [KOD] `:326`
+- Paket 10 dakikada bir geliyor, `ts` **nanosaniye** ve pencerenin **sonu**. [KOD] `:322-325`. S1 Active v2'de de tip 10 nanosaniye [ÖLÇÜM].
+- Kayıtların kendi zamanı yok. Gadgetbridge `N` kaydı `ts`'ten önceki 10 dakikaya eşit aralıkla yayıyor: kayıt `i` (0'dan) = `ts − 600 sn + (i + 1) · 600 / (N + 1)` (`:329-343`). Eşit yayma Gadgetbridge'in kabulü. [TAHMİN]
+- 1–40 dışındaki değer atılıyor (`:338`); 0 "ölçüm yok" demek olmalı [TAHMİN].
+- Freeband aynı kuralı tam saniyeyle uyguluyor (`SleepDetails.respiratoryRate`): `packetSeconds(ts) − 600 + (i + 1) · 600 / (N + 1)`, tam sayı bölmesi. Baytlar 0, 2 ve 3 yorumlanmıyor; paket gövdesi ham da duruyor.
+- **Yalnız v5 için kaynakta okundu.** S1 Active v2 dosyasındaki tek tip-10 paketi de 4 bayttı (`59 07 92 00`, uykuya dalmadan 17 dk önce) [ÖLÇÜM]; bayt 1'in orada da solunum hızı olduğu doğrulanmadı (7 düşük bir değer). Band 10 Pro v6 dosyasında tip 10 var, içeriği bu düzenle karşılaştırılmadı. Parser sürüme bakmadan okuyor; v2 ve v6 değerleri bantla karşılaştırılmadan gösterilmemeli. [TAHMİN]
+- Bandın ayarı: `HeartRate.sleepRespiratoryRate = 11` (0 desteklenmiyor, 1 açık, 2 kapalı). [KOD] `P/xiaomi/wear_fitness.proto:99-101`
 
 Tip 17, evreler (`:284-299`): `dataLen / 2` tane u16 BE kelime. Her kelime:
 
@@ -602,7 +624,7 @@ python3 -I activity_ref.py fileid 21F328650403A0  # id ya da id listesi
 | `gb_manual_samples_v1.json` | [TEST] `T/impl/ManualSamplesParserTest.java:34-87` | 3 **gerçek** Band 9 Active paketi (CRC'li) ve 3 ret vakası; mutasyondan sonra CRC yeniden hesaplandı ki ret içerikten gelsin |
 | `gb_daily_summary.json` | [TEST] `T/impl/DailySummaryParserTest.java` | Gadgetbridge'in bellekte kurduğu girdiler bayt bayt yeniden üretildi (CRC'siz); beklenenler testin assert'leri |
 | `gb_workout_summary_blobs.json` | [TEST] `T/impl/WorkoutSummaryParserTest.java` | 13 **gerçek** antrenman özeti dosyası: id, CRC ve yerel tarih kontrolü; içerik parse edilmiyor |
-| `synthetic.json` | **SENTETİK**, `make_fixtures.py` | DailyDetails v2/v3/v4, SleepDetails v2/v5/v6 (v6: gerçek dosyanın biçiminde, değerler uydurma; bir de blokları hizalanmayan v6), 30 slotluk DailySummary v5, SleepStages v2, ManualSamples v2 (kayıtlar kaynak yorumundan), CRC kontrol değeri, gerçek bir dosyanın 3 parçaya bölünüp birleştirilmesi, bozuk parça, sıra dışı parça, id listesi ve getirme sırası |
+| `synthetic.json` | **SENTETİK**, `make_fixtures.py` | DailyDetails v2/v3/v4, SleepDetails v2/v5/v6 (v5: bir de tip-10 solunum hızı paketleri; v6: gerçek dosyanın biçiminde, değerler uydurma; bir de blokları hizalanmayan v6), 30 slotluk DailySummary v5, SleepStages v2, ManualSamples v2 (kayıtlar kaynak yorumundan), CRC kontrol değeri, gerçek bir dosyanın 3 parçaya bölünüp birleştirilmesi, bozuk parça, sıra dışı parça, id listesi ve getirme sırası |
 
 Gadgetbridge test ağacında **günlük detay, uyku detayı ve uyku evreleri için hiç gerçek veri yok**; bunlar için yalnız sentetik fikstür var. Sentetik dosyalar bu belgedeki düzenle `make_fixtures.py` içinde, parser'dan bağımsız olarak paketlendi; beklenen değerler paketlenen değerler. Yani iki uygulamanın birbirine uyduğunu gösteriyorlar, bilekliğin gerçekten böyle gönderdiğini değil. İlk gerçek Band 10 dosyaları geldiğinde (`activity_ref.py parse` ile) bu bölümler doğrulanmalı.
 
