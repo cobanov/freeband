@@ -225,23 +225,24 @@ enum MiCrypto {
         return out
     }
 
-    /// AES-128-CCM (RFC 3610) with a 12-byte nonce, 4-byte tag and no associated data.
+    /// AES-128-CCM (RFC 3610) with a 12-byte nonce and a 4-byte tag. Associated data is empty
+    /// everywhere but in the bind result (docs/BIND.md section 3).
     /// Returns ciphertext ‖ tag. Apple frameworks have no CCM, so it is built on AES-ECB.
-    static func ccmEncrypt(key: Data, nonce: Data, plaintext: Data) -> Data {
+    static func ccmEncrypt(key: Data, nonce: Data, plaintext: Data, aad: Data = Data()) -> Data {
         precondition(nonce.count == 12)
         let p = [UInt8](plaintext)
-        let tag = ccmTag(key: key, nonce: nonce, plaintext: p)
+        let tag = ccmTag(key: key, nonce: nonce, aad: [UInt8](aad), plaintext: p)
         return ccmKeystream(key: key, nonce: nonce, p) + Data(tag)
     }
 
     /// The reverse of ccmEncrypt: nil when the input is shorter than the tag or the tag doesn't match.
-    static func ccmDecrypt(key: Data, nonce: Data, ciphertextAndTag: Data) -> Data? {
+    static func ccmDecrypt(key: Data, nonce: Data, ciphertextAndTag: Data, aad: Data = Data()) -> Data? {
         precondition(nonce.count == 12)
         let c = [UInt8](ciphertextAndTag)
         guard c.count >= ccmTagLength else { return nil }
         let bodyLength = c.count - ccmTagLength
         let plaintext = ccmKeystream(key: key, nonce: nonce, Array(c[..<bodyLength]))
-        let tag = ccmTag(key: key, nonce: nonce, plaintext: [UInt8](plaintext))
+        let tag = ccmTag(key: key, nonce: nonce, aad: [UInt8](aad), plaintext: [UInt8](plaintext))
         var difference: UInt8 = 0
         for j in 0..<ccmTagLength { difference |= tag[j] ^ c[bodyLength + j] }
         return difference == 0 ? plaintext : nil
@@ -256,15 +257,20 @@ enum MiCrypto {
             + Data([UInt8((counter >> 16) & 0xFF), UInt8((counter >> 8) & 0xFF), UInt8(counter & 0xFF)])
     }
 
-    /// CBC-MAC over B0 and the zero-padded plaintext, masked with counter block 0.
-    private static func ccmTag(key: Data, nonce: Data, plaintext p: [UInt8]) -> [UInt8] {
-        var b0 = Data([UInt8(((ccmTagLength - 2) / 2) << 3 | (ccmLengthSize - 1))]) + nonce
+    /// CBC-MAC over B0, the associated data (behind its 2-byte length) and the plaintext, each
+    /// zero-padded to whole blocks, masked with counter block 0.
+    private static func ccmTag(key: Data, nonce: Data, aad: [UInt8], plaintext p: [UInt8]) -> [UInt8] {
+        precondition(aad.count < 0xFF00)
+        var b0 = Data([UInt8((aad.isEmpty ? 0 : 0x40) | ((ccmTagLength - 2) / 2) << 3 | (ccmLengthSize - 1))]) + nonce
         b0.append(contentsOf: [UInt8((p.count >> 16) & 0xFF), UInt8((p.count >> 8) & 0xFF), UInt8(p.count & 0xFF)])
         var mac = aesBlock(key: key, b0)
-        for start in stride(from: 0, to: p.count, by: 16) {
-            var block = mac
-            for j in 0..<min(16, p.count - start) { block[j] ^= p[start + j] }
-            mac = aesBlock(key: key, Data(block))
+        let a = aad.isEmpty ? [] : [UInt8(aad.count >> 8), UInt8(aad.count & 0xFF)] + aad
+        for part in [a, p] {
+            for start in stride(from: 0, to: part.count, by: 16) {
+                var block = mac
+                for j in 0..<min(16, part.count - start) { block[j] ^= part[start + j] }
+                mac = aesBlock(key: key, Data(block))
+            }
         }
         let s0 = aesBlock(key: key, ccmCounterBlock(nonce, 0))
         return (0..<ccmTagLength).map { mac[$0] ^ s0[$0] }
@@ -313,10 +319,12 @@ enum MiAuth {
         let encryptionNonce: Data
     }
 
-    /// Step 1: Command{type 1, subtype 26, auth.appVerify{nonce}}
-    static func nonceCommand(phoneNonce: Data) -> Data {
+    /// Step 1: Command{type 1, subtype 26, auth.appVerify{nonce}}. `appDeviceID` is the id a
+    /// local bind gave the band (docs/BIND.md section 6); nil for a key from the vendor app.
+    static func nonceCommand(phoneNonce: Data, appDeviceID: String? = nil) -> Data {
         var verify = PBWriter()
         verify.bytes(1, phoneNonce)
+        if let appDeviceID { verify.string(2, appDeviceID) }
         var account = PBWriter()
         account.message(30, verify)
         var command = PBWriter()

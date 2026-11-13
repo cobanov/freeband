@@ -1,6 +1,7 @@
 // Prints MiProtocol outputs for fixed inputs; check_vectors.py recomputes them independently.
-// Build: swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift main.swift -o /tmp/mitest
+// Build: swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift main.swift -o /tmp/mitest
 // Run with TZ=UTC: check_vectors.py formats notify_cmd's timestamp in UTC.
+import CryptoKit
 import Foundation
 
 func hex(_ d: Data) -> String { d.map { String(format: "%02x", $0) }.joined() }
@@ -199,6 +200,84 @@ let bandState: [String: Any] = [
     "state_pushed_one_field": stateText(MiAuth.deviceStateChange(PBMessage(pushedCharging)!)),
 ]
 
+// Local bind (docs/BIND.md). The band below is glue with fixed keys: check_vectors.py plays the
+// band on its own, so it checks these replies as well as every packet the machine sends.
+let bindPhoneKey = try! P256.KeyAgreement.PrivateKey(rawRepresentation: Data(0x01...0x20))
+let bindBandKey = try! P256.KeyAgreement.PrivateKey(rawRepresentation: Data(0x21...0x40))
+let bindSecret = try! bindBandKey.sharedSecretFromKeyAgreement(with: bindPhoneKey.publicKey).withUnsafeBytes { Data($0) }
+let bindAppRandom = Data(0x50...0x5F)
+let bindBandRandom = Data(0x60...0x6F)
+func bandReply(_ id: UInt64, _ field: Int, _ build: (inout PBWriter) -> Void) -> Data {
+    var body = PBWriter(); build(&body)
+    var account = PBWriter(); account.message(field, body)
+    var command = PBWriter(); command.varint(1, 1); command.varint(2, id); command.message(3, account)
+    return command.data
+}
+func bandError(_ id: UInt64, _ code: UInt64) -> Data {
+    var account = PBWriter(); account.varint(3, code)
+    var command = PBWriter(); command.varint(1, 1); command.varint(2, id); command.message(3, account)
+    return command.data
+}
+func bandInfo(verify: UInt64, oob: UInt64) -> Data {
+    bandReply(17, 12) {
+        $0.varint(1, verify); $0.string(2, "SN0000"); $0.string(3, "AA:BB:CC:DD:5E:6F"); $0.string(4, "M0000")
+        $0.varint(5, oob); $0.bytes(6, Data(0x70...0x7F)); $0.string(7, "did0")
+    }
+}
+func bandVerify(code: String = "", key: Data = bindBandKey.publicKey.rawRepresentation, flip: Bool = false) -> Data {
+    var sign = MiCrypto.hmacSHA256(key: bindSecret, bindBandRandom + Data(code.utf8))
+    if flip { sign[5] ^= 1 }
+    return bandReply(18, 18) { $0.bytes(1, key); $0.bytes(2, bindBandRandom); $0.bytes(3, sign) }
+}
+func bandConfirm(_ ok: Bool) -> Data { bandReply(19, 20) { $0.bool(1, ok) } }
+func bindStep(_ step: MiBind.Step) -> String {
+    switch step {
+    case .send(let data, let confirmOnBand): return "send:\(hex(data)):\(confirmOnBand)"
+    case .bound(let b):
+        return "bound:" + [b.authKey, b.keys.decryptionKey, b.keys.encryptionKey, b.keys.decryptionNonce, b.keys.encryptionNonce].map(hex).joined(separator: ":")
+            + ":\(b.appDeviceID):\(b.info.model):\(b.info.oobMode)"
+    case .failed(let failure, let tellBand): return "failed:\(failure):" + (tellBand.map(hex) ?? "-")
+    case .ignored: return "ignored"
+    }
+}
+/// Starts a bind and feeds it the replies: the start command, then one line per reply.
+func bindRun(name: String = "Freeband", code: String = "", _ replies: [Data]) -> [String] {
+    let config = MiBind.Config(userID: "freeband-test", appDeviceID: "0123456789abcdef", deviceName: name, dynamicCode: code)
+    var machine = MiBind.Machine(config: config, privateKey: bindPhoneKey, appRandom: bindAppRandom)!
+    return [hex(machine.start())] + replies.map { bindStep(machine.receive($0)) }
+}
+let bindAAD = Data("bind-data".utf8)
+let bindCCM = MiCrypto.ccmEncrypt(key: key, nonce: ccmNonce, plaintext: long, aad: bindAAD)
+var offCurve = bindBandKey.publicKey.rawRepresentation
+offCurve[63] ^= 1
+let bind: [String: Any] = [
+    "ccm_aad": hex(bindCCM),
+    "ccm_aad_roundtrip": MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: bindCCM, aad: bindAAD) == long,
+    "ccm_aad_wrong_rejected": MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: bindCCM, aad: Data("bind-datb".utf8)) == nil
+        && MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: bindCCM) == nil,
+    "nonce_cmd_app_id": hex(MiAuth.nonceCommand(phoneNonce: phone, appDeviceID: "0123456789abcdef")),
+    "bind_band_replies": [bandInfo(verify: 2, oob: 3), bandVerify(), bandConfirm(true), bandError(25, 0)].map(hex),
+    // The whole bind, button mode; a stray reply and a non-bind command in between change nothing.
+    "bind_ok": bindRun([bandInfo(verify: 2, oob: 3), bandConfirm(true), resp.data, bandVerify(), bandConfirm(true), bandError(25, 0), bandError(25, 0)]),
+    // Dynamic-code mode with a code, no device name, and a last reply that carries no error code.
+    "bind_code": bindRun(name: "", code: "123456", [bandInfo(verify: 2, oob: 2), bandVerify(code: "123456"), bandConfirm(true), bandReply(25, 29) { _ in }]),
+    "bind_server_psk": bindRun([bandInfo(verify: 1, oob: 0), bandVerify()]),
+    "bind_verify_mode_3": bindRun([bandInfo(verify: 3, oob: 0)]),
+    "bind_oob_numeric": bindRun([bandInfo(verify: 2, oob: 1)]),
+    "bind_already_bound": bindRun([bandError(17, 1)]),
+    "bind_wrong_proof": bindRun([bandInfo(verify: 2, oob: 0), bandVerify(flip: true), bandConfirm(true)]),
+    "bind_wrong_code": bindRun(code: "123456", [bandInfo(verify: 2, oob: 2), bandVerify(code: "123457")]),
+    "bind_off_curve": bindRun([bandInfo(verify: 2, oob: 0), bandVerify(key: offCurve)]),
+    "bind_declined": bindRun([bandInfo(verify: 2, oob: 3), bandVerify(), bandConfirm(false)]),
+    "bind_cancelled": bindRun([bandInfo(verify: 2, oob: 3), bandVerify(), bandError(19, 6)]),
+    "bind_state_error": bindRun([bandInfo(verify: 2, oob: 3), bandError(18, 8)]),
+    "bind_result_error": bindRun([bandInfo(verify: 2, oob: 3), bandVerify(), bandConfirm(true), bandError(25, 3)]),
+    "bind_unexpected": bindRun([bandReply(17, 4) { $0.string(1, "x") }]),
+    "bind_bad_config": [MiBind.Config(userID: "", appDeviceID: "a", deviceName: ""), MiBind.Config(userID: "u", appDeviceID: String(repeating: "a", count: 65), deviceName: ""),
+                        MiBind.Config(userID: "u\0", appDeviceID: "a", deviceName: ""), MiBind.Config(userID: "u", appDeviceID: String(repeating: "a", count: 64), deviceName: "")]
+        .map { MiBind.Machine(config: $0) == nil },
+]
+
 let out: [String: Any] = [
     "crc_123456789": String(format: "%04x", MiFrame.crc16arc(Data("123456789".utf8))),
     "okm": hex(okm),
@@ -245,4 +324,4 @@ let out: [String: Any] = [
     "gps_info_no_altitude": hex(MiAuth.gpsInfoCommand(at: Date(timeIntervalSince1970: 1_760_000_000), latitude: -33.8688, longitude: 151.2093, altitude: nil)),
     "resend_seqs": [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)].map { MiFrame.resendSeqs(next: $0.0, nack: $0.1) },
 ]
-print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }.merging(bandState) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)
+print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }.merging(bandState) { $1 }.merging(bind) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)

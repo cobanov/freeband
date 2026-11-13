@@ -12,7 +12,7 @@ Instructions for coding agents (and people) changing this repository. The README
   - A log the user shares has them in it (the band's name, the login bytes). Read it, don't paste it.
   - Model codes and firmware versions (`M2116W1`, `1.4.174`) are the same on every unit and belong in the notes.
 - **Code never depends on one band's address or ID.** The app finds a band by what is stored for it (`Band.mac`, `macSuffix`, its keys in the Keychain); nothing in the source names a particular device.
-- **Protocol code has no I/O.** `MiProtocol.swift`, `MiProtocolV1.swift` and `ActivityFiles.swift` use Foundation only (no CoreBluetooth, no SwiftUI), take bytes in and return bytes and events, so they build and test on the Mac. `BandLink.swift` does the Bluetooth.
+- **Protocol code has no I/O.** `MiProtocol.swift`, `MiProtocolV1.swift`, `MiBind.swift` and `ActivityFiles.swift` use Foundation and Apple's crypto only (no CoreBluetooth, no SwiftUI), take bytes in and return bytes and events, so they build and test on the Mac. `BandLink.swift` does the Bluetooth.
 
 ## Supporting a new band, or a new part of the protocol
 
@@ -29,8 +29,8 @@ Instructions for coding agents (and people) changing this repository. The README
 ## Tests
 
 ```sh
-# protocol vectors (V2 and V1); needs python3 with `cryptography`. TZ=UTC: notify_cmd's expected time is UTC.
-cd ios/tests/protocol && swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift main.swift -o /tmp/mitest && TZ=UTC /tmp/mitest | python3 check_vectors.py
+# protocol vectors (V2, V1 and the local bind); needs python3 with `cryptography`. TZ=UTC: notify_cmd's expected time is UTC.
+cd ios/tests/protocol && swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift main.swift -o /tmp/mitest && TZ=UTC /tmp/mitest | python3 check_vectors.py
 
 # activity files: Swift against the fixtures and the Python reference, then the reference alone
 cd ios/tests/activity/swift && swiftc ../../../Freeband/Band/ActivityFiles.swift main.swift -o /tmp/act && /tmp/act

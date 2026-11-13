@@ -84,6 +84,65 @@ in_slices = [u16(1) + in_ct[:18], u16(2) + in_ct[18:36], u16(3) + in_ct[36:]]
 PLAIN, ENC = b"\0\0\x02\x02", b"\0\0\x02\x01"
 ACK, READY, DONE = w(b"\0\0\x03\0"), w(b"\0\0\x01\x01"), w(b"\0\0\x01\0")
 
+# Local bind (docs/BIND.md): the phone and the band, each from its own fixed key, with cryptography's
+# P-256. The band is played here; main.swift's band replies are checked against it too.
+from cryptography.hazmat.primitives.asymmetric import ec
+def p256(scalar): return ec.derive_private_key(int.from_bytes(scalar, "big"), ec.SECP256R1())
+def xy(k): n = k.public_key().public_numbers(); return n.x.to_bytes(32, "big") + n.y.to_bytes(32, "big")
+phone_key, band_key = p256(bytes(range(0x01, 0x21))), p256(bytes(range(0x21, 0x41)))
+app_random, band_random = bytes(range(0x50, 0x60)), bytes(range(0x60, 0x70))
+secret = band_key.exchange(ec.ECDH(), phone_key.public_key())
+assert secret == phone_key.exchange(ec.ECDH(), band_key.public_key())
+def sha_hmac(k, m): return hmac.new(k, m, hashlib.sha256).digest()
+def hkdf(salt, ikm, info, n):
+    prk, out, t, i = sha_hmac(salt, ikm), b"", b"", 1
+    while len(out) < n:
+        t = sha_hmac(prk, t + info + bytes([i])); out += t; i += 1
+    return out[:n]
+block = hkdf(app_random + band_random, secret, b"miwear-bind", 64)
+def acct(i, body): return f_varint(1, 1) + f_varint(2, i) + f_bytes(3, body)
+def b_err(i, code): return acct(i, f_varint(3, code)).hex()
+def b_info(verify, oob):
+    return acct(17, f_bytes(12, f_varint(1, verify) + f_bytes(2, b"SN0000") + f_bytes(3, b"AA:BB:CC:DD:5E:6F") + f_bytes(4, b"M0000")
+                            + f_varint(5, oob) + f_bytes(6, bytes(range(0x70, 0x80))) + f_bytes(7, b"did0"))).hex()
+def b_verify(code=b""):
+    return acct(18, f_bytes(18, f_bytes(1, xy(band_key)) + f_bytes(2, band_random) + f_bytes(3, sha_hmac(secret, band_random + code)))).hex()
+def b_confirm(ok): return acct(19, f_bytes(20, f_varint(1, int(ok)))).hex()
+def p_start(name=b"Freeband"):
+    return acct(17, f_bytes(11, f_varint(1, 0) + f_bytes(2, hashlib.md5(b"freeband-test").digest()) + (f_bytes(3, name) if name else b""))).hex()
+def send(b, wait): return "send:" + b.hex() + (":true" if wait else ":false")
+def p_verify(wait): return send(acct(18, f_bytes(17, f_bytes(1, b"0123456789abcdef") + f_bytes(2, xy(phone_key)))), wait)
+def p_confirm(wait, code=b""): return send(acct(19, f_bytes(19, f_bytes(1, app_random) + f_bytes(2, sha_hmac(secret, app_random + code)))), wait)
+def p_result(name=b"Freeband"):
+    info = f_bytes(1, b"freeband-test") + f_bytes(2, f_varint(1, 1) + f_bytes(3, name) + f_varint(4, 0xFFFFFFFF))
+    sealed = AESCCM(block[16:32], tag_length=4).encrypt(bytes(range(0x10, 0x1C)), info, b"bind-data")
+    return send(acct(25, f_bytes(29, f_bytes(1, sealed))), False)
+def p_bound(oob): return "bound:" + ":".join(x.hex() for x in (block[40:56], block[:16], block[16:32], block[32:36], block[36:40])) + f":0123456789abcdef:M0000:{oob}"
+def failed(what, tell=None): return f"failed:{what}:" + (tell or "-")
+tell_verify = b_err(19, 7)
+bind_want = {
+    "ccm_aad": AESCCM(key, tag_length=4).encrypt(ccm_nonce, b"BandProbe companion device test vector!", b"bind-data").hex(),
+    "ccm_aad_roundtrip": True,
+    "ccm_aad_wrong_rejected": True,
+    "nonce_cmd_app_id": (f_varint(1, 1) + f_varint(2, 26) + f_bytes(3, f_bytes(30, f_bytes(1, phone) + f_bytes(2, b"0123456789abcdef")))).hex(),
+    "bind_band_replies": [b_info(2, 3), b_verify(), b_confirm(True), b_err(25, 0)],
+    "bind_ok": [p_start(), p_verify(True), "ignored", "ignored", p_confirm(True), p_result(), p_bound(3), "ignored"],
+    "bind_code": [p_start(b""), p_verify(False), p_confirm(False, b"123456"), p_result(b""), p_bound(2)],
+    "bind_server_psk": [p_start(), failed("serverBindRequired"), "ignored"],
+    "bind_verify_mode_3": [p_start(), failed("unsupportedVerifyMode(3)")],
+    "bind_oob_numeric": [p_start(), failed("unsupportedOOB(1)")],
+    "bind_already_bound": [p_start(), failed("alreadyBound")],
+    "bind_wrong_proof": [p_start(), p_verify(False), failed("bandProofMismatch", tell_verify), "ignored"],
+    "bind_wrong_code": [p_start(), p_verify(False), failed("bandProofMismatch", tell_verify)],
+    "bind_off_curve": [p_start(), p_verify(False), failed("bandProofMismatch", tell_verify)],
+    "bind_declined": [p_start(), p_verify(True), p_confirm(True), failed("rejectedOnBand")],
+    "bind_cancelled": [p_start(), p_verify(True), p_confirm(True), failed("rejectedOnBand")],
+    "bind_state_error": [p_start(), p_verify(True), failed("band(code: 8, step: 18)")],
+    "bind_result_error": [p_start(), p_verify(True), p_confirm(True), p_result(), failed("band(code: 3, step: 25)")],
+    "bind_unexpected": [p_start(), failed("unexpectedReply(step: 17)")],
+    "bind_bad_config": [True, True, True, False],
+}
+
 want = {
     "ccm_decrypt": b"BandProbe companion device test vector!".hex(),
     "ccm_decrypt_empty": "",
@@ -185,6 +244,7 @@ want.update({
     # a push with only charging (2 = no): the other parts are not in it
     "state_pushed_one_field": "false/nil/nil",
 })
+want.update(bind_want)
 bad = [k for k in want if got.get(k) != want[k]]
 for k in want:
     print(("OK  " if k not in bad else "FAIL"), k)
