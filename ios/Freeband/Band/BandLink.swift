@@ -664,15 +664,20 @@ final class BandLink: NSObject, ObservableObject {
                 guard let id, let has = hasActivityFile else { return true }
                 return !has(id, file.hex)
             }
-            // Only files from the past list, and never one from today's: today's file is still
-            // growing, and a Redmi Watch 5 Active lists everything under today (docs/ACTIVITY.md 2.6).
+            // Minute files that a later one follows are finished (ActivityFileID.finishedDetails):
+            // once stored they are not fetched again, and they may be acknowledged. Everything
+            // else on today's list can still change (the summary, manual readings, the newest
+            // minute file), so it is fetched every time and never acknowledged from here.
             let today = Set(todayIDs)
-            let stored = past.filter { file in
-                guard let id, let can = canAcknowledge, !today.contains(file) else { return false }
-                return can(id, file.hex)
+            let finished = ActivityFileID.finishedDetails(in: todayIDs)
+            func has(_ file: ActivityFileID) -> Bool { id.flatMap { hasActivityFile?($0, file.hex) } ?? false }
+            let todayWanted = todayIDs.filter { !(finished.contains($0) && has($0)) }
+            let stored = (past.filter { !today.contains($0) } + finished.sorted()).filter { file in
+                id.flatMap { canAcknowledge?($0, file.hex) } ?? false
             }
             for file in stored { sendCommand(MiAuth.activityAckCommand(file.data), encrypted: true) }
             if !stored.isEmpty { note("→ acknowledged \(stored.count) stored file(s); the band deletes them") }
+            if todayWanted.count < todayIDs.count { note("\(todayIDs.count - todayWanted.count) finished minute file(s) already stored, not fetched again") }
             var probes: [ActivityFileID] = []
             if probeDayBefore {
                 probeDayBefore = false
@@ -682,7 +687,7 @@ final class BandLink: NSObject, ObservableObject {
                 }.compactMap { $0.shifted(days: -1) }.filter { !today.contains($0) }
                 note("probe: also asking for \(probes.count) file(s) of the day before: \(probes.map(\.hex).joined(separator: " "))")
             }
-            requestedFiles = Set(todayIDs + wanted + probes)
+            requestedFiles = Set(todayWanted + wanted + probes)
             fileQueue = requestedFiles.sorted()
             note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")
             fileProgress = (0, fileQueue.count)
@@ -738,7 +743,17 @@ final class BandLink: NSObject, ObservableObject {
             if let id = target?.id { onFindPhone?(id, ring) }
 
         default:
-            note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 240))")
+            // Things the band asks or reports that Freeband leaves unanswered (docs/CAPABILITIES.md 9.7).
+            let known: [String: String] = [
+                "16/3": "the band asks for the phone's location", "23/0": "the band asks for the phone's status",
+                "23/17": "the band registers for phone usage", "4/1": "the band changed its watch face",
+                "2/18": "the band acknowledged Find", "7/16": "the band asks for the app's icon",
+            ]
+            if let what = known["\(type)/\(subtype)"] {
+                note("← \(type)/\(subtype) \(what) (not answered)")
+            } else {
+                note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 240))")
+            }
         }
     }
 

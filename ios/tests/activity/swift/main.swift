@@ -896,6 +896,16 @@ check("unknown versions of every parsed kind are .unsupported(.version)") {
     return e
 }
 
+check("finished minute files: every daily details id but the newest; other kinds never") {
+    // ids: ts u32 LE | tz | version | flags (0 details, 1 summary, 0x18 manual samples)
+    let ids = ["00f153650c0400", "3cf153650c0400", "78f153650c0400", "00f153650c0501", "00f153650c0218"].compactMap { ActivityFileID(hexData($0)) }
+    let finished = ActivityFileID.finishedDetails(in: ids).map(\.hex).sorted()
+    var e: [String] = []
+    if finished != ["00f153650c0400", "3cf153650c0400"] { e.append("got \(finished)") }
+    if !ActivityFileID.finishedDetails(in: [ids[0], ids[3]]).isEmpty { e.append("a single minute file is not finished") }
+    return e
+}
+
 // Two v4 records in the shape a Band 10 Pro sends (header ff ff f8 cf ff ff). Group 2 is 0x83 in
 // the first (level 100b = 4, sport type 3) and 0xe0 in the second (level 7, a still wrist).
 check("daily details: activity level is the top three bits of group 2") {

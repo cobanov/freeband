@@ -272,6 +272,17 @@ struct ActivityFileID: Hashable, Comparable, Sendable, CustomStringConvertible {
         self.init(bytes: [UInt8](bytes))
     }
 
+    /// The daily details files of a list that a later daily details file of the same list
+    /// follows. A Band 10 Pro closes the minute file each time it is fetched and opens a new one
+    /// (docs/ACTIVITY.md section 2.6), so a file with a successor is finished: it will not change
+    /// again. On a band that keeps one growing file a day, that file has no successor and is
+    /// never in the result.
+    static func finishedDetails(in list: [ActivityFileID]) -> Set<ActivityFileID> {
+        let details = list.filter { $0.kind == .dailyDetails }
+        guard let newest = details.map(\.ts).max() else { return [] }
+        return Set(details.filter { $0.ts < newest })
+    }
+
     /// The same id with its time moved by whole days (the kind, version and time zone stay).
     func shifted(days: Int) -> ActivityFileID? {
         var b = [UInt8](data)

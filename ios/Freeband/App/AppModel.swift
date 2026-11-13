@@ -161,7 +161,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Diagnostics › Probe the band: asks the read-only Health commands AstroBox names and
-    /// Gadgetbridge doesn't use (6 remaining sport data, 29 sport status, 42 goals, 44 basic
+    /// Gadgetbridge doesn't use (6 remaining sport data, 7 user profile, 29 sport status, 42 goals, 44 basic
     /// data, 61 sleep regularity, 63 sleep disorder, 86 training status), then syncs once while
     /// also asking for yesterday's daily files. The replies go to the log whole.
     func probeSelectedBand() {
@@ -169,7 +169,7 @@ final class AppModel: ObservableObject {
     }
 
     func probe(_ band: Band) {
-        let gets: [UInt64] = [6, 29, 42, 44, 61, 63, 86]
+        let gets: [UInt64] = [6, 7, 29, 42, 44, 61, 63, 86]
         Task {
             link.note("probe: asking 8/" + gets.map(String.init).joined(separator: ", 8/"))
             start(band, .send(gets.map(MiAuth.healthGet)))
