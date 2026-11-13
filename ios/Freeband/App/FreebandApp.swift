@@ -12,6 +12,7 @@ struct FreebandApp: App {
         // the held session there is no window, and the Bluetooth manager must exist at launch
         // (docs/STAY-CONNECTED.md section 3).
         _ = AppSession.shared
+        AppModel.registerBackgroundRefresh()
     }
 
     var body: some Scene {

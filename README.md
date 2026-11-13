@@ -33,7 +33,8 @@ Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1
 | Optional web hub: REST API, web panel, webhooks, CSV/JSON export | live at freeband.cobanov.dev |
 | Health monitoring settings on the band: heart rate interval, heart rate during sleep, blood oxygen, all-day stress (Band tab) | implemented and tested against vectors; not tried on a band yet |
 | Alarms, Do Not Disturb, weather, watch faces | not built yet |
-| Replacing Mi Fitness entirely (background connection, file acknowledgement) | not built yet |
+| Background sync: a sync finishes after you leave the app, iOS's background refresh runs one, and with Stay connected on the band coming back in range or changing state starts one ([docs/STAY-CONNECTED.md](docs/STAY-CONNECTED.md) section 4.1) | implemented; not tried on a band yet |
+| Replacing Mi Fitness entirely (file acknowledgement, first pairing) | not built yet |
 
 <img src="docs/img/redmi-watch-5-active.png" width="200" alt="Band: a Redmi Watch 5 Active with battery, sync and quick actions">
 

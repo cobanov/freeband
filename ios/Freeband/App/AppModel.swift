@@ -1,3 +1,4 @@
+import BackgroundTasks
 import Combine
 import Foundation
 import SwiftData
@@ -96,6 +97,7 @@ final class AppModel: ObservableObject {
             // The log line marks a new process: what came before it in the log is gone.
             link.note("— app started")
             updateHold()
+            watchHeldSession()
             Task { await self.launchMaintenance() }
         }
     }
@@ -194,7 +196,13 @@ final class AppModel: ObservableObject {
     /// don't run in a suspended app. Once it is open, Bluetooth events wake the app
     /// (docs/STAY-CONNECTED.md section 3).
     func enterBackground() {
-        stop()
+        scheduleBackgroundRefresh()
+        // A sync, a check or a command finishes in the background; only Live is cut short.
+        if link.phase.isBusy, link.phase != .live {
+            Task { await self.finishInBackground() }
+        } else {
+            stop()
+        }
         guard !isDemo, UserDefaults.standard.bool(forKey: Self.stayConnectedKey) else { return }
         endBackgroundTask()
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Stay connected") { [weak self] in
@@ -259,6 +267,93 @@ final class AppModel: ObservableObject {
         ringer.stop()
         findPhoneAlert?.clear()
         if tellBand { link.stopFindPhone() }
+    }
+
+    // MARK: background sync
+
+    static let backgroundRefreshID = "dev.cobanov.freeband.sync"
+    /// A sync nobody asked for runs when the last complete one is older than this,
+    static let backgroundSyncAfter: TimeInterval = 60 * 60
+    /// and at most this often, so a band that can't be synced isn't asked on every event.
+    static let backgroundSyncRetry: TimeInterval = 15 * 60
+    private var lastBackgroundSync = Date.distantPast
+    private var syncBackgroundTask = UIBackgroundTaskIdentifier.invalid
+    private var watchers: Set<AnyCancellable> = []
+
+    /// Once, while the app launches (FreebandApp.init): iOS runs this now and then while the app
+    /// is in the background, more often for an app that is opened often.
+    static func registerBackgroundRefresh() {
+        let now = Date()
+        assert(backgroundSyncDue(lastSync: nil, lastAttempt: .distantPast, now: now))
+        assert(!backgroundSyncDue(lastSync: now.addingTimeInterval(-backgroundSyncAfter + 1), lastAttempt: .distantPast, now: now))
+        assert(!backgroundSyncDue(lastSync: nil, lastAttempt: now.addingTimeInterval(-backgroundSyncRetry + 1), now: now))
+        assert(backgroundSyncDue(lastSync: now.addingTimeInterval(-backgroundSyncAfter), lastAttempt: now.addingTimeInterval(-backgroundSyncRetry), now: now))
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundRefreshID, using: .main) { task in
+            MainActor.assumeIsolated {
+                guard let model = AppModel.shared else { return task.setTaskCompleted(success: false) }
+                model.scheduleBackgroundRefresh()
+                task.expirationHandler = { Task { @MainActor in AppModel.shared?.stop() } }
+                Task {
+                    await model.backgroundSync("background refresh")
+                    task.setTaskCompleted(success: true)
+                }
+            }
+        }
+    }
+
+    func scheduleBackgroundRefresh() {
+        guard !isDemo else { return }
+        let request = BGAppRefreshTaskRequest(identifier: Self.backgroundRefreshID)
+        request.earliestBeginDate = Date().addingTimeInterval(Self.backgroundSyncAfter)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    /// With Stay connected on, Bluetooth events wake the app: the held session opening (the band
+    /// came back in range) and the band reporting a change (put on, woke up, on the charger).
+    /// Each is a chance to sync before the user opens the app.
+    private func watchHeldSession() {
+        link.$holdState.removeDuplicates().filter { $0 == .connected }
+            .sink { [weak self] _ in Task { await self?.backgroundSync("held session opened") } }
+            .store(in: &watchers)
+        link.$deviceState.dropFirst().removeDuplicates()
+            .sink { [weak self] _ in Task { await self?.backgroundSync("band state changed") } }
+            .store(in: &watchers)
+    }
+
+    /// Syncs the selected band if its last complete sync is old. Returns when the session ended.
+    func backgroundSync(_ reason: String, now: Date = Date()) async {
+        guard !isDemo, UserDefaults.standard.bool(forKey: "onboarded"), let band = selectedBand(), !link.phase.isBusy else { return }
+        guard Self.backgroundSyncDue(lastSync: band.lastSyncAt, lastAttempt: lastBackgroundSync, now: now) else { return }
+        lastBackgroundSync = now
+        link.note("background sync: \(reason)")
+        start(band, .sync)
+        await finishInBackground()
+    }
+
+    static func backgroundSyncDue(lastSync: Date?, lastAttempt: Date, now: Date) -> Bool {
+        if let lastSync, now.timeIntervalSince(lastSync) < backgroundSyncAfter { return false }
+        return now.timeIntervalSince(lastAttempt) >= backgroundSyncRetry
+    }
+
+    /// Keeps the app running until the session ends. When iOS's time runs out first, the session
+    /// stops: the files that arrived are kept and the rest come with the next sync.
+    private func finishInBackground() async {
+        endSyncBackgroundTask()
+        syncBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Sync") { [weak self] in
+            self?.stop()
+            self?.endSyncBackgroundTask()
+        }
+        try? await Task.sleep(for: .milliseconds(300))
+        while link.phase.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
+        // A held session opens again 2 s after another session ends, on a timer.
+        try? await Task.sleep(for: .seconds(3))
+        endSyncBackgroundTask()
+    }
+
+    private func endSyncBackgroundTask() {
+        guard syncBackgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(syncBackgroundTask)
+        syncBackgroundTask = .invalid
     }
 
     /// Plan section 4 ("daily open"): when the app comes to the front, sync if the last sync is

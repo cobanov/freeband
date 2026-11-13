@@ -62,6 +62,18 @@ Mi Fitness can ring the phone because it keeps a session open in the background.
   - Ringing stops on the band's stop, on Stop in the app or the notification, or after 2 minutes. When it stops on the phone, the phone sends the stop in section 1 so the band can close its screen.
 - **The log.** Diagnostics keeps the last 600 lines across sessions instead of only the last session, so what happened on the held session is still there after a sync. While holding, every command from the band is logged as `← held t/s`. The log lives in memory: `— app started` marks a new process, and `restored by iOS` a relaunch for the held session. When Stay connected is on but can't start, the log says why (`stay connected: no band`, `no key`).
 
+## 4.1 Background sync
+
+A sync used to run only with the app in front, and leaving the app stopped it. Now:
+
+- **Leaving the app.** A running sync, check or command finishes in the background: the app asks iOS for more time (a background task, about 30 s) and stops the session only when that runs out. Files that arrived are kept, the rest come with the next sync. Live HR still stops at once.
+- **Background refresh.** The app registers a background refresh task (`dev.cobanov.freeband.sync`, background mode `fetch`). iOS runs it when it chooses, more often for an app that is opened often; it is not a schedule. [iOS]
+- **The held session.** With Stay connected on, two Bluetooth events wake the app and start a sync: the held session opening (the band came back in range) and the band's state changing (`2/78`, `2/79`: put on, woke up, on the charger; [`CAPABILITIES.md`](CAPABILITIES.md) section 9.7). The sync pauses the hold like any other session.
+- **How often.** Only when the last complete sync is over an hour old, and at most one attempt in 15 minutes, so a band that can't be synced (Mi Fitness holds it, out of range) isn't asked on every event.
+- **The log.** `background sync: <reason>`, with the reason `background refresh`, `held session opened` or `band state changed`.
+
+Not checked on a band: whether a Band 10 sends `2/79` on an idle held session [UNVERIFIED], and how much of a sync fits in the time iOS gives [UNVERIFIED].
+
 ## 5. Limits
 
 - The band can only reach the phone while the hold is open. Find Phone doesn't work after the user swipes Freeband away, while Bluetooth is off, or while another session runs. In those cases the hold reopens within a few seconds when Freeband next runs.
