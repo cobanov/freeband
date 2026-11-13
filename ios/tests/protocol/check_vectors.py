@@ -1,4 +1,5 @@
 """Independent recomputation of the MiProtocol test vectors (stdlib + cryptography)."""
+import struct
 import hashlib, hmac, json, sys
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
@@ -107,6 +108,12 @@ want = {
     "realtime_stop": (f_varint(1, 8) + f_varint(2, 46)).hex(),
     "live_parsed": "8421/312/74/9",
     "live_intensity": 49,  # realTimeStats field 5
+    # gnss(18).gps_info(3){timestamp 1, longitude 2, latitude 3, altitude 4}; doubles are wire type 1, little-endian
+    "gps_info": (f_varint(1, 16) + f_varint(2, 2) + f_bytes(18, f_bytes(3, f_varint(1, 1760000000)
+                 + varint(2 << 3 | 1) + struct.pack("<d", 28.9784) + varint(3 << 3 | 1) + struct.pack("<d", 41.0082)
+                 + varint(4 << 3 | 1) + struct.pack("<d", 35.5)))).hex(),
+    "gps_info_no_altitude": (f_varint(1, 16) + f_varint(2, 2) + f_bytes(18, f_bytes(3, f_varint(1, 1760000000)
+                 + varint(2 << 3 | 1) + struct.pack("<d", 151.2093) + varint(3 << 3 | 1) + struct.pack("<d", -33.8688)))).hex(),
     # Gadgetbridge setCurrentTime: local date/time, sint32 (zigzag) 15-min offsets, name, isNot24hour
     "clock_istanbul": clock(1760000000, "Europe/Istanbul", True),
     "clock_newyork_12h": clock(1760000000, "America/New_York", False),

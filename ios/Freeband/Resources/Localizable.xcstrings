@@ -5628,6 +5628,26 @@
           }
         }
       }
+    },
+    "Share location with the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konumu bantla paylaş"
+          }
+        }
+      }
+    },
+    "The band asks where this phone is at every sync. Freeband answers only while this is on.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bant her senkronda bu telefonun konumunu soruyor. Freeband yalnız bu açıkken cevap verir."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

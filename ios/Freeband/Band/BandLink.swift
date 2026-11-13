@@ -209,6 +209,8 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var deviceState: MiAuth.DeviceState?
     /// The band's Find Phone (Command{2,17}): true to start ringing, false to stop.
     var onFindPhone: ((UUID, Bool) -> Void)?
+    /// The phone's last known location, when the user lets the band have it; nil otherwise.
+    var phoneLocation: (() -> (at: Date, latitude: Double, longitude: Double, altitude: Double?)?)?
     /// One shot (Diagnostics › Probe the band): the next sync also asks for the day-before
     /// copies of today's files that start at local midnight, to see whether the band still
     /// hands over a file that another app acknowledged.
@@ -741,6 +743,13 @@ final class BandLink: NSObject, ObservableObject {
             guard let ring = MiAuth.findPhoneRequest(command) else { return }
             note("← find phone: \(ring ? "ring" : "stop") \(Self.hexPrefix(lastCommandBody))")
             if let id = target?.id { onFindPhone?(id, ring) }
+
+        case (16, 3) where phoneLocation?() != nil:
+            // The band asks where the phone is; answered only when the user turned that on.
+            if let l = phoneLocation?() {
+                sendCommand(MiAuth.gpsInfoCommand(at: l.at, latitude: l.latitude, longitude: l.longitude, altitude: l.altitude), encrypted: true)
+                note("← 16/3 the band asks for the phone's location → sent")
+            }
 
         default:
             // Things the band asks or reports that Freeband leaves unanswered (docs/CAPABILITIES.md 9.7).

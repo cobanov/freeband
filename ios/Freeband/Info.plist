@@ -46,6 +46,8 @@
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Freeband uses Bluetooth to talk directly to the band on your wrist.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>If you turn on Share location with the band, Freeband sends this phone's location to your band when the band asks for it. It goes nowhere else.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>OpenSauceSans-Regular.otf</string>

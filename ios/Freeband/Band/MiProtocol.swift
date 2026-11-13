@@ -116,6 +116,12 @@ struct PBWriter {
         varint(field, UInt64(bitPattern: (value << 1) ^ (value >> 63)))
     }
 
+    /// double: wire type 1, 8 bytes little-endian.
+    mutating func double(_ field: Int, _ value: Double) {
+        key(field, wire: 1)
+        withUnsafeBytes(of: value.bitPattern.littleEndian) { data.append(contentsOf: $0) }
+    }
+
     mutating func bool(_ field: Int, _ value: Bool) {
         varint(field, value ? 1 : 0)
     }
@@ -546,6 +552,24 @@ extension MiAuth {
     /// Whether the phone shows 24-hour time.
     static var phoneUses24Hour: Bool {
         !(DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: .current) ?? "").contains("a")
+    }
+
+    /// The answer to the band's Command{16,3} (it asks for the phone's location at every sync):
+    /// Command{16,2} gnss(18).gps_info(3){timestamp 1 (Unix s), longitude 2, latitude 3,
+    /// altitude 4 (doubles)} (docs/CAPABILITIES.md section 9.7; AstroBox wear_gnss.proto).
+    static func gpsInfoCommand(at time: Date, latitude: Double, longitude: Double, altitude: Double?) -> Data {
+        var info = PBWriter()
+        info.varint(1, UInt64(max(time.timeIntervalSince1970, 0)))
+        info.double(2, longitude)
+        info.double(3, latitude)
+        if let altitude { info.double(4, altitude) }
+        var gnss = PBWriter()
+        gnss.message(3, info)
+        var command = PBWriter()
+        command.varint(1, 16)
+        command.varint(2, 2)
+        command.message(18, gnss)
+        return command.data
     }
 
     /// A Health command with no payload: Command{8, subtype}.

@@ -85,6 +85,12 @@ final class AppModel: ObservableObject {
         }
         link.onActivityFile = { [weak self] id, file, data, today in self?.storeActivityFile(id, file, data, today: today) }
         link.onFindPhone = { [weak self] id, ring in self?.findPhone(id, ring) }
+        link.phoneLocation = { [weak self] in
+            // A fix older than six hours says little about where the phone is now.
+            guard let self, UserDefaults.standard.bool(forKey: Self.shareLocationKey), let l = self.phoneLocation.last,
+                  Date().timeIntervalSince(l.timestamp) < 6 * 3600 else { return nil }
+            return (l.timestamp, l.coordinate.latitude, l.coordinate.longitude, l.verticalAccuracy >= 0 ? l.altitude : nil)
+        }
         link.canAcknowledge = { [weak self] id, hex in
             UserDefaults.standard.bool(forKey: Self.clearBandKey) && self?.blob(id, hex)?.parseStatus == ParseStatus.parsed.rawValue
         }
@@ -186,6 +192,20 @@ final class AppModel: ObservableObject {
     static let stayConnectedKey = "stayConnected"
     /// Clear the band after sync: files stored and parsed here are acknowledged at the next sync.
     static let clearBandKey = "clearBandAfterSync"
+    /// Share location with the band: answer its location request at each sync.
+    static let shareLocationKey = "shareLocation"
+    private let phoneLocation = PhoneLocation()
+
+    /// The switch; turning it on asks iOS for the location permission and a first fix.
+    func setShareLocation(_ on: Bool) {
+        UserDefaults.standard.set(on, forKey: Self.shareLocationKey)
+        if on { phoneLocation.refresh() }
+    }
+
+    /// When the app comes to the front: a fresh fix for the next time the band asks.
+    func refreshSharedLocation() {
+        if !isDemo, UserDefaults.standard.bool(forKey: Self.shareLocationKey) { phoneLocation.refresh() }
+    }
     /// Ringing stops by itself after this long.
     static let ringLimit: TimeInterval = 120
 

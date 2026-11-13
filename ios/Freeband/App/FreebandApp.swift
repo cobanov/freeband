@@ -88,6 +88,7 @@ struct RootView: View {
             // Live mode keeps the band measuring; never leave it running in the background.
             if phase == .background { model.enterBackground() }
             if phase == .active {
+                model.refreshSharedLocation()
                 autoSync()
                 // A held session waiting out a retry opens now (after the sync, if one started).
                 model.updateHold()

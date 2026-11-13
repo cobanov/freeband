@@ -31,6 +31,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSBluetoothAlwaysUsageDescription: Freeband uses Bluetooth to talk directly to the band on your wrist.
+        NSLocationWhenInUseUsageDescription: If you turn on Share location with the band, Freeband sends this phone's location to your band when the band asks for it. It goes nowhere else.
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.healthcare-fitness
         UILaunchScreen: {}
