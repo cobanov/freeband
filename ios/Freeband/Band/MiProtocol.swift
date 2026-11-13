@@ -512,6 +512,70 @@ extension MiAuth {
     }
 }
 
+/// One sleep (a night or a nap) of a SleepResult, in plain values (docs/SLEEP-WRITEBACK.md).
+struct SleepResultSection: Equatable, Sendable {
+    /// Fields 1-5 of ExtraData, raw. Mi Fitness 9.8.348i never sends ExtraData, so the units
+    /// are not known; all five go out when this is set.
+    struct Extra: Equatable, Sendable {
+        var bedtime: Int
+        var sleepTime: Int
+        var quality: Int
+        var efficiency: Int
+        var breathing: Int
+    }
+
+    /// Fell asleep and woke up; sent as Unix seconds.
+    var bedTime: Date
+    var wakeTime: Date
+    /// Offset from UTC in 15-minute blocks, DST included: the tz byte of the sleep file's id.
+    var tzQuarterHours: Int
+    /// Sent in seconds (× 60).
+    var minutesAsleep: Int
+    /// nil goes out as 0, as Mi Fitness does.
+    var averageHeartRate: Int?
+    var averageSpO2: Int?
+    /// nil leaves ExtraData out, as Mi Fitness does.
+    var extra: Extra?
+}
+
+extension MiAuth {
+    /// Command{8,41}: fitness(10).sleepResult(37){section 1 (repeated){timezone 1{offset 1 sint32},
+    /// validSleepTime 2 (s), sleepTimestamp 3, wakeupTimestamp 4, averageHeartRate 5,
+    /// averageBloodOxygen 6, extraData 7{bedtime 1, sleepTime 2, sleepQuality 3, sleepEfficiency 4,
+    /// breathing 5}}}. The phone's sleep summary for the band to show; sections go out oldest
+    /// first. Not tried on a band yet (docs/SLEEP-WRITEBACK.md, "To check on the band").
+    static func sleepResultCommand(_ sections: [SleepResultSection]) -> Data {
+        func unsigned(_ v: Int) -> UInt64 { UInt64(max(v, 0)) }
+        var result = PBWriter()
+        for s in sections.sorted(by: { $0.bedTime < $1.bedTime }) {
+            var zone = PBWriter()
+            zone.sint(1, Int64(s.tzQuarterHours))
+            var section = PBWriter()
+            section.message(1, zone)
+            section.varint(2, unsigned(s.minutesAsleep) * 60)
+            section.varint(3, unsigned(Int(s.bedTime.timeIntervalSince1970)))
+            section.varint(4, unsigned(Int(s.wakeTime.timeIntervalSince1970)))
+            section.varint(5, unsigned(s.averageHeartRate ?? 0))
+            section.varint(6, unsigned(s.averageSpO2 ?? 0))
+            if let e = s.extra {
+                var extra = PBWriter()
+                for (field, value) in [e.bedtime, e.sleepTime, e.quality, e.efficiency, e.breathing].enumerated() {
+                    extra.varint(field + 1, unsigned(value))
+                }
+                section.message(7, extra)
+            }
+            result.message(1, section)
+        }
+        var fitness = PBWriter()
+        fitness.message(37, result)
+        var command = PBWriter()
+        command.varint(1, 8)
+        command.varint(2, 41)
+        command.message(10, fitness)
+        return command.data
+    }
+}
+
 extension MiAuth {
     /// Command{2,3}: system(4).clock(4){date 1{year, month, day}, time 2{hour, minute, second, ms},
     /// timezone 3{zoneOffset 1 sint32, dstOffset 2 sint32 (15-minute blocks), name 3}, isNot24hour 4}.

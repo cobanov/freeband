@@ -41,6 +41,16 @@ def clock(ts, tzname, h24):
     clk = f_bytes(1, date) + f_bytes(2, time) + f_bytes(3, zone) + f_varint(4, 0 if h24 else 1)
     return (f_varint(1, 2) + f_varint(2, 3) + f_bytes(4, f_bytes(4, clk))).hex()
 
+# SleepResult.Section: timezone 1{offset 1, zigzag}, valid_sleep_time 2 (seconds), sleep_timestamp 3,
+# wakeup_timestamp 4, average_heart_rate 5, average_blood_oxygen 6, extra_data 7 (five varints, optional)
+def sleep_section(tz, seconds, bed, wake, hr, spo2, extra=None):
+    s = f_bytes(1, f_sint(1, tz)) + f_varint(2, seconds) + f_varint(3, bed) + f_varint(4, wake) + f_varint(5, hr) + f_varint(6, spo2)
+    if extra: s += f_bytes(7, b"".join(f_varint(n + 1, v) for n, v in enumerate(extra)))
+    return s
+
+def sleep_result(*sections):
+    return (f_varint(1, 8) + f_varint(2, 41) + f_bytes(10, f_bytes(37, b"".join(f_bytes(1, s) for s in sections)))).hex()
+
 def crc16arc(data):
     crc = 0
     for b in data:
@@ -117,6 +127,12 @@ want = {
     # Gadgetbridge setCurrentTime: local date/time, sint32 (zigzag) 15-min offsets, name, isNot24hour
     "clock_istanbul": clock(1760000000, "Europe/Istanbul", True),
     "clock_newyork_12h": clock(1760000000, "America/New_York", False),
+    # docs/SLEEP-WRITEBACK.md: Command{8,41}, fitness(10).sleepResult(37), one section(1) per sleep
+    "sleep_result": sleep_result(sleep_section(12, 437 * 60, 1794090600, 1794117600, 56, 96)),
+    "sleep_result_two": sleep_result(
+        sleep_section(-16, 437 * 60, 1794090600, 1794117600, 56, 96, extra=(1794089700, 26220, 82, 91, 15)),
+        sleep_section(-16, 45 * 60, 1794140000, 1794143000, 0, 0)),
+    "sleep_result_empty": sleep_result(),
     # docs/ACTIVITY.md section 2.2
     "activity_today": "0808100152042a020800",
     "activity_past": "08081002",

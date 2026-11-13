@@ -224,6 +224,19 @@ let out: [String: Any] = [
     "activity_past": hex(MiAuth.activityListCommand(today: false)),
     "activity_ack": hex(MiAuth.activityAckCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
     "activity_fetch": hex(MiAuth.activityFetchCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
+    "sleep_result": hex(MiAuth.sleepResultCommand([
+        SleepResultSection(bedTime: Date(timeIntervalSince1970: 1_794_090_600), wakeTime: Date(timeIntervalSince1970: 1_794_117_600),
+                           tzQuarterHours: 12, minutesAsleep: 437, averageHeartRate: 56, averageSpO2: 96, extra: nil),
+    ])),
+    // given newest first: goes out oldest first; no averages on the nap; a negative offset; ExtraData on one
+    "sleep_result_two": hex(MiAuth.sleepResultCommand([
+        SleepResultSection(bedTime: Date(timeIntervalSince1970: 1_794_140_000), wakeTime: Date(timeIntervalSince1970: 1_794_143_000),
+                           tzQuarterHours: -16, minutesAsleep: 45, averageHeartRate: nil, averageSpO2: nil, extra: nil),
+        SleepResultSection(bedTime: Date(timeIntervalSince1970: 1_794_090_600), wakeTime: Date(timeIntervalSince1970: 1_794_117_600),
+                           tzQuarterHours: -16, minutesAsleep: 437, averageHeartRate: 56, averageSpO2: 96,
+                           extra: .init(bedtime: 1_794_089_700, sleepTime: 26_220, quality: 82, efficiency: 91, breathing: 15)),
+    ])),
+    "sleep_result_empty": hex(MiAuth.sleepResultCommand([])),
     "clock_istanbul": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "Europe/Istanbul")!, is24Hour: true)),
     "clock_newyork_12h": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "America/New_York")!, is24Hour: false)),
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
