@@ -78,22 +78,32 @@ struct SleepNightScreen: View {
                 pager("chevron.left", String(localized: "Previous night"), enabled: index > 0) { step(-1) }
                 pager("chevron.right", String(localized: "Next night"), enabled: index < nights.count - 1) { step(1) }
             }
-            Text(FBFormat.duration(minutes: metrics?.totalSleepMinutes ?? Double(night.totalSleepMinutes ?? 0)))
-                .textStyle(.figureL)
-                .foregroundStyle(.textPrimary)
-                .accessibilityLabel(Text("Slept \(FBFormat.duration(minutes: metrics?.totalSleepMinutes ?? 0))"))
-            Text(spanLine(night: night, metrics: metrics))
-                .textStyle(.subhead)
-                .foregroundStyle(.textSecondary)
         }
-
-        ListCard {
-            NavigationLink(value: Route.score(.sleep, day: day.index)) {
-                ListRow(title: String(localized: "Sleep score"), value: scoreValue(day), systemImage: "moon", showsDivider: false)
+        let asleep = metrics?.totalSleepMinutes ?? Double(night.totalSleepMinutes ?? 0)
+        NavigationLink(value: Route.score(.sleep, day: day.index)) {
+            Card(padding: FBSpace.m) {
+                HStack(alignment: .center, spacing: FBSpace.m) {
+                    ScoreArc(kind: .sleep, value: history.score(.sleep, day), style: .hero)
+                    VStack(alignment: .leading, spacing: FBSpace.xs) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(FBFormat.duration(minutes: asleep))
+                                .textStyle(.figureM)
+                                .foregroundStyle(.textPrimary)
+                                .accessibilityLabel(Text("Slept \(FBFormat.duration(minutes: asleep))"))
+                            Text(spanLine(night: night, metrics: metrics))
+                                .textStyle(.subhead)
+                                .foregroundStyle(.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        VStack(spacing: FBSpace.xxs) {
+                            FactRow(String(localized: "Deep", comment: "Sleep stage"), night.deepMinutes.map { FBFormat.duration(minutes: Double($0)) })
+                            FactRow(String(localized: "REM", comment: "Sleep stage"), night.remMinutes.map { FBFormat.duration(minutes: Double($0)) })
+                        }
+                    }
+                }
             }
-            .buttonStyle(.fbRow)
         }
-
+        .buttonStyle(.plain)
         let segments = night.hypnogramSegments
         if !segments.isEmpty {
             VStack(alignment: .leading, spacing: FBSpace.xs) {

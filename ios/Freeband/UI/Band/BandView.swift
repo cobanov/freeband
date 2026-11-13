@@ -72,31 +72,39 @@ private struct BandPage: View {
                 if bands.count > 1 {
                     switcher
                 }
-                TimelineView(.everyMinute) { timeline in
-                    BandRender(model: BandPresentation.model(band), state: liveState(timeline.date),
-                               height: dynamicTypeSize.isAccessibilitySize ? 150 : 220)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, FBSpace.xs)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(Text(band.shortName))
-                        .accessibilityValue(Text(renderDescription))
-                }
-
-                VStack(alignment: .leading, spacing: FBSpace.xxs) {
-                    Text(band.shortName)
-                        .textStyle(.headline)
-                        .foregroundStyle(.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    StatusLine(name: band.macSuffix.map { String(localized: "ID \($0)") } ?? band.shortName,
-                               battery: BandPresentation.battery(link, band),
-                               state: BandPresentation.statusState(link, band), lastSync: band.lastSyncAt)
-                    if BandPresentation.isSyncing(link, band), let progress = link.fileProgress, progress.total > 0 {
-                        ProgressView(value: Double(progress.done), total: Double(progress.total))
-                            .tint(.textPrimary)
-                            .padding(.top, FBSpace.xxs)
+                Card(padding: FBSpace.m) {
+                    HStack(alignment: .center, spacing: FBSpace.m) {
+                        TimelineView(.everyMinute) { timeline in
+                            BandRender(model: BandPresentation.model(band), state: liveState(timeline.date),
+                                       height: dynamicTypeSize.isAccessibilitySize ? 120 : 168)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text(band.shortName))
+                                .accessibilityValue(Text(renderDescription))
+                        }
+                        VStack(alignment: .leading, spacing: FBSpace.xs) {
+                            Text(band.shortName)
+                                .textStyle(.headline)
+                                .foregroundStyle(.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(BandPresentation.battery(link, band).map { FBFormat.percent(Double($0) / 100) } ?? "–")
+                                    .textStyle(.figureL)
+                                    .foregroundStyle(.textPrimary)
+                                Text("Battery")
+                                    .textStyle(.subhead)
+                                    .foregroundStyle(.textSecondary)
+                            }
+                            .accessibilityElement(children: .combine)
+                            StatusLine(name: band.macSuffix.map { String(localized: "ID \($0)") } ?? band.shortName,
+                                       battery: nil, state: BandPresentation.statusState(link, band), lastSync: band.lastSyncAt)
+                            if BandPresentation.isSyncing(link, band), let progress = link.fileProgress, progress.total > 0 {
+                                ProgressView(value: Double(progress.done), total: Double(progress.total))
+                                    .tint(.textPrimary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-
                 BandContextCard(band: band)
 
                 QuickActionRow {

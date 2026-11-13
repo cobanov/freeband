@@ -218,7 +218,10 @@ Kullanıcı "tamamen yeni, çok daha profesyonel, en az WHOOP kalitesinde" bir a
 - **Yazı:** Open Sauce Sans kaldı; rakamlar, başlıklar ve düğmeler 600 (önceden en çok 500). Büyük rakam 64 pt.
 - **Şekil:** kart yarıçapı 20, ince kenar çizgili; düğme yarıçapı 14.
 - **Bugün:** kahraman kart (Toparlanma halkası ve yanında dinlenik nabız, HRV, uyku), yan yana Uyku ve Yük kartları, kart içinde günün izi, dikkat çekenler, sayı ızgarası (Adım geniş, diğerleri ikili; her karoda değer, 7 günlük ortalamaya göre değişim ve metriğin renginde çizgi).
-- Yapılmadı: Uyku, Trendler, Bant ve skor detayının düzeni v3'teki gibi (yalnız yeni renk, halka ve kartları aldılar); README ve App Store ekran görüntüleri eski tasarımda; hub'ın CSS belirteçleri üretildi ama site yayınlanmadı.
+- **Uyku:** gecenin kahraman kartı (Uyku halkası, yanında süre, yatış–kalkış ve verim, derin ve REM), altında evreler ve gece grafikleri.
+- **Trendler:** her kartta metrik adı, büyük ortalama ve aynı uzunluktaki önceki döneme göre değişim (iki yanda en az 3 gün varsa), altında grafik.
+- **Bant:** tek kartta bant çizimi, adı, büyük pil yüzdesi ve durum satırı; altında hızlı aksiyonlar ve ayarlar.
+- Yapılmadı: skor detayının düzeni v3'teki gibi (yalnız yeni renk, halka ve kartları aldı); README ve App Store ekran görüntüleri eski tasarımda; hub'ın CSS belirteçleri üretildi ama site yayınlanmadı.
 
 ## 9. Fazlar ve yürütme (gece, otonom; kullanıcı 2026-10-14'te onay verdi)
 

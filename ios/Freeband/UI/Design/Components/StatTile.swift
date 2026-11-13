@@ -73,3 +73,28 @@ struct StatTile: View {
         }
     }
 }
+
+/// A label and its value on one line, for the facts beside a hero ring.
+struct FactRow: View {
+    let label: String
+    let value: String?
+
+    init(_ label: String, _ value: String?) {
+        self.label = label
+        self.value = value
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .textStyle(.subhead)
+                .foregroundStyle(.textSecondary)
+            Spacer(minLength: FBSpace.xs)
+            Text(value ?? "–")
+                .textStyle(.figureS)
+                .foregroundStyle(value == nil ? Color.textTertiary : Color.textPrimary)
+        }
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+    }
+}
