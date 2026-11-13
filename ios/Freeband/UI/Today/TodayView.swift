@@ -176,6 +176,7 @@ private struct TodayContent: View {
                     }
                     .opacity(syncing ? 0.5 : 1)
                     .fbStateAnimation(syncing)
+                    WorkoutsSection(bandID: band.id, day: day)
                     InsightList(insights: history.insights(day, sleepNeedMinutes: Profile.load().sleepNeed), day: day)
                 }
                 if isToday {

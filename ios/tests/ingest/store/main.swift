@@ -281,6 +281,12 @@ func run() async {
     equal("one band", count(Band.self, dctx), 1)
     check("minute days", count(MinuteDay.self, dctx) == 30)
     check("RR for 20 nights", count(SleepRR.self, dctx) >= 19)
+    // 30 days with a run on about every third; today's is missing before it ends.
+    let demoWorkouts = (try? dctx.fetch(FetchDescriptor<Workout>())) ?? []
+    check("demo workouts", demoWorkouts.count >= 12, "\(demoWorkouts.count)")
+    check("demo workouts are plausible runs", demoWorkouts.allSatisfy {
+        ($0.distanceMeters ?? 0) > 3000 && (110 ... 180).contains($0.hrAvg ?? 0) && (240 ... 480).contains($0.paceAvg ?? 0)
+    }, "\(demoWorkouts.map { [$0.distanceMeters ?? 0, $0.hrAvg ?? 0, $0.paceAvg ?? 0] }.prefix(3))")
     let decoded = demoScores.compactMap(\.result)
     equal("all decode", decoded.count, 30)
     check("first nights: no RR", decoded.prefix(10).allSatisfy { !$0.hasRR })

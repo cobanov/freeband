@@ -17,6 +17,8 @@ enum Route: Hashable {
     case scoreMethod(ScoreKind, day: Int)
     case trend(TrendMetric, day: Int)
     case night(day: Int)
+    /// A workout of the selected band, by its summary file's id.
+    case workout(fileID: String)
     case aboutBand(UUID)
     case monitoring(UUID)
     case bandOptions(UUID)
@@ -130,6 +132,7 @@ private struct RouteView: View {
                         case .scoreMethod(let kind, let day): ScoreMethodView(kind: kind, day: DayKey(index: day), history: history)
                         case .trend(let metric, let day): TrendDetailView(metric: metric, day: DayKey(index: day), band: band, history: history)
                         case .night(let day): SleepNightScreen(band: band, history: history, initialDay: DayKey(index: day))
+                        case .workout(let fileID): WorkoutDetailView(bandID: band.id, fileID: fileID)
                         default: EmptyView()
                         }
                     }
