@@ -150,7 +150,7 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 | 16.1 | Bantta internet (ağ vekili) | ↔ | 2/92 + kanal 7 | AB | oturum + TCP/IP yığını | L | yüksek | yok |
 | 16.2 | Hızlı uygulamayla mesajlaşma | ↔ | 20/6–9 | AB | oturum + bant uygulaması | L | orta | yok |
 | 16.3 | Kadın sağlığı, rota, tıbbi kimlik, temel veri... | ↔ | 8/7, 20, 37–41, 44, 57–62... | AB | çoğu kolay | S–L | orta | yok |
-| 16.6 | Bilinmeyen 2/110 | B→T | 2/110 | — | loglanmalı | S | düşük | loglanıyor, çözülmüyor |
+| 16.6 | Bilinmeyen 2/110 | B→T | 2/110 | — | loglanmalı | S | düşük | içeriği okundu (alan 71: adlı kaynak listesi), anlamı tahmin |
 
 ## 3. Bildirimler ve aramalar
 
@@ -814,6 +814,7 @@ Uyumsuzluklar (bantta doğrulanmalı):
 - Gadgetbridge'de `System` için 110 yok (en büyük 79) [KOD] `X/services/XiaomiSystemService.java:76-103`. AstroBox'ın `SystemID` listesi 98'de bitiyor, 110 yok; ABP ve ABC'deki tek "110" `SportType DRIVING` [AB] `ABP/wear_system.proto:41-131`, `ABP/wear_common.proto:73`. `System` yük alanları 64'e kadar (`ABP/wear_system.proto:133-197`).
 - Benzer bant-kendiliğinden mesajlar: `REPORT_BASIC_STATUS 79`, `REPORT_BATTERY_STATUS 97`, `REPORT_ALERT_STATUS 91`, `REPORT_SYSTEM_SETTING 42` [AB] `ABP/wear_system.proto:101`, `:116-120`. 110 büyük olasılıkla yeni yazılımda eklenmiş bir durum raporu ya da bantın telefondan bir şey istemesi [TAHMİN].
 - AstroBox auth sonrası yalnız `Command{2,92}` (ağ durumu) yolluyor [AB] `ABC/device.rs:290-300`. Freeband bunu göndermediği için 110'un "ağ yok" ya da eşlikçi durumu sorusu olması mümkün [TAHMİN].
+- **İçerik okundu** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13, auth'tan hemen sonra, 60 bayt: `08 02 10 6e 22 36 ba 04 33 …` = `system(4)` içinde **alan 71**, onun içinde tekrarlanan alan 1: `{1: 1, 2: "watch_manual", 3: 0, 4: 0, 5: 0}` ve `{1: 0, 2: "watch_snap_rule", 3: 0, 4: 0, 5: 0}`. Yani adlı iki kaynağın (bandın kullanım kılavuzu ve bir "snap" kuralı) durum ya da sürüm listesi; telefondan bunları güncellemesini istiyor olabilir. [TAHMİN: anlamı; alan 1'in 1/0 değeri "var/yok" ya da "güncel/değil" olabilir] Freeband cevap vermiyor ve senkron bundan etkilenmiyor.
 - **Yapılacak:** Freeband çözülmüş gövdeyi hex olarak loglasın ve genel protobuf çözücüyle alan ağacını yazsın. Gövde `08 02 10 6e 22 <uzunluk>` ile başlamalı; ardından gelen varint `system(4)` içindeki alanı verir (alan = etiket >> 3). 64 ve altıysa bilinen bir yük: ör. `8a 03` = 49 `report_basic_status`, `fa 03` = 63 `battery_status`, `ba 03` = 55 `ota_progress`. 64'ün üstündeyse yeni bir yük. `system` yerine `a0 06` (alan 100, `status`/`error_code`) da gelebilir [AB] `ABP/wear.proto:77`. Cevap vermemek şimdilik zararsız görünüyor: pil cevabı ve canlı akış normal geldi [ÖLÇÜM].
 - **Efor / risk:** S (loglama) / düşük.
 
