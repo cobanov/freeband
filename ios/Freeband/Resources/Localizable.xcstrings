@@ -5648,6 +5648,116 @@
           }
         }
       }
+    },
+    "Connection and data": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantı ve veri"
+          }
+        }
+      }
+    },
+    "Stays connected": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı kalıyor"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantı"
+          }
+        }
+      }
+    },
+    "Records": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıtlar"
+          }
+        }
+      }
+    },
+    "Phone": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefon"
+          }
+        }
+      }
+    },
+    "Show sleep on the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uykuyu bantta göster"
+          }
+        }
+      }
+    },
+    "After a night is synced, Freeband writes its summary to the band, so the band's own sleep screen fills in.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir gece senkronlanınca Freeband özetini banda yazar; bandın kendi uyku ekranı böylece dolar."
+          }
+        }
+      }
+    },
+    "Ask the band how it pairs": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banda nasıl eşleştiğini sor"
+          }
+        }
+      }
+    },
+    "Ask the band how it pairs?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banda nasıl eşleştiği sorulsun mu?"
+          }
+        }
+      }
+    },
+    "Ask": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sor"
+          }
+        }
+      }
+    },
+    "Freeband sends the first step of pairing and stops. The answer shows in the log. On a band that is already paired this has not been tried: it should only be refused, but the band may show a pairing screen.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband eşleşmenin ilk adımını gönderir ve durur. Cevap günlükte görünür. Zaten eşli bir bantta bu denenmedi: yalnızca reddedilmesi beklenir, ama bant bir eşleşme ekranı gösterebilir."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

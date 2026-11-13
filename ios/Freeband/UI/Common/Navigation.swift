@@ -19,6 +19,7 @@ enum Route: Hashable {
     case night(day: Int)
     case aboutBand(UUID)
     case monitoring(UUID)
+    case bandOptions(UUID)
     case settings
     case bands
     case profile
@@ -119,6 +120,7 @@ private struct RouteView: View {
         case .about: AboutView()
         case .aboutBand(let id): AboutBandView(bandID: id)
         case .monitoring(let id): MonitoringView(bandID: id)
+        case .bandOptions(let id): BandOptionsView(bandID: id)
         default:
             SelectedBand { band in
                 if let band {

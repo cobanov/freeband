@@ -133,16 +133,11 @@ private struct BandPage: View {
                         ListRow(title: String(localized: "Health monitoring"), systemImage: "heart.text.square")
                     }
                     .buttonStyle(.fbRow)
-                    ListRow(title: String(localized: "Stay connected"), subtitle: stayConnectedSubtitle,
-                            systemImage: "link",
-                            accessory: .toggle(Binding(get: { stayConnected }, set: { model.setStayConnected($0) })))
-                    ListRow(title: String(localized: "Clear the band after sync"),
-                            subtitle: String(localized: "The band deletes records Freeband has stored. Mi Fitness won't get them."),
-                            systemImage: "tray.and.arrow.down", accessory: .toggle($clearBand))
-                    ListRow(title: String(localized: "Share location with the band"),
-                            subtitle: String(localized: "The band asks where this phone is at every sync. Freeband answers only while this is on."),
-                            systemImage: "location",
-                            accessory: .toggle(Binding(get: { shareLocation }, set: { model.setShareLocation($0) })))
+                    NavigationLink(value: Route.bandOptions(band.id)) {
+                        ListRow(title: String(localized: "Connection and data"),
+                                value: stayConnected ? String(localized: "Stays connected") : nil, systemImage: "link")
+                    }
+                    .buttonStyle(.fbRow)
                     NavigationLink(value: Route.aboutBand(band.id)) {
                         ListRow(title: String(localized: "About this band"), value: band.firmware,
                                 systemImage: "info.circle", showsDivider: false)

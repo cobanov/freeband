@@ -199,6 +199,8 @@ final class AppModel: ObservableObject {
     static let clearBandKey = "clearBandAfterSync"
     /// Share location with the band: answer its location request at each sync.
     static let shareLocationKey = "shareLocation"
+    /// Show sleep on the band: write the night's summary back, as Mi Fitness does.
+    static let sleepToBandKey = "sleepToBand"
     private let phoneLocation = PhoneLocation()
 
     /// The switch; turning it on asks iOS for the location permission and a first fix.
@@ -401,6 +403,31 @@ final class AppModel: ObservableObject {
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "morning-summary", content: content, trigger: nil))
     }
 
+    /// Show sleep on the band (docs/SLEEP-WRITEBACK.md): once per night, after the sync that
+    /// brought it, the night's summary goes to the band (Command{8,41}), which is what fills the
+    /// band's own sleep screen when Mi Fitness is around. Off by default.
+    private func writeBackSleep(_ bandID: UUID) {
+        guard !isDemo, UserDefaults.standard.bool(forKey: Self.sleepToBandKey), let band = band(bandID) else { return }
+        let today = DayKey.current(Date()).index
+        let nights = (try? context.fetch(FetchDescriptor<SleepRecord>(
+            predicate: #Predicate { $0.bandID == bandID && $0.dayIndex == today && !$0.isNap }))) ?? []
+        guard let night = nights.max(by: { $0.wakeTime.timeIntervalSince($0.bedTime) < $1.wakeTime.timeIntervalSince($1.bedTime) }),
+              UserDefaults.standard.double(forKey: "sleepToBandWake") != night.wakeTime.timeIntervalSince1970 else { return }
+        let scores = try? context.fetch(FetchDescriptor<DailyScore>(predicate: #Predicate { $0.bandID == bandID && $0.dayIndex == today }))
+        let metrics = scores?.first?.result?.sleep.metrics
+        guard let asleep = metrics.map({ Int($0.totalSleepMinutes.rounded()) }) ?? night.totalSleepMinutes, asleep > 0 else { return }
+        let section = SleepResultSection(bedTime: night.bedTime, wakeTime: night.wakeTime, tzQuarterHours: night.tzOffsetMinutes / 15,
+                                         minutesAsleep: asleep, averageHeartRate: metrics?.hrAverage.map { Int($0.rounded()) },
+                                         averageSpO2: metrics?.spo2Average.map { Int($0.rounded()) }, extra: nil)
+        // After the session that just ended has let go of the band.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, !self.link.phase.isBusy else { return }
+            self.link.note("sleep summary → band: \(asleep) min asleep")
+            self.start(band, .send([MiAuth.sleepResultCommand([section])]))
+            UserDefaults.standard.set(night.wakeTime.timeIntervalSince1970, forKey: "sleepToBandWake")
+        }
+    }
+
     static func backgroundSyncDue(lastSync: Date?, lastAttempt: Date, now: Date) -> Bool {
         if let lastSync, now.timeIntervalSince(lastSync) < backgroundSyncAfter { return false }
         return now.timeIntervalSince(lastAttempt) >= backgroundSyncRetry
@@ -469,6 +496,7 @@ final class AppModel: ObservableObject {
             sessionIngest = IngestSummary()
             runPendingRollups()
             notifyMorningSummary(id)
+            writeBackSleep(id)
             if !parsed.isEmpty {
                 setCalibration(makeReport(parsed, bandID: id, outcome: outcome.label))
             }
