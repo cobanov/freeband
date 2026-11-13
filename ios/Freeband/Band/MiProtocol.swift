@@ -565,3 +565,222 @@ extension MiAuth {
         return nil
     }
 }
+
+/// A protobuf message as its fields in wire order. A setting the band returned goes back with
+/// only the known fields changed and every other byte as it came (docs/CAPABILITIES.md §1.1).
+struct PBFields: Equatable {
+    struct Field: Equatable {
+        var number: Int
+        /// 0 varint, 1 fixed64, 2 length-delimited, 5 fixed32.
+        var wire: UInt8
+        var varint: UInt64 = 0
+        /// The payload of wire types 1, 2 and 5.
+        var bytes = Data()
+    }
+
+    private(set) var fields: [Field] = []
+
+    init() {}
+
+    init?(_ data: Data) {
+        let b = [UInt8](data)
+        var i = 0
+        func readVarint() -> UInt64? {
+            var result: UInt64 = 0
+            var shift: UInt64 = 0
+            while i < b.count, shift < 64 {
+                let x = b[i]
+                i += 1
+                result |= UInt64(x & 0x7F) << shift
+                if x & 0x80 == 0 { return result }
+                shift += 7
+            }
+            return nil
+        }
+        func take(_ n: Int) -> Data? {
+            guard n >= 0, b.count - i >= n else { return nil }
+            defer { i += n }
+            return Data(b[i..<(i + n)])
+        }
+        while i < b.count {
+            guard let key = readVarint(), key >> 3 > 0 else { return nil }
+            var field = Field(number: Int(key >> 3), wire: UInt8(key & 7))
+            switch field.wire {
+            case 0:
+                guard let v = readVarint() else { return nil }
+                field.varint = v
+            case 1:
+                guard let d = take(8) else { return nil }
+                field.bytes = d
+            case 2:
+                guard let n = readVarint(), n <= UInt64(b.count - i), let d = take(Int(n)) else { return nil }
+                field.bytes = d
+            case 5:
+                guard let d = take(4) else { return nil }
+                field.bytes = d
+            default:
+                return nil
+            }
+            fields.append(field)
+        }
+    }
+
+    func varint(_ number: Int) -> UInt64? {
+        fields.first { $0.number == number && $0.wire == 0 }?.varint
+    }
+
+    func bytes(_ number: Int) -> Data? {
+        fields.first { $0.number == number && $0.wire == 2 }?.bytes
+    }
+
+    /// Replaces the field where it stands, or adds it at the end.
+    mutating func set(_ number: Int, varint value: UInt64) {
+        put(Field(number: number, wire: 0, varint: value))
+    }
+
+    mutating func set(_ number: Int, bytes value: Data) {
+        put(Field(number: number, wire: 2, bytes: value))
+    }
+
+    mutating func remove(_ number: Int) {
+        fields.removeAll { $0.number == number }
+    }
+
+    private mutating func put(_ field: Field) {
+        if let at = fields.firstIndex(where: { $0.number == field.number }) {
+            fields[at] = field
+        } else {
+            fields.append(field)
+        }
+    }
+
+    var data: Data {
+        var out = Data()
+        func putVarint(_ value: UInt64) {
+            var v = value
+            while v >= 0x80 {
+                out.append(UInt8(v & 0x7F) | 0x80)
+                v >>= 7
+            }
+            out.append(UInt8(v))
+        }
+        for field in fields {
+            putVarint(UInt64(field.number) << 3 | UInt64(field.wire))
+            switch field.wire {
+            case 0: putVarint(field.varint)
+            case 2:
+                putVarint(UInt64(field.bytes.count))
+                out.append(field.bytes)
+            default: out.append(field.bytes)
+            }
+        }
+        return out
+    }
+}
+
+/// Health monitoring settings (docs/CAPABILITIES.md §9.1-9.3): Command{8, GET} returns
+/// health(10).<setting>; Command{8, GET + 1} writes the same message back.
+enum MiMonitoring {
+    /// The raw value is the GET subtype.
+    enum Setting: UInt64, CaseIterable {
+        case spo2 = 8, heartRate = 10, stress = 14
+
+        /// The setting's field in `health(10)`.
+        var field: Int {
+            switch self {
+            case .spo2: 7
+            case .heartRate: 8
+            case .stress: 10
+            }
+        }
+    }
+
+    static func get(_ setting: Setting) -> Data {
+        var command = PBWriter()
+        command.varint(1, 8)
+        command.varint(2, setting.rawValue)
+        return command.data
+    }
+
+    /// The setting's message in the band's reply to a GET, as it came.
+    static func reply(_ command: PBMessage, _ setting: Setting) -> Data? {
+        command.message(10)?.blobs[setting.field]
+    }
+
+    static func set(_ setting: Setting, _ body: Data) -> Data {
+        var health = PBWriter()
+        health.bytes(setting.field, body)
+        var command = PBWriter()
+        command.varint(1, 8)
+        command.varint(2, setting.rawValue + 1)
+        command.message(10, health)
+        return command.data
+    }
+
+    // MARK: heart rate: {disabled 1, interval 2 (minutes; 0 smart), ..., advancedMonitoring 5, unknown7 7, ...}
+
+    enum HeartRateMode: Hashable {
+        case off, smart
+        case every(Int)
+    }
+
+    static func heartRateMode(_ body: Data) -> HeartRateMode? {
+        guard let f = PBFields(body) else { return nil }
+        if f.varint(1) == 1 { return .off }
+        let interval = Int(f.varint(2) ?? 0)
+        return interval == 0 ? .smart : .every(interval)
+    }
+
+    /// Sleep heart rate monitoring ("advanced monitoring"): advancedMonitoring 5{enabled 1}.
+    static func sleepHeartRate(_ body: Data) -> Bool? {
+        PBFields(body)?.bytes(5).flatMap(PBFields.init)?.varint(1).map { $0 == 1 }
+    }
+
+    static func heartRate(_ body: Data, mode: HeartRateMode? = nil, sleep: Bool? = nil) -> Data? {
+        guard var f = PBFields(body) else { return nil }
+        switch mode {
+        case .off: f.set(1, varint: 1)
+        case .smart:
+            f.set(1, varint: 0)
+            f.set(2, varint: 0)
+        case .every(let minutes):
+            f.set(1, varint: 0)
+            f.set(2, varint: UInt64(minutes))
+        case nil: break
+        }
+        // advancedMonitoring is required in a SET, and Gadgetbridge always writes unknown7 = 1.
+        var advanced = f.bytes(5).flatMap(PBFields.init) ?? PBFields()
+        if let sleep { advanced.set(1, varint: sleep ? 1 : 0) } else if advanced.varint(1) == nil { advanced.set(1, varint: 0) }
+        f.set(5, bytes: advanced.data)
+        if f.varint(7) == nil { f.set(7, varint: 1) }
+        // breathingScore 9, irregularRhythmAlert 10, sleepRespiratoryRate 11: 0 means the band
+        // doesn't have it, and such a field must not be sent back.
+        for number in 9...11 where f.varint(number) == 0 { f.remove(number) }
+        return f.data
+    }
+
+    // MARK: SpO2: {unknown1 1 = 1, mode 2 (0 off, 1 during sleep, 2 all day), alarmLow 4}
+
+    static func spo2Mode(_ body: Data) -> Int? {
+        PBFields(body).map { Int($0.varint(2) ?? 0) }
+    }
+
+    static func spo2(_ body: Data, mode: Int) -> Data? {
+        guard var f = PBFields(body) else { return nil }
+        if f.varint(1) == nil { f.set(1, varint: 1) }
+        f.set(2, varint: UInt64(mode))
+        return f.data
+    }
+
+    // MARK: stress: {allDayTracking 1, relaxReminder 2}
+
+    static func stressAllDay(_ body: Data) -> Bool? {
+        PBFields(body).map { $0.varint(1) == 1 }
+    }
+
+    static func stress(_ body: Data, allDay: Bool) -> Data? {
+        guard var f = PBFields(body) else { return nil }
+        f.set(1, varint: allDay ? 1 : 0)
+        return f.data
+    }
+}

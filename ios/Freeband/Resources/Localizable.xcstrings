@@ -5298,6 +5298,86 @@
           }
         }
       }
+    },
+    "Reading from the band…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banttan okunuyor…"
+          }
+        }
+      }
+    },
+    "Couldn't read the settings. Close Mi Fitness, keep the band close and try again.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar okunamadı. Mi Fitness'ı kapat, bandı yakın tut ve tekrar dene."
+          }
+        }
+      }
+    },
+    "Smart": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akıllı"
+          }
+        }
+      }
+    },
+    "Heart rate during sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uykuda nabız"
+          }
+        }
+      }
+    },
+    "Every minute gives Strain and resting heart rate the most to work with, and uses the most battery.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dakikada bir ölçüm, Yük ve dinlenik nabız için en çok veriyi sağlar ve en çok pili harcar."
+          }
+        }
+      }
+    },
+    "During sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uykuda"
+          }
+        }
+      }
+    },
+    "All day": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm gün"
+          }
+        }
+      }
+    },
+    "Stress, all day": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stres, tüm gün"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

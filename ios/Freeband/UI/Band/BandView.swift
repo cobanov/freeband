@@ -117,9 +117,12 @@ private struct BandPage: View {
                 ListCard {
                     if BandFeatures.controls {
                         ListRow(title: String(localized: "Alarms"), systemImage: "alarm")
-                        ListRow(title: String(localized: "Health monitoring"), systemImage: "heart.text.square")
                         ListRow(title: String(localized: "Display & Do Not Disturb"), systemImage: "moon")
                     }
+                    NavigationLink(value: Route.monitoring(band.id)) {
+                        ListRow(title: String(localized: "Health monitoring"), systemImage: "heart.text.square")
+                    }
+                    .buttonStyle(.fbRow)
                     ListRow(title: String(localized: "Stay connected"), subtitle: stayConnectedSubtitle,
                             systemImage: "link",
                             accessory: .toggle(Binding(get: { stayConnected }, set: { model.setStayConnected($0) })))

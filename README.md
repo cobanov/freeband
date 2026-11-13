@@ -31,7 +31,8 @@ Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1
 | Sleep, Recovery and Strain scores with contributors and confidence | implemented (algorithm v1) |
 | English and Turkish, light and dark themes | done |
 | Optional web hub: REST API, web panel, webhooks, CSV/JSON export | live at freeband.cobanov.dev |
-| Alarms, health monitoring settings, Do Not Disturb, weather, watch faces | not built yet |
+| Health monitoring settings on the band: heart rate interval, heart rate during sleep, blood oxygen, all-day stress (Band tab) | implemented and tested against vectors; not tried on a band yet |
+| Alarms, Do Not Disturb, weather, watch faces | not built yet |
 | Replacing Mi Fitness entirely (background connection, file acknowledgement) | not built yet |
 
 <img src="docs/img/redmi-watch-5-active.png" width="200" alt="Band: a Redmi Watch 5 Active with battery, sync and quick actions">

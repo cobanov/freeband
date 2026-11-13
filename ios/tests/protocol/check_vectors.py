@@ -126,6 +126,30 @@ want = {
     "resend_seqs": [[(nack + i) % 256 for i in range((next - nack) % 256)] if 0 < (next - nack) % 256 <= 32 else []
                     for next, nack in [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)]],
 }
+# Health monitoring settings: the expected bytes are built here field by field, in the order the
+# band sent them; a changed field keeps its place, a new one goes to the end.
+def hr_body(disabled, interval, sleep, tail9_11=True):
+    return (f_varint(1, disabled) + f_varint(2, interval) + f_varint(3, 1) + f_varint(4, 120)
+            + f_bytes(5, f_varint(1, sleep)) + f_varint(7, 1) + f_bytes(8, f_varint(1, 0) + f_varint(2, 40))
+            + f_varint(9, 2) + (f_varint(10, 0) if tail9_11 else b"") + f_varint(11, 1)
+            + f_varint(20, 300) + f_bytes(21, b"ab") + bytes([0xB5, 0x01, 1, 2, 3, 4]))
+def mon_set(sub, field, body): return (f_varint(1, 8) + f_varint(2, sub) + f_bytes(10, f_bytes(field, body))).hex()
+want.update({
+    "mon_get": [(f_varint(1, 8) + f_varint(2, s)).hex() for s in (8, 10, 14)],
+    "mon_reply": hr_body(0, 30, 1).hex(),
+    "mon_reply_other": True,
+    "mon_hr_parsed": "every(30)/true",
+    # field 10 came back as 0 (the band doesn't have it), so it is not sent
+    "mon_hr_1min": mon_set(11, 8, hr_body(0, 1, 1, tail9_11=False)),
+    "mon_hr_off": mon_set(11, 8, hr_body(1, 30, 1, tail9_11=False)),
+    "mon_hr_smart_nosleep": mon_set(11, 8, hr_body(0, 0, 0, tail9_11=False)),
+    "mon_hr_empty_smart": mon_set(11, 8, f_varint(1, 0) + f_varint(2, 0) + f_bytes(5, f_varint(1, 0)) + f_varint(7, 1)),
+    "mon_hr_garbage": "nil",
+    "mon_spo2_parsed": 0,
+    "mon_spo2_allday": mon_set(9, 7, f_varint(1, 1) + f_varint(2, 2) + f_bytes(4, f_varint(1, 1) + f_varint(2, 90))),
+    "mon_stress_parsed": False,
+    "mon_stress_on": mon_set(15, 10, f_varint(1, 1) + f_bytes(2, f_varint(1, 1) + f_varint(2, 0))),
+})
 bad = [k for k in want if got.get(k) != want[k]]
 for k in want:
     print(("OK  " if k not in bad else "FAIL"), k)

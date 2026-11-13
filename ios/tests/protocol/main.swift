@@ -148,6 +148,37 @@ let v1: [String: Any] = [
     "v1_auth_reset": authReset,
 ]
 
+// Health monitoring settings (docs/CAPABILITIES.md §9.1-9.3). hrBody is what a band could
+// return, with fields the app doesn't know (20, 21, a fixed32 22) that must come back unchanged.
+func pb(_ build: (inout PBWriter) -> Void) -> PBWriter { var w = PBWriter(); build(&w); return w }
+let hrBody = pb {
+    $0.varint(1, 0); $0.varint(2, 30); $0.varint(3, 1); $0.varint(4, 120)
+    $0.message(5, pb { $0.varint(1, 1) }); $0.varint(7, 1)
+    $0.message(8, pb { $0.varint(1, 0); $0.varint(2, 40) })
+    $0.varint(9, 2); $0.varint(10, 0); $0.varint(11, 1); $0.varint(20, 300); $0.string(21, "ab")
+}.data + Data([0xB5, 0x01, 1, 2, 3, 4])
+let spo2Body = pb { $0.varint(1, 1); $0.varint(2, 0); $0.message(4, pb { $0.varint(1, 1); $0.varint(2, 90) }) }.data
+let stressBody = pb { $0.varint(1, 0); $0.message(2, pb { $0.varint(1, 1); $0.varint(2, 0) }) }.data
+let hrReply = pb { $0.varint(1, 8); $0.varint(2, 10); $0.message(10, pb { $0.bytes(8, hrBody) }) }.data
+func hrSet(_ body: Data, _ mode: MiMonitoring.HeartRateMode?, _ sleep: Bool? = nil) -> String {
+    MiMonitoring.heartRate(body, mode: mode, sleep: sleep).map { hex(MiMonitoring.set(.heartRate, $0)) } ?? "nil"
+}
+let monitoring: [String: Any] = [
+    "mon_get": MiMonitoring.Setting.allCases.map { hex(MiMonitoring.get($0)) },
+    "mon_reply": hex(MiMonitoring.reply(PBMessage(hrReply)!, .heartRate) ?? Data()),
+    "mon_reply_other": MiMonitoring.reply(PBMessage(hrReply)!, .spo2) == nil,
+    "mon_hr_parsed": "\(MiMonitoring.heartRateMode(hrBody)!)/\(MiMonitoring.sleepHeartRate(hrBody)!)",
+    "mon_hr_1min": hrSet(hrBody, .every(1)),
+    "mon_hr_off": hrSet(hrBody, .off),
+    "mon_hr_smart_nosleep": hrSet(hrBody, .smart, false),
+    "mon_hr_empty_smart": hrSet(Data(), .smart),
+    "mon_hr_garbage": hrSet(Data([0x0A, 0x05, 0x01]), .smart),
+    "mon_spo2_parsed": MiMonitoring.spo2Mode(spo2Body) ?? -1,
+    "mon_spo2_allday": hex(MiMonitoring.set(.spo2, MiMonitoring.spo2(spo2Body, mode: 2)!)),
+    "mon_stress_parsed": MiMonitoring.stressAllDay(stressBody) ?? true,
+    "mon_stress_on": hex(MiMonitoring.set(.stress, MiMonitoring.stress(stressBody, allDay: true)!)),
+]
+
 let out: [String: Any] = [
     "crc_123456789": String(format: "%04x", MiFrame.crc16arc(Data("123456789".utf8))),
     "okm": hex(okm),
@@ -177,4 +208,4 @@ let out: [String: Any] = [
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
     "resend_seqs": [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)].map { MiFrame.resendSeqs(next: $0.0, nack: $0.1) },
 ]
-print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)
+print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)

@@ -83,6 +83,9 @@ final class AppModel: ObservableObject {
         }
         link.onActivityFile = { [weak self] id, file, data, today in self?.storeActivityFile(id, file, data, today: today) }
         link.onFindPhone = { [weak self] id, ring in self?.findPhone(id, ring) }
+        link.onMonitoring = { [weak self] id, setting, body in
+            self?.monitoring["\(id.uuidString).\(setting.rawValue)"] = body
+        }
         findPhoneAlert?.onStop = { [weak self] in self?.stopFindPhone() }
         calibration = Self.loadCalibration()
         mergeDuplicateBands()
@@ -127,6 +130,28 @@ final class AppModel: ObservableObject {
     func findBand(_ band: Band, start vibrating: Bool) {
         guard band.supportsFind else { return }
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
+    }
+
+    // MARK: health monitoring settings (docs/CAPABILITIES.md §9)
+
+    /// Each setting as the band last returned it, keyed "<band id>.<GET subtype>". A change is
+    /// built from these bytes, and the screen shows what the band answers afterwards.
+    @Published private(set) var monitoring = (UserDefaults.standard.dictionary(forKey: "monitoring") as? [String: Data]) ?? [:] {
+        didSet { if !isDemo { UserDefaults.standard.set(monitoring, forKey: "monitoring") } }
+    }
+
+    func monitoring(_ band: Band, _ setting: MiMonitoring.Setting) -> Data? {
+        monitoring["\(band.id.uuidString).\(setting.rawValue)"]
+    }
+
+    func readMonitoring(_ band: Band) {
+        start(band, .send(MiMonitoring.Setting.allCases.map(MiMonitoring.get)))
+    }
+
+    /// Writes the setting, then reads it back.
+    func writeMonitoring(_ band: Band, _ setting: MiMonitoring.Setting, _ body: Data?) {
+        guard let body else { return }
+        start(band, .send([MiMonitoring.set(setting, body), MiMonitoring.get(setting)]))
     }
 
     // MARK: Stay connected and Find Phone (docs/STAY-CONNECTED.md)
@@ -585,6 +610,7 @@ final class AppModel: ObservableObject {
         ActivityIngest.deleteDerived(context: context, bandID: id, includingScores: true)
         pendingRollup[id] = nil
         pendingHubRecords[id] = nil
+        monitoring = monitoring.filter { !$0.key.hasPrefix(id.uuidString) }
         context.delete(band)
         try? context.save()
         updateHold()

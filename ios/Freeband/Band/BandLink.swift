@@ -209,6 +209,8 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var deviceState: MiAuth.DeviceState?
     /// The band's Find Phone (Command{2,17}): true to start ringing, false to stop.
     var onFindPhone: ((UUID, Bool) -> Void)?
+    /// A health monitoring setting as the band returned it (MiMonitoring).
+    var onMonitoring: ((UUID, MiMonitoring.Setting, Data) -> Void)?
 
     /// Activity files fetched / requested in this sync.
     @Published private(set) var fileProgress: (done: Int, total: Int)?
@@ -679,6 +681,18 @@ final class BandLink: NSObject, ObservableObject {
             let name = command.message(15)?.message(3)?.blobs[1].map { String(decoding: $0, as: UTF8.self) }
             let label = name.map { "\"\($0)\"" } ?? "fields \(command.fieldNumbers)"
             if factoryDumps.insert(label).inserted { note("← 13/2 factory file dump \(label), not used") }
+
+        case (8, 8), (8, 10), (8, 14):
+            // The bytes are logged whole: the first reads on a new band show what it really sends.
+            guard let setting = MiMonitoring.Setting(rawValue: subtype), let body = MiMonitoring.reply(command, setting) else {
+                note("← 8/\(subtype) without its setting: \(Self.hexPrefix(lastCommandBody))")
+                return
+            }
+            note("← 8/\(subtype) setting \(Self.hexPrefix(body, limit: 64))")
+            if let id = target?.id { onMonitoring?(id, setting, body) }
+
+        case (8, 9), (8, 11), (8, 15):
+            note("← 8/\(subtype) setting written (status \(command.varints[100] ?? 0))")
 
         case (2, 17):
             // Find Phone from the band (docs/STAY-CONNECTED.md section 1).

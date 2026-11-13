@@ -118,9 +118,9 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 | 7 | Müzik | ↔ | 18/0–2 | statik | oturum, yalnız Apple Music | M | düşük | yok |
 | 8.1 | Kullanıcı bilgisi, günlük hedefler | T→B | 8/0 | statik | kolay | S | düşük | yok |
 | 8.2 | Hedef bildirimi, ikincil hedef, vitality | T→B | 8/21–22, 42–43, 35–36 | runtime | kolay | S | düşük | yok |
-| 9.1 | Nabız aralığı, yüksek/düşük alarm, uyku | T→B | 8/10, 11 | statik + runtime | kolay | S | düşük | yok |
-| 9.2 | SpO2 | T→B | 8/8, 9 | runtime | kolay | S | düşük | yok |
-| 9.3 | Stres | T→B | 8/14, 15 | runtime | kolay | S | düşük | yok |
+| 9.1 | Nabız aralığı, yüksek/düşük alarm, uyku | T→B | 8/10, 11 | statik + runtime | kolay | S | düşük | **var**, cihazda denenmedi |
+| 9.2 | SpO2 | T→B | 8/8, 9 | runtime | kolay | S | düşük | **var**, cihazda denenmedi |
+| 9.3 | Stres | T→B | 8/14, 15 | runtime | kolay | S | düşük | **var**, cihazda denenmedi |
 | 9.4 | Hareketsizlik hatırlatıcısı | T→B | 8/12, 13 | runtime | kolay | S | düşük | yok |
 | 9.6 | Canlı nabız/adım | ↔ | 8/45–47 | statik | kolay | S | düşük | **var** |
 | 9.7 | Takılı / şarjda / uyuyor, pil ayrıntısı | ↔ | 2/78, 2/79, 2/1 | runtime | kolay (itme: oturum) | S | düşük | pil seviyesi var |
@@ -424,7 +424,7 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 
 ## 9. Sağlık ayarları
 
-Hepsi telefon → bant, GET/SET çifti, arka plan gerektirmez. Gadgetbridge hepsini her bağlantıda GET'liyor [KOD] `X/services/XiaomiHealthService.java:257-275`. Beyanlar statik (`supportsStressMeasurement`, `supportsSpo2`, `supportsHeartRateMeasurement` hepsi `true`) ve runtime (`FEAT_STRESS`, `FEAT_SPO2`, `FEAT_INACTIVITY`) [KOD] `XD/XiaomiCoordinator.java:344-352`, `:481-488`, `:610-619`.
+Hepsi telefon → bant, GET/SET çifti, arka plan gerektirmez. **Freeband'de 9.1–9.3 var** [FB] `FB/Band/MiProtocol.swift` (`MiMonitoring`, `PBFields`), `FB/UI/Band/MonitoringView.swift`: ekran açılınca GET, değişiklikte bandın döndürdüğü baytlar üzerinde yalnız bilinen alan değişip SET, ardından tekrar GET; ekran bandın cevabını gösterir. Bantta henüz denenmedi: ilk okumada cevabın baytları loga yazılıyor (`← 8/10 setting …`). [TAHMİN: bandın GET cevabındaki alan kümesi] Gadgetbridge hepsini her bağlantıda GET'liyor [KOD] `X/services/XiaomiHealthService.java:257-275`. Beyanlar statik (`supportsStressMeasurement`, `supportsSpo2`, `supportsHeartRateMeasurement` hepsi `true`) ve runtime (`FEAT_STRESS`, `FEAT_SPO2`, `FEAT_INACTIVITY`) [KOD] `XD/XiaomiCoordinator.java:344-352`, `:481-488`, `:610-619`.
 
 ### 9.1 Sürekli nabız, nabız uyarıları, uyku tespiti
 
