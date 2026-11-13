@@ -106,6 +106,7 @@ want = {
     "realtime_start": (f_varint(1, 8) + f_varint(2, 45)).hex(),
     "realtime_stop": (f_varint(1, 8) + f_varint(2, 46)).hex(),
     "live_parsed": "8421/312/74/9",
+    "live_moving": 49,  # realTimeStats field 5
     # Gadgetbridge setCurrentTime: local date/time, sint32 (zigzag) 15-min offsets, name, isNot24hour
     "clock_istanbul": clock(1760000000, "Europe/Istanbul", True),
     "clock_newyork_12h": clock(1760000000, "America/New_York", False),

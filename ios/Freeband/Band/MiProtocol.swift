@@ -380,6 +380,9 @@ extension MiAuth {
         let calories: UInt64
         let heartRate: UInt64
         let standingHours: UInt64
+        /// The band's "Moving" minutes: the third of its goals after calories and steps
+        /// (AstroBox calls the field `intensity`; the goals reply names calorie, step, intensity).
+        var movingMinutes: UInt64?
     }
 
     /// Command{type 8 (Health), subtype 45 start | 46 stop}: the band then sends subtype 47
@@ -395,7 +398,8 @@ extension MiAuth {
     static func liveStats(_ command: PBMessage) -> LiveStats? {
         guard let stats = command.message(10)?.message(39) else { return nil }
         return LiveStats(steps: stats.varints[1] ?? 0, calories: stats.varints[2] ?? 0,
-                         heartRate: stats.varints[4] ?? 0, standingHours: stats.varints[6] ?? 0)
+                         heartRate: stats.varints[4] ?? 0, standingHours: stats.varints[6] ?? 0,
+                         movingMinutes: stats.varints[5])
     }
 }
 
@@ -542,6 +546,14 @@ extension MiAuth {
     /// Whether the phone shows 24-hour time.
     static var phoneUses24Hour: Bool {
         !(DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: .current) ?? "").contains("a")
+    }
+
+    /// A Health command with no payload: Command{8, subtype}.
+    static func healthGet(_ subtype: UInt64) -> Data {
+        var command = PBWriter()
+        command.varint(1, 8)
+        command.varint(2, subtype)
+        return command.data
     }
 
     static func systemGet(_ subtype: UInt64) -> Data {

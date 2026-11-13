@@ -27,7 +27,7 @@ var power = PBWriter(); power.message(1, battery)
 var system = PBWriter(); system.message(2, power)
 var resp = PBWriter(); resp.varint(1, 2); resp.varint(2, 1); resp.message(4, system)
 
-var rts = PBWriter(); rts.varint(1, 8421); rts.varint(2, 312); rts.varint(3, 5); rts.varint(4, 74); rts.varint(6, 9)
+var rts = PBWriter(); rts.varint(1, 8421); rts.varint(2, 312); rts.varint(3, 5); rts.varint(4, 74); rts.varint(5, 49); rts.varint(6, 9)
 var health = PBWriter(); health.message(39, rts)
 var liveCmd = PBWriter(); liveCmd.varint(1, 8); liveCmd.varint(2, 47); liveCmd.message(10, health)
 let live = MiAuth.liveStats(PBMessage(liveCmd.data)!)!
@@ -227,6 +227,7 @@ let out: [String: Any] = [
     "clock_istanbul": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "Europe/Istanbul")!, is24Hour: true)),
     "clock_newyork_12h": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "America/New_York")!, is24Hour: false)),
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
+    "live_moving": live.movingMinutes.map { Int($0) } ?? -1,
     "resend_seqs": [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)].map { MiFrame.resendSeqs(next: $0.0, nack: $0.1) },
 ]
 print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }.merging(bandState) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)

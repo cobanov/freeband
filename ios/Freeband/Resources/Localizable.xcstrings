@@ -5608,6 +5608,26 @@
           }
         }
       }
+    },
+    "Probe the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bandı yokla"
+          }
+        }
+      }
+    },
+    "Moving": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hareket"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

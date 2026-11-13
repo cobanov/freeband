@@ -101,6 +101,8 @@ struct DiagnosticsView: View {
                 Task { await model.reparseAll() }
             }
             .disabled(busy)
+            Button(String(localized: "Probe the band")) { model.probeSelectedBand() }
+                .disabled(link.phase.isBusy)
         } header: {
             Text("Calibration")
         } footer: {

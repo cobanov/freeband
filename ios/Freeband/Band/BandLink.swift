@@ -209,6 +209,10 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var deviceState: MiAuth.DeviceState?
     /// The band's Find Phone (Command{2,17}): true to start ringing, false to stop.
     var onFindPhone: ((UUID, Bool) -> Void)?
+    /// One shot (Diagnostics › Probe the band): the next sync also asks for the day-before
+    /// copies of today's files that start at local midnight, to see whether the band still
+    /// hands over a file that another app acknowledged.
+    var probeDayBefore = false
     /// Whether a file on the band's past list may be acknowledged, which makes the band delete
     /// it: the user turned that on, and the file is stored here and fully parsed.
     var canAcknowledge: ((UUID, String) -> Bool)?
@@ -637,6 +641,8 @@ final class BandLink: NSObject, ObservableObject {
 
         case (8, 47):
             guard let live = MiAuth.liveStats(command) else { return }
+            // The first of a session whole: fields 3 and 5 are read on AstroBox's names only.
+            if stats == nil { note("← 8/47 live \(Self.hexPrefix(lastCommandBody))") }
             stats = live
             emit(.live(live))
             switch purpose {
@@ -667,7 +673,16 @@ final class BandLink: NSObject, ObservableObject {
             }
             for file in stored { sendCommand(MiAuth.activityAckCommand(file.data), encrypted: true) }
             if !stored.isEmpty { note("→ acknowledged \(stored.count) stored file(s); the band deletes them") }
-            requestedFiles = Set(todayIDs + wanted)
+            var probes: [ActivityFileID] = []
+            if probeDayBefore {
+                probeDayBefore = false
+                probes = todayIDs.filter { file in
+                    let local = Int(file.ts.timeIntervalSince1970) + file.utcOffsetMinutes * 60
+                    return local % 86_400 == 0
+                }.compactMap { $0.shifted(days: -1) }.filter { !today.contains($0) }
+                note("probe: also asking for \(probes.count) file(s) of the day before: \(probes.map(\.hex).joined(separator: " "))")
+            }
+            requestedFiles = Set(todayIDs + wanted + probes)
             fileQueue = requestedFiles.sorted()
             note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")
             fileProgress = (0, fileQueue.count)
@@ -723,7 +738,7 @@ final class BandLink: NSObject, ObservableObject {
             if let id = target?.id { onFindPhone?(id, ring) }
 
         default:
-            note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 40))")
+            note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 240))")
         }
     }
 
@@ -786,6 +801,7 @@ final class BandLink: NSObject, ObservableObject {
             // so file the data under that id (as Gadgetbridge does), not under the one awaited;
             // that one is still owed, so its timer restarts.
             let got = ActivityFileID(data.prefix(7)) ?? file
+            note("← file \(got.hex), \(data.count) bytes")
             let queued = fileQueue.contains(got)
             fileQueue.removeAll { $0 == got }
             if receivedFiles.insert(got).inserted, let id = target?.id {

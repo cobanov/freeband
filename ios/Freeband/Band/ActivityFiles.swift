@@ -272,6 +272,15 @@ struct ActivityFileID: Hashable, Comparable, Sendable, CustomStringConvertible {
         self.init(bytes: [UInt8](bytes))
     }
 
+    /// The same id with its time moved by whole days (the kind, version and time zone stay).
+    func shifted(days: Int) -> ActivityFileID? {
+        var b = [UInt8](data)
+        let ts = Int64(UInt32(b[0]) | UInt32(b[1]) << 8 | UInt32(b[2]) << 16 | UInt32(b[3]) << 24) + Int64(days) * 86_400
+        guard let moved = UInt32(exactly: ts) else { return nil }
+        for i in 0 ..< 4 { b[i] = UInt8(truncatingIfNeeded: moved >> (8 * UInt32(i))) }
+        return ActivityFileID(bytes: b)
+    }
+
     init?<Bytes: Collection>(bytes: Bytes) where Bytes.Element == UInt8 {
         guard bytes.count == 7 else { return nil }
         let b = Array(bytes)

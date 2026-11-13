@@ -160,6 +160,27 @@ final class AppModel: ObservableObject {
         start(band, .send([MiMonitoring.set(setting, body), MiMonitoring.get(setting)]))
     }
 
+    /// Diagnostics › Probe the band: asks the read-only Health commands AstroBox names and
+    /// Gadgetbridge doesn't use (6 remaining sport data, 29 sport status, 42 goals, 44 basic
+    /// data, 61 sleep regularity, 63 sleep disorder, 86 training status), then syncs once while
+    /// also asking for yesterday's daily files. The replies go to the log whole.
+    func probeSelectedBand() {
+        if let band = selectedBand() { probe(band) }
+    }
+
+    func probe(_ band: Band) {
+        let gets: [UInt64] = [6, 29, 42, 44, 61, 63, 86]
+        Task {
+            link.note("probe: asking 8/" + gets.map(String.init).joined(separator: ", 8/"))
+            start(band, .send(gets.map(MiAuth.healthGet)))
+            try? await Task.sleep(for: .milliseconds(300))
+            while link.phase.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
+            link.probeDayBefore = true
+            await syncAndWait(band)
+            link.note("probe: done")
+        }
+    }
+
     // MARK: Stay connected and Find Phone (docs/STAY-CONNECTED.md)
 
     static let stayConnectedKey = "stayConnected"
@@ -403,7 +424,18 @@ final class AppModel: ObservableObject {
         sessionDrafts.append(draft)
         context.insert(Sample(bandID: id, draft: draft))
         if draft.kind == "battery", let band = band(id) { band.lastBattery = draft.level }
+        if let minutes = draft.movingMinutes { movingMinutes["\(id.uuidString).\(DayKey.current(draft.ts).index)"] = minutes }
         try? context.save()
+    }
+
+    /// The band's own moving minutes by day, keyed "<band id>.<day index>": the last value a live
+    /// reading carried that day. It is in no file, so it is kept here.
+    @Published private(set) var movingMinutes = (UserDefaults.standard.dictionary(forKey: "movingMinutes") as? [String: Int]) ?? [:] {
+        didSet { if !isDemo, movingMinutes != oldValue { UserDefaults.standard.set(movingMinutes, forKey: "movingMinutes") } }
+    }
+
+    func movingMinutes(_ band: Band, _ day: DayKey) -> Int? {
+        movingMinutes["\(band.id.uuidString).\(day.index)"]
     }
 
     /// `lastSyncAt` moves only on a complete session. Files that arrived are parsed whatever the
@@ -732,6 +764,7 @@ final class AppModel: ObservableObject {
         pendingRollup[id] = nil
         pendingHubRecords[id] = nil
         monitoring = monitoring.filter { !$0.key.hasPrefix(id.uuidString) }
+        movingMinutes = movingMinutes.filter { !$0.key.hasPrefix(id.uuidString) }
         context.delete(band)
         try? context.save()
         updateHold()

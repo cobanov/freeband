@@ -391,7 +391,14 @@ private struct TodayContent: View {
                          unit: String(localized: "kcal"),
                          trend: (0..<7).reversed().map { history.summary(day.adding(days: -$0))?.activeCalories.map(Double.init) },
                          color: .activity)
-                tile(.activeMinutes)
+                // The band's own count when it has sent one for the day; else minutes in the heart rate zones.
+                if let moving = model.movingMinutes(band, day) {
+                    StatTile(title: String(localized: "Moving"), value: FBFormat.number(moving), unit: String(localized: "min"),
+                             trend: (0..<7).reversed().map { model.movingMinutes(band, day.adding(days: -$0)).map(Double.init) },
+                             color: .activity)
+                } else {
+                    tile(.activeMinutes)
+                }
                 tile(.restingHeartRate)
                 NavigationLink(value: Route.trend(.stress, day: day.index)) {
                     StatTile(title: String(localized: "Stress"), value: summary?.stressAvg.map { FBFormat.number($0) },
