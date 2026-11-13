@@ -575,12 +575,17 @@ extension MiAuth {
     /// off its charger, at 82% answered {1: 1, 2: 0, 3: 0, 4: 0}, which is neither Gadgetbridge's
     /// {isCharging, batteryLevel, isWorn, isUserAsleep} nor anything else settled yet
     /// (docs/CAPABILITIES.md section 9.7). Charging comes from the battery reply instead.
-    static func deviceState(_ command: PBMessage) -> DeviceState? {
-        let system = command.message(4)
-        if let pushed = system?.message(49) {
-            return DeviceState(charging: pushed.varints[1] == 1, worn: pushed.varints[2] == 1, asleep: pushed.varints[3] == 1)
-        }
-        return nil
+    /// A push names only what changed (a Band 10 Pro sent just {1: 2}), so each part is optional.
+    struct DeviceStateChange: Equatable {
+        var charging: Bool?
+        var worn: Bool?
+        var asleep: Bool?
+    }
+
+    static func deviceStateChange(_ command: PBMessage) -> DeviceStateChange? {
+        guard let pushed = command.message(4)?.message(49) else { return nil }
+        return DeviceStateChange(charging: pushed.varints[1].map { $0 == 1 }, worn: pushed.varints[2].map { $0 == 1 },
+                                 asleep: pushed.varints[3].map { $0 == 1 })
     }
 }
 

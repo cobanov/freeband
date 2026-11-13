@@ -11,6 +11,8 @@ struct StatTile: View {
     var delta: MetricDelta?
     var color: Color = .textSecondary
     var wide = false
+    /// Shown in the change's place when there is no change to show, e.g. when the value is from.
+    var note: String?
 
     var body: some View {
         Card {
@@ -34,7 +36,7 @@ struct StatTile: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
-        .accessibilityValue([value.map { [$0, unit].compactMap { $0 }.joined(separator: " ") }, delta?.spoken].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityValue([value.map { [$0, unit].compactMap { $0 }.joined(separator: " ") }, delta?.spoken ?? note].compactMap { $0 }.joined(separator: ", "))
     }
 
     private var label: some View {
@@ -68,8 +70,11 @@ struct StatTile: View {
                 .foregroundStyle(.textSecondary)
                 .lineLimit(1)
         } else {
-            // Keeps the tile's height when there is nothing to compare with yet.
-            Text(verbatim: " ").textStyle(.caption)
+            // A space keeps the tile's height when there is nothing to say.
+            Text(verbatim: value == nil ? " " : (note ?? " "))
+                .textStyle(.caption)
+                .foregroundStyle(.textSecondary)
+                .lineLimit(1)
         }
     }
 }

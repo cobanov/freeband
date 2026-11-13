@@ -686,7 +686,11 @@ final class BandLink: NSObject, ObservableObject {
         case (2, 78), (2, 79):
             // Logged whole until the fields are settled: a Band 10 Pro on the wrist read as charging.
             note("← 2/\(subtype) state \(Self.hexPrefix(lastCommandBody))")
-            if let state = MiAuth.deviceState(command) { deviceState = state }
+            if let change = MiAuth.deviceStateChange(command) {
+                deviceState = MiAuth.DeviceState(charging: change.charging ?? deviceState?.charging ?? false,
+                                                 worn: change.worn ?? deviceState?.worn ?? true,
+                                                 asleep: change.asleep ?? deviceState?.asleep ?? false)
+            }
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")

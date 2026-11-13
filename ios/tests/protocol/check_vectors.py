@@ -158,6 +158,8 @@ want.update({
     "battery_level_with_state": 82,
     "state_basic_not_read": "nil",
     "state_pushed": "false/true/false",
+    # a push with only charging (2 = no): the other parts are not in it
+    "state_pushed_one_field": "false/nil/nil",
 })
 bad = [k for k in want if got.get(k) != want[k]]
 for k in want:

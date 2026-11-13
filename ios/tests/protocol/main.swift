@@ -186,12 +186,17 @@ func batteryReply(_ state: UInt64?) -> PBMessage {
 }
 let basicState = pb { $0.varint(1, 2); $0.varint(2, 78); $0.message(4, pb { $0.message(48, pb { $0.varint(1, 1); $0.varint(2, 0); $0.varint(3, 0); $0.varint(4, 0) }) }) }.data
 let pushedState = pb { $0.varint(1, 2); $0.varint(2, 79); $0.message(4, pb { $0.message(49, pb { $0.varint(1, 2); $0.varint(2, 1); $0.varint(3, 2) }) }) }.data
-func stateText(_ s: MiAuth.DeviceState?) -> String { s.map { "\($0.charging)/\($0.worn)/\($0.asleep)" } ?? "nil" }
+let pushedCharging = pb { $0.varint(1, 2); $0.varint(2, 79); $0.message(4, pb { $0.message(49, pb { $0.varint(1, 2) }) }) }.data
+func stateText(_ s: MiAuth.DeviceStateChange?) -> String {
+    func t(_ b: Bool?) -> String { b.map { "\($0)" } ?? "nil" }
+    return s.map { "\(t($0.charging))/\(t($0.worn))/\(t($0.asleep))" } ?? "nil"
+}
 let bandState: [String: Any] = [
     "battery_charging": [batteryReply(2), batteryReply(1), batteryReply(3), batteryReply(nil)].map { MiAuth.batteryCharging($0).map { "\($0)" } ?? "nil" },
     "battery_level_with_state": MiAuth.batteryLevel(batteryReply(2)) ?? 0,
-    "state_basic_not_read": stateText(MiAuth.deviceState(PBMessage(basicState)!)),
-    "state_pushed": stateText(MiAuth.deviceState(PBMessage(pushedState)!)),
+    "state_basic_not_read": stateText(MiAuth.deviceStateChange(PBMessage(basicState)!)),
+    "state_pushed": stateText(MiAuth.deviceStateChange(PBMessage(pushedState)!)),
+    "state_pushed_one_field": stateText(MiAuth.deviceStateChange(PBMessage(pushedCharging)!)),
 ]
 
 let out: [String: Any] = [

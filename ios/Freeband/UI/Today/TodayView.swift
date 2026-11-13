@@ -118,6 +118,25 @@ private struct TodayContent: View {
         return (try? context.fetch(FetchDescriptor<MinuteDay>(predicate: #Predicate { $0.bandID == id && $0.dayIndex == index })))?.first?.series
     }
 
+    /// The newest heart rate of the shown day, wherever it came from: a measurement started on
+    /// the band, the band's own minutes, or (today) a live reading.
+    private func latestHeartRate(_ minutes: MinuteSeries?) -> (value: Int, at: Date)? {
+        var best: (value: Int, at: Date)?
+        func offer(_ value: Int, _ at: Date) {
+            if ValidRange.hr(value) != nil, best.map({ at > $0.at }) ?? true { best = (value, at) }
+        }
+        let id = band.id
+        let index = day.index
+        let manual = (try? context.fetch(FetchDescriptor<ManualReading>(
+            predicate: #Predicate { $0.bandID == id && $0.dayIndex == index && $0.kind == "heart_rate" }))) ?? []
+        for reading in manual { offer(reading.value, reading.ts) }
+        if let minutes, let last = (0 ..< MinuteSeries.slots).last(where: { ValidRange.hr(minutes.heartRate[$0]) != nil }) {
+            offer(minutes.heartRate[last] ?? 0, minutes.time(ofMinute: last))
+        }
+        if isToday, let live = liveSamples.last(where: { $0.heartRate > 10 }) { offer(live.heartRate, live.ts) }
+        return best
+    }
+
     /// Every sleep that touches the shown day: the night that ended on it, its naps, and the
     /// night that began on it. A session without stages is drawn as one stretch of light sleep.
     private var daySleep: [StageSegment] {
@@ -359,6 +378,11 @@ private struct TodayContent: View {
         }
         return VStack(alignment: .leading, spacing: FBSpace.xs) {
             SectionHeader(title: isToday ? String(localized: "Today") : FBFormat.shortDay(day.noon))
+            let minutes = dayMinutes
+            let heart = latestHeartRate(minutes)
+            StatTile(title: String(localized: "Heart rate"), value: heart.map { FBFormat.number($0.value) }, unit: String(localized: "bpm"),
+                     trend: minutes.map { $0.heartRate.compactMap { ValidRange.hr($0).map(Double.init) } } ?? [],
+                     color: .heart, wide: true, note: heart.map { FBFormat.time($0.at) })
             tile(.steps, wide: true)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: FBSpace.xs), GridItem(.flexible())], spacing: FBSpace.xs) {
                 ForEach(TodayMetric.allCases.filter { $0 != .steps }) { tile($0) }
