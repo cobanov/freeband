@@ -283,15 +283,6 @@ struct ActivityFileID: Hashable, Comparable, Sendable, CustomStringConvertible {
         return Set(details.filter { $0.ts < newest })
     }
 
-    /// The same id with its time moved by whole days (the kind, version and time zone stay).
-    func shifted(days: Int) -> ActivityFileID? {
-        var b = [UInt8](data)
-        let ts = Int64(UInt32(b[0]) | UInt32(b[1]) << 8 | UInt32(b[2]) << 16 | UInt32(b[3]) << 24) + Int64(days) * 86_400
-        guard let moved = UInt32(exactly: ts) else { return nil }
-        for i in 0 ..< 4 { b[i] = UInt8(truncatingIfNeeded: moved >> (8 * UInt32(i))) }
-        return ActivityFileID(bytes: b)
-    }
-
     init?<Bytes: Collection>(bytes: Bytes) where Bytes.Element == UInt8 {
         guard bytes.count == 7 else { return nil }
         let b = Array(bytes)
@@ -1666,5 +1657,36 @@ enum ActivityParser {
             }
         }
         return ActivityParseResult(fileID: id, pad: pad, crc: crc, payloadLength: body.count, payload: payload, warnings: warnings)
+    }
+}
+
+/// What one sync does with the band's two file lists: which files to ask for and which to
+/// acknowledge (the band deletes an acknowledged file, so this is the one place that decides
+/// what leaves the band).
+struct ActivitySyncPlan: Equatable, Sendable {
+    var fetch: [ActivityFileID]
+    var acknowledge: [ActivityFileID]
+
+    /// A night that began yesterday evening can still grow until the morning; nothing older can.
+    static let settledAfter: TimeInterval = 36 * 3600
+
+    /// A file is settled when it can no longer change on the band: a minute file that a later
+    /// one on today's list follows (`finishedDetails`), or any file whose time is more than 36
+    /// hours before `now`. A Band 10 Pro keeps everything unacknowledged on today's list, so
+    /// without this every old night, summary and workout would be fetched again at every sync.
+    ///
+    /// - A settled file that is stored is not fetched again; every other file on today's list
+    ///   is fetched each time (it may have changed). A past file is fetched when not stored.
+    /// - Only settled or past files are acknowledged, and only when `mayAcknowledge` says so
+    ///   (the user turned clearing on, and the file is stored here and fully parsed).
+    static func make(today: [ActivityFileID], past: [ActivityFileID], now: Date,
+                     isStored: (ActivityFileID) -> Bool, mayAcknowledge: (ActivityFileID) -> Bool) -> ActivitySyncPlan {
+        let listedToday = Set(today)
+        var settled = ActivityFileID.finishedDetails(in: today)
+        for file in today where now.timeIntervalSince(file.ts) > settledAfter { settled.insert(file) }
+        let pastOnly = past.filter { !listedToday.contains($0) }
+        let fetch = today.filter { !(settled.contains($0) && isStored($0)) } + pastOnly.filter { !isStored($0) }
+        let acknowledge = (settled.sorted() + pastOnly).filter(mayAcknowledge)
+        return ActivitySyncPlan(fetch: Array(Set(fetch)).sorted(), acknowledge: Array(Set(acknowledge)).sorted())
     }
 }

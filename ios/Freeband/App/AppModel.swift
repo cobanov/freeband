@@ -168,8 +168,9 @@ final class AppModel: ObservableObject {
 
     /// Diagnostics › Probe the band: asks the read-only Health commands AstroBox names and
     /// Gadgetbridge doesn't use (6 remaining sport data, 7 user profile, 29 sport status, 42 goals, 44 basic
-    /// data, 61 sleep regularity, 63 sleep disorder, 86 training status), then syncs once while
-    /// also asking for yesterday's daily files. The replies go to the log whole.
+    /// data, 61 sleep regularity, 63 sleep disorder, 86 training status). The replies go to the
+    /// log whole. (Whether an acknowledged file comes back when asked for by id was probed once
+    /// and answered: it does not, docs/ACTIVITY.md section 2.6.)
     /// Diagnostics › Ask the band how it pairs (docs/BIND.md): one question, no pairing.
     func probeBindSelectedBand() {
         if let band = selectedBand() { start(band, .bindProbe) }
@@ -186,8 +187,6 @@ final class AppModel: ObservableObject {
             start(band, .send(gets.map(MiAuth.healthGet)))
             try? await Task.sleep(for: .milliseconds(300))
             while link.phase.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
-            link.probeDayBefore = true
-            await syncAndWait(band)
             link.note("probe: done")
         }
     }

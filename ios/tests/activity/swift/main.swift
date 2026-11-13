@@ -941,6 +941,37 @@ check("finished minute files: every daily details id but the newest; other kinds
     return e
 }
 
+check("sync plan: settled files are fetched once and are the only ones acknowledged") {
+    // "now" is 2023-11-15 10:00 UTC. ids: ts u32 LE | tz 0 | version | flags (00 minute file,
+    // 01 summary, 20 sleep details, 18 manual samples).
+    let now = Date(timeIntervalSince1970: 1_700_042_400)
+    func fid(_ ts: Int, _ versionAndFlags: String) -> ActivityFileID {
+        var le = UInt32(ts).littleEndian
+        let bytes = withUnsafeBytes(of: &le) { Data($0) } + hexData("00" + versionAndFlags)
+        return ActivityFileID(bytes)!
+    }
+    let minuteA = fid(1_700_040_000, "0400"), minuteB = fid(1_700_040_600, "0400"), minuteNewest = fid(1_700_041_200, "0400")
+    let summaryToday = fid(1_700_006_400, "0501")              // today 00:00, 10 h old
+    let sleepOld = fid(1_700_042_400 - 40 * 3600, "0620")      // 40 h old: settled
+    let sleepLastNight = fid(1_700_042_400 - 11 * 3600, "0620")
+    let pastStored = fid(1_699_900_000, "0501"), pastNew = fid(1_699_900_000, "0218")
+    let stored: Set<ActivityFileID> = [minuteA, summaryToday, sleepOld, pastStored]
+    let parsed: Set<ActivityFileID> = [minuteA, minuteB, summaryToday, sleepOld, sleepLastNight, pastStored]
+    func plan(clear: Bool) -> ActivitySyncPlan {
+        ActivitySyncPlan.make(today: [summaryToday, minuteA, minuteB, minuteNewest, sleepOld, sleepLastNight], past: [pastStored, pastNew],
+                              now: now, isStored: { stored.contains($0) }, mayAcknowledge: { clear && stored.contains($0) && parsed.contains($0) })
+    }
+    var e: [String] = []
+    // Not fetched: minuteA (finished, stored), sleepOld (over 36 h, stored), pastStored.
+    let wantFetch = [minuteB, minuteNewest, summaryToday, sleepLastNight, pastNew].sorted()
+    if plan(clear: true).fetch != wantFetch { e.append("fetch \(plan(clear: true).fetch.map(\.hex))") }
+    // Acknowledged: only settled or past files; never today's summary, last night or the newest minute file.
+    if plan(clear: true).acknowledge != [minuteA, sleepOld, pastStored].sorted() { e.append("ack \(plan(clear: true).acknowledge.map(\.hex))") }
+    if !plan(clear: false).acknowledge.isEmpty { e.append("acknowledged with clearing off") }
+    if plan(clear: false).fetch != wantFetch { e.append("fetch changes with clearing") }
+    return e
+}
+
 // Two v4 records in the shape a Band 10 Pro sends (header ff ff f8 cf ff ff). Group 2 is 0x83 in
 // the first (level 100b = 4, sport type 3) and 0xe0 in the second (level 7, a still wrist).
 check("daily details: activity level is the top three bits of group 2") {

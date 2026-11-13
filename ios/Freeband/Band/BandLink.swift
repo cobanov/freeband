@@ -214,10 +214,6 @@ final class BandLink: NSObject, ObservableObject {
     var onFindPhone: ((UUID, Bool) -> Void)?
     /// The phone's last known location, when the user lets the band have it; nil otherwise.
     var phoneLocation: (() -> (at: Date, latitude: Double, longitude: Double, altitude: Double?)?)?
-    /// One shot (Diagnostics › Probe the band): the next sync also asks for the day-before
-    /// copies of today's files that start at local midnight, to see whether the band still
-    /// hands over a file that another app acknowledged.
-    var probeDayBefore = false
     /// Whether a file on the band's past list may be acknowledged, which makes the band delete
     /// it: the user turned that on, and the file is stored here and fully parsed.
     var canAcknowledge: ((UUID, String) -> Bool)?
@@ -700,36 +696,18 @@ final class BandLink: NSObject, ObservableObject {
         case (8, 2) where fileStage == .listingPast:
             let past = ActivityFileID.list(MiAuth.activityFileIDBytes(command))
             let id = target?.id
-            let wanted = past.filter { file in
-                guard let id, let has = hasActivityFile else { return true }
-                return !has(id, file.hex)
-            }
-            // Minute files that a later one follows are finished (ActivityFileID.finishedDetails):
-            // once stored they are not fetched again, and they may be acknowledged. Everything
-            // else on today's list can still change (the summary, manual readings, the newest
-            // minute file), so it is fetched every time and never acknowledged from here.
-            let today = Set(todayIDs)
-            let finished = ActivityFileID.finishedDetails(in: todayIDs)
-            func has(_ file: ActivityFileID) -> Bool { id.flatMap { hasActivityFile?($0, file.hex) } ?? false }
-            let todayWanted = todayIDs.filter { !(finished.contains($0) && has($0)) }
-            let stored = (past.filter { !today.contains($0) } + finished.sorted()).filter { file in
-                id.flatMap { canAcknowledge?($0, file.hex) } ?? false
-            }
-            for file in stored { sendCommand(MiAuth.activityAckCommand(file.data), encrypted: true) }
-            if !stored.isEmpty { note("→ acknowledged \(stored.count) stored file(s); the band deletes them") }
-            if todayWanted.count < todayIDs.count { note("\(todayIDs.count - todayWanted.count) finished minute file(s) already stored, not fetched again") }
-            var probes: [ActivityFileID] = []
-            if probeDayBefore {
-                probeDayBefore = false
-                probes = todayIDs.filter { file in
-                    let local = Int(file.ts.timeIntervalSince1970) + file.utcOffsetMinutes * 60
-                    return local % 86_400 == 0
-                }.compactMap { $0.shifted(days: -1) }.filter { !today.contains($0) }
-                note("probe: also asking for \(probes.count) file(s) of the day before: \(probes.map(\.hex).joined(separator: " "))")
-            }
-            requestedFiles = Set(todayWanted + wanted + probes)
+            // Which files to ask for and which to let the band delete: ActivitySyncPlan.
+            let plan = ActivitySyncPlan.make(
+                today: todayIDs, past: past, now: Date(),
+                isStored: { file in id.flatMap { self.hasActivityFile?($0, file.hex) } ?? false },
+                mayAcknowledge: { file in id.flatMap { self.canAcknowledge?($0, file.hex) } ?? false })
+            for file in plan.acknowledge { sendCommand(MiAuth.activityAckCommand(file.data), encrypted: true) }
+            if !plan.acknowledge.isEmpty { note("→ acknowledged \(plan.acknowledge.count) stored file(s); the band deletes them") }
+            let listed = Set(todayIDs + past).count
+            if plan.fetch.count < listed { note("\(listed - plan.fetch.count) settled file(s) already stored, not fetched again") }
+            requestedFiles = Set(plan.fetch)
             fileQueue = requestedFiles.sorted()
-            note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")
+            note("← past \(past.count) file(s); \(fileQueue.count) to request")
             fileProgress = (0, fileQueue.count)
             fileStage = .fetching
             fetchNextFile()
