@@ -4,6 +4,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 import UIKit
+import UserNotifications
 
 /// Ties the band session to storage and integrations: every observation is stored as it
 /// arrives; every activity file is stored, then parsed into the derived models; when a session
@@ -330,6 +331,25 @@ final class AppModel: ObservableObject {
         await finishInBackground()
     }
 
+    /// The morning summary: once a day, the first time a sync that ran in the background brings
+    /// today's scores, a notification says how the day starts. Nothing while the app is in front
+    /// (the scores are on screen) and nothing unless notifications are allowed (Stay connected
+    /// asks for them).
+    private func notifyMorningSummary(_ bandID: UUID) {
+        guard !isDemo, UIApplication.shared.applicationState != .active else { return }
+        let today = DayKey.current(Date()).index
+        guard UserDefaults.standard.integer(forKey: "morningSummaryDay") != today else { return }
+        let scores = try? context.fetch(FetchDescriptor<DailyScore>(predicate: #Predicate { $0.bandID == bandID && $0.dayIndex == today }))
+        guard let score = scores?.first, score.recoveryScore != nil || score.sleepScore != nil else { return }
+        UserDefaults.standard.set(today, forKey: "morningSummaryDay")
+        let content = UNMutableNotificationContent()
+        content.title = score.recoveryScore.map { DayVerdict(recovery: Double($0)).word }
+            ?? score.sleepScore.map { ScoreBand.sleep(Double($0)).word } ?? ""
+        content.body = [score.recoveryScore.map { "\(ScoreKind.recovery.name) \($0)" }, score.sleepScore.map { "\(ScoreKind.sleep.name) \($0)" }]
+            .compactMap { $0 }.joined(separator: " · ")
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "morning-summary", content: content, trigger: nil))
+    }
+
     static func backgroundSyncDue(lastSync: Date?, lastAttempt: Date, now: Date) -> Bool {
         if let lastSync, now.timeIntervalSince(lastSync) < backgroundSyncAfter { return false }
         return now.timeIntervalSince(lastAttempt) >= backgroundSyncRetry
@@ -397,6 +417,7 @@ final class AppModel: ObservableObject {
             let parsed = sessionIngest
             sessionIngest = IngestSummary()
             runPendingRollups()
+            notifyMorningSummary(id)
             if !parsed.isEmpty {
                 setCalibration(makeReport(parsed, bandID: id, outcome: outcome.label))
             }
