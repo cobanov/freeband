@@ -134,6 +134,9 @@ private struct TodayContent: View {
                         .fbStateAnimation(syncing)
                 }
 
+                if !isFirstSync {
+                    InsightList(insights: history.insights(day, sleepNeedMinutes: Profile.load().sleepNeed), day: day)
+                }
                 if isToday {
                     BandContextCard(band: band)
                 }

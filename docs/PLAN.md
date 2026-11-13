@@ -129,6 +129,17 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 - **Stres ve SpO2:** skora girmez. Stres: zaman ağırlıklı ortalama ve 4 banttaki dakikalar. SpO2: gece ortalaması, minimumu ve %90 altındaki dakikalar. Tıbbi iddia yok.
 - **Güven:** yüksek/orta/düşük/yok, her zaman gerekçe listesiyle ("RR yok", "nabız 30 dakikada bir", "bazalde 5/14 gece").
 
+### 5.1 Dikkat çekenler (içgörüler, v1)
+
+Bugün ekranında, skorların altında, en çok üç satır; önce uyarılar. Her kural kişiyi kendi bazalıyla karşılaştırır, tam bazal (7 gün) ister, yoksa susar. Eşikler seçimdir, bir popülasyonla doğrulanmadı. `Analytics/Insights.swift`.
+
+- **Dinlenik nabız yüksek:** bazaldan 2σ yukarıda. 3σ ya da üst üste 3 gün ise uyarı. Her günün z'si kendi önceki günlerinin bazalına göre.
+- **İki haftanın en düşük dinlenik nabzı:** z ≤ −1 ve önceki 14 geçerli günün hepsinden düşük (olumlu).
+- **HRV düşük:** bazaldan 2σ aşağıda; 3σ ya da üst üste 3 gece ise uyarı.
+- **Uyku açığı:** son 7 gecede (en az 5'i verili) ihtiyaçtan toplam 5 saat eksik; 10 saat ise uyarı.
+- **Uyku saati kaydı:** gecenin ortası, önceki gecelerin (en az 4) medyanından 90 dakika ileri ya da geri; saat gece yarısında sarılır.
+- **Yoğun günler, düşük toparlanma:** önceki 3 günün her birinde yük bazalın 1σ üstünde ve bugünkü toparlanma düşük bantta (34'ün altı).
+
 ## 6. Veri hattı ve hata düzeltmeleri
 
 - **Yeni modeller** (`Data/HealthModels.swift`):

@@ -5378,6 +5378,156 @@
           }
         }
       }
+    },
+    "Worth noticing": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikkat çekenler"
+          }
+        }
+      }
+    },
+    "Resting heart rate is high": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dinlenik nabız yüksek"
+          }
+        }
+      }
+    },
+    "Lowest resting heart rate in two weeks": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İki haftanın en düşük dinlenik nabzı"
+          }
+        }
+      }
+    },
+    "HRV is low": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HRV düşük"
+          }
+        }
+      }
+    },
+    "You're short on sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku açığın var"
+          }
+        }
+      }
+    },
+    "You slept later than usual": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her zamankinden geç uyudun"
+          }
+        }
+      }
+    },
+    "You slept earlier than usual": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her zamankinden erken uyudun"
+          }
+        }
+      }
+    },
+    "Hard days, low recovery": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yoğun günler, düşük toparlanma"
+          }
+        }
+      }
+    },
+    "%@, your normal is %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, normalin %2$@."
+          }
+        }
+      }
+    },
+    "%@, your normal is %@. %lld days in a row.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, normalin %2$@. %3$lld gündür böyle."
+          }
+        }
+      }
+    },
+    "%lld ms, your normal is %lld ms.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld ms, normalin %2$lld ms."
+          }
+        }
+      }
+    },
+    "%lld ms, your normal is %lld ms. %lld nights in a row.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld ms, normalin %2$lld ms. %3$lld gecedir böyle."
+          }
+        }
+      }
+    },
+    "%@ less than you need over the last %lld nights.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son %2$lld gecede ihtiyacından %1$@ az uyudun."
+          }
+        }
+      }
+    },
+    "The middle of your night moved by %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gecenin ortası %@ kaydı."
+          }
+        }
+      }
+    },
+    "Recovery is %lld after %lld days of strain above your normal.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normalinin üstünde yükle geçen %2$lld günün ardından toparlanma %1$lld."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

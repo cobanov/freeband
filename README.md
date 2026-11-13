@@ -29,6 +29,7 @@ Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1
 | Mi Band 8, on BLE V1 | expected to work: Gadgetbridge puts it on the same channel as the Watch S1 Active. Not tested on a band yet ([#4](https://github.com/cobanov/freeband/issues/4)) |
 | Parsing them: per-minute data, daily summary, sleep and sleep stages, manual readings | implemented and tested against fixtures; not yet checked with real files from a Band 10 |
 | Sleep, Recovery and Strain scores with contributors and confidence | implemented (algorithm v1) |
+| Worth noticing: what stands out today against your own normal (resting heart rate, HRV, sleep debt, sleep timing, hard days on low recovery) | implemented and tested (v1 thresholds, not validated on real weeks yet) |
 | English and Turkish, light and dark themes | done |
 | Optional web hub: REST API, web panel, webhooks, CSV/JSON export | live at freeband.cobanov.dev |
 | Health monitoring settings on the band: heart rate interval, heart rate during sleep, blood oxygen, all-day stress (Band tab) | implemented and tested against vectors; not tried on a band yet |
