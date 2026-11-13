@@ -25,6 +25,8 @@ final class BandLink: NSObject, ObservableObject {
     /// `hold` is the held session; it starts only through `hold(_:)`.
     enum Purpose: Equatable {
         case check, sync, live, send([Data]), hold
+        /// Asks the band how it would pair (docs/BIND.md step 1) and stops there.
+        case bindProbe
 
         var label: String {
             switch self {
@@ -33,6 +35,7 @@ final class BandLink: NSObject, ObservableObject {
             case .live: return "live"
             case .send: return "send"
             case .hold: return "hold"
+            case .bindProbe: return "bind probe"
             }
         }
     }
@@ -531,6 +534,41 @@ final class BandLink: NSObject, ObservableObject {
         stage = .authenticating
         note("→ SessionConfig")
         send(MiFrame.encode(kind: MiFrame.kindSessionConfig, seq: 0, payload: MiFrame.startSessionPayload))
+    }
+
+    /// Step 1 of a local bind and nothing more: the band's answer says whether it would pair
+    /// without the vendor's server (verify mode 2), wants the server, or is already bound.
+    /// Freeband sends no second step, so no key is agreed and nothing is stored.
+    private var bindProbe: MiBind.Machine?
+
+    private func startBindProbe() {
+        guard var machine = MiBind.Machine(config: MiBind.Config(userID: "freeband-probe", appDeviceID: "freeband-probe", deviceName: "")) else { return finish() }
+        let first = machine.start()
+        bindProbe = machine
+        stage = .reading
+        note("→ bind probe 1/17 \(Self.hexPrefix(first, limit: 80))")
+        sendCommand(first, encrypted: false)
+        let thisRun = run
+        after(6, thisRun) { [weak self] in
+            guard let self, self.purpose == .bindProbe else { return }
+            self.note("bind probe: no answer")
+            self.finish()
+        }
+    }
+
+    private func bindProbeReply(_ body: Data) {
+        guard var machine = bindProbe else { return }
+        note("← bind probe reply \(Self.hexPrefix(body, limit: 240))")
+        switch machine.receive(body) {
+        case .send(_, let confirmOnBand):
+            note("bind probe: the band offers local pairing\(confirmOnBand ? ", confirmed on the band" : ""); stopping here")
+        case .failed(let failure, _):
+            note("bind probe: \(failure)")
+        case .bound, .ignored:
+            return
+        }
+        bindProbe = nil
+        finish()
     }
 
     private func startAuth() {
@@ -1043,7 +1081,7 @@ final class BandLink: NSObject, ObservableObject {
         for packet in MiFrame.drain(&buffer) {
             switch packet.kind {
             case MiFrame.kindSessionConfig:
-                if phoneNonce.isEmpty { startAuth() }
+                if purpose == .bindProbe { startBindProbe() } else if phoneNonce.isEmpty { startAuth() }
             case MiFrame.kindData:
                 send(MiFrame.encode(kind: MiFrame.kindAck, seq: packet.seq, payload: Data()))
                 decode(packet)
@@ -1082,6 +1120,7 @@ final class BandLink: NSObject, ObservableObject {
     private func handleCommandBytes(_ body: Data) {
         guard let command = PBMessage(body) else { return }
         lastCommandBody = body
+        if purpose == .bindProbe, command.varints[1] == 1 { return bindProbeReply(body) }
         if purpose == .hold, authed {
             // What the band sends on its own while the session is idle (docs/STAY-CONNECTED.md section 6).
             note("← held \(command.varints[1] ?? 0)/\(command.varints[2] ?? 0), \(body.count) bytes")

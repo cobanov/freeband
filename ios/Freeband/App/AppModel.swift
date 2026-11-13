@@ -170,6 +170,11 @@ final class AppModel: ObservableObject {
     /// Gadgetbridge doesn't use (6 remaining sport data, 7 user profile, 29 sport status, 42 goals, 44 basic
     /// data, 61 sleep regularity, 63 sleep disorder, 86 training status), then syncs once while
     /// also asking for yesterday's daily files. The replies go to the log whole.
+    /// Diagnostics › Ask the band how it pairs (docs/BIND.md): one question, no pairing.
+    func probeBindSelectedBand() {
+        if let band = selectedBand() { start(band, .bindProbe) }
+    }
+
     func probeSelectedBand() {
         if let band = selectedBand() { probe(band) }
     }

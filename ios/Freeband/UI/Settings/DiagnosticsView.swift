@@ -5,6 +5,7 @@ import SwiftUI
 /// raw files (shareable) and the last session's log.
 struct DiagnosticsView: View {
     @EnvironmentObject private var link: BandLink
+    @State private var askingBind = false
     @EnvironmentObject private var model: AppModel
     @Query(sort: \ActivityBlob.ts, order: .reverse) private var blobs: [ActivityBlob]
     @State private var share: ShareItem?
@@ -103,6 +104,14 @@ struct DiagnosticsView: View {
             .disabled(busy)
             Button(String(localized: "Probe the band")) { model.probeSelectedBand() }
                 .disabled(link.phase.isBusy)
+            Button(String(localized: "Ask the band how it pairs")) { askingBind = true }
+                .disabled(link.phase.isBusy)
+                .confirmationDialog(String(localized: "Ask the band how it pairs?"), isPresented: $askingBind, titleVisibility: .visible) {
+                    Button(String(localized: "Ask")) { model.probeBindSelectedBand() }
+                    Button(String(localized: "Cancel"), role: .cancel) {}
+                } message: {
+                    Text("Freeband sends the first step of pairing and stops. The answer shows in the log. On a band that is already paired this has not been tried: it should only be refused, but the band may show a pairing screen.")
+                }
         } header: {
             Text("Calibration")
         } footer: {
