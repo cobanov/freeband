@@ -13,6 +13,8 @@ struct DayTrace: View {
     let dayStart: Date
     /// For today: where the day has got to. Nothing is drawn after it.
     var now: Date?
+    /// Workouts recorded on the band that day: each is shaded behind the heart rate and steps.
+    var workouts: [ClosedRange<Date>] = []
 
     private static let height: CGFloat = 148
     /// Heart rate on top, steps under it, sleep along the bottom; y from the top.
@@ -67,12 +69,13 @@ struct DayTrace: View {
                 }
                 .textStyle(.caption)
                 .foregroundStyle(.textTertiary)
-                HStack(spacing: FBSpace.m) {
+                HStack(spacing: FBSpace.s) {
                     if let low, let high {
-                        key(.heart, String(localized: "Heart rate, \(Int(low))–\(Int(high)) bpm"))
+                        key(.heart, String(localized: "\(Int(low))–\(Int(high)) bpm", comment: "Heart rate range in the day trace's key"))
                     }
                     key(.activity, String(localized: "Steps"))
                     if !sleep.isEmpty { key(.stageLight, String(localized: "Sleep")) }
+                    if !workouts.isEmpty { key(.activity.opacity(0.4), String(localized: "Workout")) }
                 }
             }
             .accessibilityElement(children: .combine)
@@ -100,6 +103,15 @@ struct DayTrace: View {
             context.fill(Path(CGRect(x: lineX, y: 0, width: FBStroke.hairline, height: Self.stepsBottom)), with: .color(.hairline))
         }
         context.fill(Path(CGRect(x: 0, y: Self.stepsBottom, width: width, height: FBStroke.hairline)), with: .color(.hairlineStrong))
+
+        // Workouts: a shaded stretch, so the peaks under it explain themselves.
+        for workout in workouts {
+            let from = max(minute(workout.lowerBound), 0)
+            let to = min(minute(workout.upperBound), end)
+            guard to > from else { continue }
+            let rect = CGRect(x: x(from), y: 0, width: max(x(to) - x(from), 2), height: Self.stepsBottom)
+            context.fill(Path(rect), with: .color(.activity.opacity(0.16)))
+        }
 
         // Steps: a bar per quarter hour, scaled to the day's busiest one.
         let bins = stepBins

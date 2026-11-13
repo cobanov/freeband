@@ -137,6 +137,14 @@ private struct TodayContent: View {
         return best
     }
 
+    /// When the shown day's workouts ran, for the shading on the day trace.
+    private var dayWorkouts: [ClosedRange<Date>] {
+        let id = band.id
+        let index = day.index
+        let rows = (try? context.fetch(FetchDescriptor<Workout>(predicate: #Predicate { $0.bandID == id && $0.dayIndex == index }))) ?? []
+        return rows.filter { $0.end > $0.start }.map { $0.start ... $0.end }
+    }
+
     /// Every sleep that touches the shown day: the night that ended on it, its naps, and the
     /// night that began on it. A session without stages is drawn as one stretch of light sleep.
     private var daySleep: [StageSegment] {
@@ -171,7 +179,8 @@ private struct TodayContent: View {
                         hero
                         pillars
                         Card {
-                            DayTrace(minutes: dayMinutes, sleep: daySleep, dayStart: day.date, now: isToday ? Date() : nil)
+                            DayTrace(minutes: dayMinutes, sleep: daySleep, dayStart: day.date, now: isToday ? Date() : nil,
+                                     workouts: dayWorkouts)
                         }
                     }
                     .opacity(syncing ? 0.5 : 1)

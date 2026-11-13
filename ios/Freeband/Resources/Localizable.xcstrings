@@ -349,7 +349,6 @@
       }
     },
     "%lld–%lld bpm": {
-      "comment": "Heart-rate zone range",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5529,16 +5528,6 @@
         }
       }
     },
-    "Heart rate, %lld–%lld bpm": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nabız, %1$lld–%2$lld bpm"
-          }
-        }
-      }
-    },
     "The day, hour by hour": {
       "localizations": {
         "tr": {
@@ -5755,6 +5744,336 @@
           "stringUnit": {
             "state": "translated",
             "value": "Freeband eşleşmenin ilk adımını gönderir ve durur. Cevap günlükte görünür. Zaten eşli bir bantta bu denenmedi: yalnızca reddedilmesi beklenir, ama bant bir eşleşme ekranı gösterebilir."
+          }
+        }
+      }
+    },
+    "Workouts": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antrenmanlar"
+          }
+        }
+      }
+    },
+    "Pace and cadence": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo ve kadans"
+          }
+        }
+      }
+    },
+    "Training": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antrenman"
+          }
+        }
+      }
+    },
+    "Outdoor run": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık hava koşusu"
+          }
+        }
+      }
+    },
+    "Trail run": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Patika koşusu"
+          }
+        }
+      }
+    },
+    "Treadmill": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koşu bandı"
+          }
+        }
+      }
+    },
+    "Walk": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yürüyüş"
+          }
+        }
+      }
+    },
+    "Outdoor walk": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık hava yürüyüşü"
+          }
+        }
+      }
+    },
+    "Indoor walk": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı alan yürüyüşü"
+          }
+        }
+      }
+    },
+    "Hike": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğa yürüyüşü"
+          }
+        }
+      }
+    },
+    "Trek": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trekking"
+          }
+        }
+      }
+    },
+    "Outdoor ride": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık hava bisikleti"
+          }
+        }
+      }
+    },
+    "Indoor ride": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı alan bisikleti"
+          }
+        }
+      }
+    },
+    "Free training": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serbest antrenman"
+          }
+        }
+      }
+    },
+    "Indoor fitness": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı alan fitness"
+          }
+        }
+      }
+    },
+    "HIIT": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HIIT"
+          }
+        }
+      }
+    },
+    "Rowing": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kürek"
+          }
+        }
+      }
+    },
+    "Elliptical": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliptik"
+          }
+        }
+      }
+    },
+    "Distance": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesafe"
+          }
+        }
+      }
+    },
+    "Total calories": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toplam kalori"
+          }
+        }
+      }
+    },
+    "Average pace": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama tempo"
+          }
+        }
+      }
+    },
+    "Best pace": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En iyi tempo"
+          }
+        }
+      }
+    },
+    "Average speed": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama hız"
+          }
+        }
+      }
+    },
+    "Top speed": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En yüksek hız"
+          }
+        }
+      }
+    },
+    "Average cadence": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama kadans"
+          }
+        }
+      }
+    },
+    "Highest cadence": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En yüksek kadans"
+          }
+        }
+      }
+    },
+    "Aerobic effect": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aerobik etki"
+          }
+        }
+      }
+    },
+    "Anaerobic effect": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anaerobik etki"
+          }
+        }
+      }
+    },
+    "Training load": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antrenman yükü"
+          }
+        }
+      }
+    },
+    "VO₂ max": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VO₂ maks"
+          }
+        }
+      }
+    },
+    "Recovery time": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toparlanma süresi"
+          }
+        }
+      }
+    },
+    "%@ /km": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ /km"
+          }
+        }
+      }
+    },
+    "%lld spm": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld adım/dk"
           }
         }
       }
