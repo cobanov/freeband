@@ -54,6 +54,28 @@ No iOS simulator runtime installed? Typecheck the whole app with `xcrun --sdk ip
 
 The contract test (`ios/tests/contract`) writes into `hub/test/fixtures`; pass it another folder unless you mean to update those fixtures.
 
+## On a device
+
+The simulator has no Bluetooth, so anything that talks to a band is tried on the maintainer's iPhone. The loop that worked (first used 2026-11-13):
+
+- **Install straight onto the phone**, without TestFlight: `cd ios && ~/bin/signing-run sh tools/device-install.sh <device name>`. It replaces the installed copy and keeps its data and the band's key. TestFlight (`tools/testflight.sh`) is for other people; its export step sometimes fails once with "No certificate for team ... found" and works when run again.
+- **The log** is in memory on the phone: Band › Freeband settings › Diagnostics › share the log (AirDrop lands on the Mac's Desktop or in Downloads). It has the band's name in it: read it, don't paste it. Replies that are not understood yet are logged whole as hex.
+- **The database**, for what the band really sent: `sh ios/tools/device-pull.sh out/<date>/db <device name>` (development-signed copy only, phone unlocked). Decode a stored file with `ios/tests/activity/activity_ref.py parse`.
+- **Probes** (Diagnostics): "Probe the band" asks read-only Health commands and logs the answers; "Ask the band how it pairs" sends the first step of a local bind and stops (`docs/BIND.md`).
+- **Mi Fitness takes the band's files whenever Freeband is not holding the connection**, and a file one app acknowledged is gone for the other (`docs/ACTIVITY.md` section 2.6). For a test that needs the band's files, offload Mi Fitness (iPhone Storage › Mi Fitness › Offload App; its folder and the key stay) and keep Stay connected on.
+
+Where the facts come from, so they need not be looked up again:
+
+- `vendor/` (ignored; clone again if missing): `Gadgetbridge` (codeberg.org/Freeyourgadget/Gadgetbridge), `astrobox-Core` and `astrobox-Pb` (github.com/AstralSightStudios/AstroBox-NG-Module-Core and -Pb), and `mifitness/`: Mi Fitness for Android (`com.xiaomi.wearable`, fetched with `apkeep -a com.xiaomi.wearable -d apk-pure`) with its jadx output in `mifitness/out/sources`. The band-side parsers are under `com/xiaomi/fit/fitness/parser/` and `.../device/mi/`; class names are obfuscated elsewhere, so search for strings and enum names.
+- Notes with citations: `docs/MIFITNESS-2026-11-13.md` (what the vendor app sends, parses and computes), `docs/SOURCES-2026-11-13.md` (today's Gadgetbridge and AstroBox), `docs/BIND.md`, `docs/SLEEP-WRITEBACK.md`, and the measured sections of `docs/ACTIVITY.md` and `docs/CAPABILITIES.md`.
+- `out/` (ignored): logs, calibration reports and database copies from the maintainer's band. Health data; never committed.
+
+Other things that cost time once:
+
+- Turkish for new strings: `python3 -I ios/tools/add-turkish.py ios/Freeband/Resources/Localizable.xcstrings` with a JSON object on stdin; it keeps the catalog's formatting.
+- Screens with demo data in the simulator: `xcrun simctl launch <id> dev.cobanov.freeband -freeband-demo full -freeband-screen today|sleep|trends|band|score-recovery [-freeband-day -1]`, then `xcrun simctl io <id> screenshot`. Wait about 7 seconds first, or the picture catches the opening animation.
+- `python3 check_vectors.py` needs `cryptography`: `uv run -q --no-project --with cryptography python check_vectors.py`.
+
 ## Committing
 
 - **Work on a branch**, not `main`.
