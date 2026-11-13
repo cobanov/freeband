@@ -478,6 +478,18 @@ extension MiAuth {
         return command.data
     }
 
+    /// Command{8,5}: health(10).activitySyncAckFileIds(3) = the file's id. The band deletes the
+    /// file (docs/ACTIVITY.md section 2.2), so this goes out only for a file that is stored and parsed.
+    static func activityAckCommand(_ id: Data) -> Data {
+        var health = PBWriter()
+        health.bytes(3, id)
+        var command = PBWriter()
+        command.varint(1, 8)
+        command.varint(2, 5)
+        command.message(10, health)
+        return command.data
+    }
+
     /// The N×7-byte id list in a {8,1} or {8,2} reply (health(10).activityRequestFileIds(2)).
     static func activityFileIDBytes(_ command: PBMessage) -> Data {
         command.message(10)?.blobs[2] ?? Data()

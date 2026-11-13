@@ -85,6 +85,9 @@ final class AppModel: ObservableObject {
         }
         link.onActivityFile = { [weak self] id, file, data, today in self?.storeActivityFile(id, file, data, today: today) }
         link.onFindPhone = { [weak self] id, ring in self?.findPhone(id, ring) }
+        link.canAcknowledge = { [weak self] id, hex in
+            UserDefaults.standard.bool(forKey: Self.clearBandKey) && self?.blob(id, hex)?.parseStatus == ParseStatus.parsed.rawValue
+        }
         link.onMonitoring = { [weak self] id, setting, body in
             self?.monitoring["\(id.uuidString).\(setting.rawValue)"] = body
         }
@@ -160,6 +163,8 @@ final class AppModel: ObservableObject {
     // MARK: Stay connected and Find Phone (docs/STAY-CONNECTED.md)
 
     static let stayConnectedKey = "stayConnected"
+    /// Clear the band after sync: files stored and parsed here are acknowledged at the next sync.
+    static let clearBandKey = "clearBandAfterSync"
     /// Ringing stops by itself after this long.
     static let ringLimit: TimeInterval = 120
 

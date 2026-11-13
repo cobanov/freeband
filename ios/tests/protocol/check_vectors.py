@@ -113,6 +113,7 @@ want = {
     "activity_today": "0808100152042a020800",
     "activity_past": "08081002",
     "activity_fetch": "080810035209120700f15365040001",
+    "activity_ack": (f_varint(1, 8) + f_varint(2, 5) + f_bytes(10, f_bytes(3, bytes.fromhex("00f15365040001")))).hex(),
     "notify_cmd": (f_varint(1, 7) + f_varint(2, 0) + f_bytes(9, f_bytes(3, f_bytes(1,
         f_bytes(1, b"dev.cobanov.freeband") + f_bytes(2, b"Freeband") + f_bytes(3, "Başlık".encode()) + f_bytes(4, b"")
         + f_bytes(5, b"Merhaba") + f_bytes(6, __import__("datetime").datetime.fromtimestamp(1760000000, __import__("datetime").timezone.utc).strftime("%Y%m%dT%H%M%S").encode())

@@ -202,6 +202,7 @@ let out: [String: Any] = [
     "find_phone_parsed": findPhoneParsed,
     "activity_today": hex(MiAuth.activityListCommand(today: true)),
     "activity_past": hex(MiAuth.activityListCommand(today: false)),
+    "activity_ack": hex(MiAuth.activityAckCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
     "activity_fetch": hex(MiAuth.activityFetchCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
     "clock_istanbul": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "Europe/Istanbul")!, is24Hour: true)),
     "clock_newyork_12h": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "America/New_York")!, is24Hour: false)),

@@ -5568,6 +5568,26 @@
           }
         }
       }
+    },
+    "Clear the band after sync": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senkrondan sonra bandı temizle"
+          }
+        }
+      }
+    },
+    "The band deletes records Freeband has stored. Mi Fitness won't get them.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bant, Freeband'in sakladığı kayıtları siler. Mi Fitness onları alamaz."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

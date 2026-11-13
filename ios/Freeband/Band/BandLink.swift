@@ -209,6 +209,9 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var deviceState: MiAuth.DeviceState?
     /// The band's Find Phone (Command{2,17}): true to start ringing, false to stop.
     var onFindPhone: ((UUID, Bool) -> Void)?
+    /// Whether a file on the band's past list may be acknowledged, which makes the band delete
+    /// it: the user turned that on, and the file is stored here and fully parsed.
+    var canAcknowledge: ((UUID, String) -> Bool)?
     /// A health monitoring setting as the band returned it (MiMonitoring).
     var onMonitoring: ((UUID, MiMonitoring.Setting, Data) -> Void)?
 
@@ -651,6 +654,15 @@ final class BandLink: NSObject, ObservableObject {
                 guard let id, let has = hasActivityFile else { return true }
                 return !has(id, file.hex)
             }
+            // Only files from the past list, and never one from today's: today's file is still
+            // growing, and a Redmi Watch 5 Active lists everything under today (docs/ACTIVITY.md 2.6).
+            let today = Set(todayIDs)
+            let stored = past.filter { file in
+                guard let id, let can = canAcknowledge, !today.contains(file) else { return false }
+                return can(id, file.hex)
+            }
+            for file in stored { sendCommand(MiAuth.activityAckCommand(file.data), encrypted: true) }
+            if !stored.isEmpty { note("→ acknowledged \(stored.count) stored file(s); the band deletes them") }
             requestedFiles = Set(todayIDs + wanted)
             fileQueue = requestedFiles.sorted()
             note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")

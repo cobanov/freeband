@@ -54,6 +54,7 @@ private struct BandPage: View {
     @State private var notifying = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(AppModel.stayConnectedKey) private var stayConnected = false
+    @AppStorage(AppModel.clearBandKey) private var clearBand = false
 
     /// What Stay connected does, and while it's on, whether the session is open right now.
     private var stayConnectedSubtitle: String {
@@ -134,6 +135,9 @@ private struct BandPage: View {
                     ListRow(title: String(localized: "Stay connected"), subtitle: stayConnectedSubtitle,
                             systemImage: "link",
                             accessory: .toggle(Binding(get: { stayConnected }, set: { model.setStayConnected($0) })))
+                    ListRow(title: String(localized: "Clear the band after sync"),
+                            subtitle: String(localized: "The band deletes records Freeband has stored. Mi Fitness won't get them."),
+                            systemImage: "tray.and.arrow.down", accessory: .toggle($clearBand))
                     NavigationLink(value: Route.aboutBand(band.id)) {
                         ListRow(title: String(localized: "About this band"), value: band.firmware,
                                 systemImage: "info.circle", showsDivider: false)
