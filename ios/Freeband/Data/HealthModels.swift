@@ -240,6 +240,73 @@ final class SleepRecord {
     }
 }
 
+/// One workout, from its summary file. See WorkoutDraft for units.
+@Model
+final class Workout {
+    var bandID: UUID = UUID()
+    var sourceFileID: String = ""
+    var sport: String = ""
+    var start: Date = Date()
+    var end: Date = Date()
+    /// The local day the workout starts on.
+    var day: String = ""
+    var dayIndex: Int = 0
+    var tzOffsetMinutes: Int = 0
+    var activeSeconds: Int = 0
+    var distanceMeters: Int?
+    var steps: Int?
+    var calories: Int?
+    var totalCalories: Int?
+    var hrAvg: Int?
+    var hrMax: Int?
+    var hrMin: Int?
+    var paceAvg: Int?
+    var paceBest: Int?
+    var speedAvg: Double?
+    var speedMax: Double?
+    var cadenceAvg: Int?
+    var cadenceMax: Int?
+    var aerobicEffect: Double?
+    var anaerobicEffect: Double?
+    var vo2max: Int?
+    var recoveryHours: Int?
+    var load: Int?
+    var vitality: Int?
+    var updatedAt: Date = Date()
+
+    init(bandID: UUID, draft d: WorkoutDraft) {
+        self.bandID = bandID
+        sourceFileID = d.sourceFileID
+        sport = d.sport
+        start = d.start
+        end = d.end
+        day = d.day.string
+        dayIndex = d.day.index
+        tzOffsetMinutes = d.tzOffsetMinutes
+        activeSeconds = d.activeSeconds
+        distanceMeters = d.distanceMeters
+        steps = d.steps
+        calories = d.calories
+        totalCalories = d.totalCalories
+        hrAvg = d.hrAvg
+        hrMax = d.hrMax
+        hrMin = d.hrMin
+        paceAvg = d.paceAvg
+        paceBest = d.paceBest
+        speedAvg = d.speedAvg
+        speedMax = d.speedMax
+        cadenceAvg = d.cadenceAvg
+        cadenceMax = d.cadenceMax
+        aerobicEffect = d.aerobicEffect
+        anaerobicEffect = d.anaerobicEffect
+        vo2max = d.vo2max
+        recoveryHours = d.recoveryHours
+        load = d.load
+        vitality = d.vitality
+        updatedAt = Date()
+    }
+}
+
 /// RR intervals of one sleep file, kept apart from SleepRecord because they are large
 /// (one UInt16 per beat).
 @Model

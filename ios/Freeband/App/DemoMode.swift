@@ -36,7 +36,7 @@ final class AppSession: ObservableObject {
 
     static let models: [any PersistentModel.Type] = [Band.self, Sample.self, Webhook.self, ActivityBlob.self,
                                                      MinuteDay.self, DaySummary.self, SleepRecord.self, SleepRR.self,
-                                                     ManualReading.self, DailyScore.self]
+                                                     ManualReading.self, DailyScore.self, Workout.self]
 
     private static func make(demo: Bool) -> (ModelContainer, AppModel) {
         let container: ModelContainer

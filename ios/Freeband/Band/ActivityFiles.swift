@@ -1384,10 +1384,127 @@ struct ManualSamples: Equatable, Sendable {
     }
 }
 
+// MARK: - Workout summary (spec section 6.6)
+
+/// SPORTS / * / SUMMARY. Values are raw: the validity header is not applied, so the band's 0 for
+/// "not measured" is kept; a key is missing only when the layout has no such field.
+struct WorkoutSummary: Equatable, Sendable {
+    /// From the workout type code when the layout has a known one, else from the file's subtype.
+    let sport: String
+    /// Decoded fields by the names of docs/ACTIVITY.md 6.6 (`start`, `active_s`, `distance_m`, ...).
+    let values: [String: Double]
+
+    func int(_ key: String) -> Int? { values[key].map { Int($0) } }
+    var start: Date { unixDate(Int64(values["start"] ?? 0)) }
+    var end: Date { unixDate(Int64(values["end"] ?? 0)) }
+
+    static let workoutTypes: [Int: String] = [
+        1: "outdoor_running", 2: "walking", 3: "hiking", 4: "trekking", 5: "trail_running", 6: "outdoor_cycling",
+        7: "indoor_cycling", 8: "freestyle", 15: "outdoor_walking", 16: "hiit", 333: "indoor_walking", 399: "indoor_fitness",
+    ]
+
+    /// Sport name and validity header length by version, for the subtypes that have a table.
+    static func headers(_ subtype: UInt8) -> (sport: String, sizes: [UInt8: Int])? {
+        switch subtype {
+        case 0x01: return ("outdoor_running", [4: 4])
+        case 0x02: return ("outdoor_walking", [4: 4])
+        case 0x03: return ("treadmill", [5: 4, 9: 6, 10: 8, 11: 9])
+        case 0x07: return ("indoor_cycling", [8: 7, 9: 8])
+        case 0x08: return ("freestyle", [5: 3, 7: 5, 8: 6, 9: 6, 10: 6])
+        case 0x0B: return ("elliptical", [3: 4, 4: 4, 5: 4, 6: 4])
+        case 0x0D: return ("rowing", [4: 4, 6: 5, 7: 5, 8: 6])
+        case 0x16: return ("workout", [1: 5, 2: 6, 4: 7, 5: 9, 6: 9, 9: 13])
+        case 0x17: return ("outdoor_cycling", [4: 6, 5: 6, 6: 7, 8: 8])
+        default: return nil
+        }
+    }
+
+    /// Fields in file order: `name:1|2|4` unsigned, `name:f` f32, `_:n` skipped, `route` the route byte.
+    static func fields(subtype: UInt8, version v: UInt8) -> String {
+        let times = "start:4 end:4 active_s:4"
+        let hr = "hr_avg:1 hr_max:1 hr_min:1"
+        let zones = "zone_extreme_s:4 zone_anaerobic_s:4 zone_aerobic_s:4 zone_fat_burn_s:4 zone_warm_up_s:4"
+        let loadVitality = "load:2 _:15 vitality:1"
+        switch subtype {
+        case 0x01, 0x02:
+            return "\(times) distance_m:4 calories:4 _:12 steps:4 _:2 \(hr)"
+        case 0x16:
+            var s = "workout_type:2 \(times) _:4 distance_m:4 total_calories:2 calories:2"
+            s += (v >= 5 ? " pace_avg:4" : "") + " pace_max:4 pace_min:4" + (v >= 5 ? " speed_avg:f" : "")
+            s += " speed_max:f steps:4" + (v >= 5 ? " step_length_cm:2 cadence_avg:2" : "")
+            s += " cadence_max:2 \(hr) _:20 te_aerobic:f"
+            s += v == 1 ? " _:9" : " _:1 te_anaerobic:f _:\(v >= 9 ? 6 : 1) vo2max:1 _:2 recovery_h:2 _:1"
+            s += " \(zones)"
+            if v == 6 { s += " _:21 \(loadVitality)" }
+            if v == 9 { s += " _:46 \(loadVitality)" }
+            return s
+        case 0x03:
+            var s = "\(times) distance_m:4 calories:2" + (v >= 10 ? " pace_avg:4" : "") + " pace_max:4 pace_min:4 steps:4"
+            s += (v >= 10 ? " step_length_cm:2 cadence_avg:2" : "") + " cadence_max:2 \(hr) te_aerobic:f"
+            s += v == 9 ? " _:4" : v == 5 ? " vo2max:1 _:1" : " _:1 vo2max:1 _:2"
+            s += " recovery_h:2 \(zones)"
+            if v == 9 { s += " _:39 load:2 _:7 vitality:1" }
+            if v == 11 { s += " total_calories:2 _:4 te_anaerobic:f _:25 distance_calibrated_m:4 \(loadVitality)" }
+            return s
+        case 0x08:
+            var s = "\(times) calories:2 \(hr)" + (v > 5 ? " _:6" : "") + " te_aerobic:f _:\(v > 6 ? 2 : 1) recovery_h:2 \(zones)"
+            if v == 5 {
+                s += " _:10 workout_type:2"
+            } else {
+                s += " total_calories:2 _:4 te_anaerobic:f _:1 workout_type:2 _:8 load:2 _:1" + (v > 7 ? " vitality:1" : "")
+            }
+            return s
+        case 0x07:
+            return "\(times) _:4 calories:2 _:4 \(hr) te_aerobic:f _:2 recovery_h:2 \(zones) _:6 te_anaerobic:f _:39 load:2"
+        case 0x17:
+            var s = "workout_type:2 \(times) _:4 distance_m:4 total_calories:2 calories:2 pace_max:4 pace_min:4"
+            s += (v >= 5 ? " speed_avg:f" : "") + " speed_max:f \(hr) _:20 te_aerobic:f _:1 te_anaerobic:f"
+            s += " _:\(v >= 7 ? 6 : 1) vo2max:1 _:2 recovery_h:2 _:1 \(zones)"
+            if v >= 6 { s += " _:\(v >= 7 ? 19 : 14) route \(loadVitality)" }
+            return s
+        case 0x0B:
+            var s = "\(times) calories:2 steps:4" + (v >= 6 ? " cadence_avg:2" : "") + " cadence_max:2 \(hr) te_aerobic:f"
+            s += " _:\(v >= 4 ? 2 : 1) recovery_h:2 \(zones)"
+            if v >= 6 { s += " total_calories:2 _:4 te_anaerobic:f _:1 route _:9 load:2 _:1 vitality:1" }
+            return s
+        case 0x0D:
+            var s = "\(times) calories:2 \(hr)" + (v >= 7 ? " te_aerobic:f _:2 recovery_h:2" : " _:\(v > 4 ? 8 : 7)")
+            s += " \(zones)" + (v >= 8 ? " _:5" : "") + (v >= 7 ? " total_calories:2" : " _:2") + " strokes:4 stroke_rate_avg:4"
+            if v >= 7 { s += " stroke_rate_max:4 _:17 te_anaerobic:f _:\(v >= 8 ? 6 : 1) _:10 load:2 _:1 vitality:1" }
+            return s
+        default:
+            return ""
+        }
+    }
+
+    /// Nil when the subtype or version has no table (the caller reports which).
+    static func parse(body: [UInt8], fileID: ActivityFileID) throws -> WorkoutSummary? {
+        guard let table = headers(fileID.subtype), let header = table.sizes[fileID.version] else { return nil }
+        var r = ActivityByteReader(body)
+        try r.skip(header)  // validity bitmap, not applied
+        var values: [String: Double] = [:]
+        for field in fields(subtype: fileID.subtype, version: fileID.version).split(separator: " ") {
+            let parts = field.split(separator: ":")
+            let name = String(parts[0])
+            if name == "route" {
+                if [0xFC, 0xFD, 0xFF].contains(try r.u8()) { try r.skip(8) }
+            } else if name == "_" {
+                try r.skip(Int(parts[1]) ?? 0)
+            } else if parts[1] == "f" {
+                values[name] = Double(try r.f32())
+            } else {
+                values[name] = Double(try r.uintLE(Int(parts[1]) ?? 1))
+            }
+        }
+        let sport = values["workout_type"].flatMap { workoutTypes[Int($0)] } ?? table.sport
+        return WorkoutSummary(sport: sport, values: values)
+    }
+}
+
 // MARK: - Dispatch
 
 enum ActivityUnsupported: Equatable, Sendable, CustomStringConvertible {
-    /// Workouts and unknown kinds: keep the raw file.
+    /// Workout details, GPS, sports without a summary table and unknown kinds: keep the raw file.
     case kind(ActivityFileKind)
     /// A known kind in a version this module does not know.
     case version(ActivityFileKind, UInt8)
@@ -1406,6 +1523,7 @@ enum ActivityPayload: Equatable, Sendable {
     case sleepDetails(SleepDetails)
     case sleepStages(SleepStages)
     case manualSamples(ManualSamples)
+    case workoutSummary(WorkoutSummary)
     /// Nothing between the pad and a matching CRC: the band has no records of this kind.
     case empty
     case unsupported(ActivityUnsupported)
@@ -1452,6 +1570,7 @@ struct ActivityParseResult: Sendable, CustomStringConvertible {
         case let .sleepDetails(d): body = "\(d.stages.count) stage(s), \(d.packets.count) packet(s)"
         case let .sleepStages(d): body = d.noData ? "no data" : "\(d.stages.count) phase change(s)"
         case let .manualSamples(d): body = "\(d.samples.count) sample(s)"
+        case let .workoutSummary(w): body = "\(w.sport), \(w.int("active_s") ?? 0) s"
         case .empty: body = "empty"
         case let .unsupported(u): body = u.description
         case let .error(e): body = "error: \(e)"
@@ -1502,6 +1621,21 @@ enum ActivityParser {
         if body.isEmpty, crc?.ok == true {
             // Only a checked CRC tells an empty file from one cut short after the pad.
             payload = .empty
+        } else if kind == .workoutSummary {
+            // Per sport and version (section 6.6), so not in supportedVersions.
+            do {
+                if let summary = try WorkoutSummary.parse(body: body, fileID: id) {
+                    payload = .workoutSummary(summary)
+                } else if WorkoutSummary.headers(id.subtype) != nil {
+                    payload = .unsupported(.version(kind, id.version))
+                } else {
+                    payload = .unsupported(.kind(kind))
+                }
+            } catch let error as ActivityParseError {
+                payload = .error(error)
+            } catch {
+                payload = .error(.malformed(String(describing: error)))
+            }
         } else if kind.supportedVersions.isEmpty {
             payload = .unsupported(.kind(kind))
         } else if !kind.supportedVersions.contains(id.version) {

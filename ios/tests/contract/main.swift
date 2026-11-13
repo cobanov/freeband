@@ -11,7 +11,7 @@ import SwiftData
 @MainActor func run() {
     let out = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? ".")
     let container = try! ModelContainer(for: Band.self, Sample.self, Webhook.self, ActivityBlob.self, MinuteDay.self,
-                                        DaySummary.self, SleepRecord.self, SleepRR.self, ManualReading.self, DailyScore.self,
+                                        DaySummary.self, SleepRecord.self, SleepRR.self, ManualReading.self, DailyScore.self, Workout.self,
                                         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let context = ModelContext(container)
     // A fixed clock keeps the fixture stable from run to run.

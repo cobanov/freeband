@@ -54,7 +54,8 @@ final class ActivityIngest {
     /// 4: sleep details without a summary or stages take their session from the fell-asleep and
     /// woke-up events (Xiaomi Watch S1 Active).
     /// 5: daily details carry the per-minute activity level (the band's Moving minutes).
-    static let parserVersion = 5
+    /// 6: workout summaries are parsed into Workout rows.
+    static let parserVersion = 6
 
     let context: ModelContext
 
@@ -191,6 +192,7 @@ final class ActivityIngest {
             for m in out.manual where !hasManualReading(job.bandID, m) {
                 context.insert(ManualReading(bandID: job.bandID, draft: m))
             }
+            for w in out.workouts { context.insert(Workout(bandID: job.bandID, draft: w)) }
             if out.kind == .dailyDetails {
                 minuteHexes[job.bandID, default: []].insert(job.hex)
                 for part in out.minuteParts { minuteParts[job.bandID, default: [:]][part.day, default: []].append(part) }
@@ -241,6 +243,7 @@ final class ActivityIngest {
         try? context.delete(model: DaySummary.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
         try? context.delete(model: SleepRecord.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
         try? context.delete(model: SleepRR.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
+        try? context.delete(model: Workout.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
     }
 
     /// Rebuilds every minute day a file of this batch feeds (now or before): the new parts plus
@@ -306,6 +309,7 @@ final class ActivityIngest {
             try? context.delete(model: SleepRecord.self, where: #Predicate { $0.bandID == id })
             try? context.delete(model: SleepRR.self, where: #Predicate { $0.bandID == id })
             if !keepingManual { try? context.delete(model: ManualReading.self, where: #Predicate { $0.bandID == id }) }
+            try? context.delete(model: Workout.self, where: #Predicate { $0.bandID == id })
             if includingScores { try? context.delete(model: DailyScore.self, where: #Predicate { $0.bandID == id }) }
         } else {
             try? context.delete(model: MinuteDay.self)
@@ -313,6 +317,7 @@ final class ActivityIngest {
             try? context.delete(model: SleepRecord.self)
             try? context.delete(model: SleepRR.self)
             if !keepingManual { try? context.delete(model: ManualReading.self) }
+            try? context.delete(model: Workout.self)
             if includingScores { try? context.delete(model: DailyScore.self) }
         }
     }

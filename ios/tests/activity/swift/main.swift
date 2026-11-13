@@ -360,6 +360,15 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
         }
         return .object(o)
 
+    case let .workoutSummary(w):
+        // The reference's shape: integers as read, f32 fields to two decimals.
+        var o: [String: JSON] = ["sport": .string(w.sport)]
+        let floats: Set<String> = ["te_aerobic", "te_anaerobic", "speed_avg", "speed_max"]
+        for (key, value) in w.values {
+            o[key] = floats.contains(key) ? .double((value * 100).rounded() / 100) : jInt(Int64(value))
+        }
+        return .object(o)
+
     case .empty, .unsupported, .error:
         return .null
     }
@@ -875,12 +884,37 @@ check("pad byte != 0 warns but parses (except manual samples v1)") {
 
 check("workouts and unknown kinds are .unsupported(.kind), with the envelope checked") {
     var e: [String] = []
-    for (t, s, d, k) in [(UInt8(1), UInt8(8), UInt8(1), ActivityFileKind.workoutSummary), (1, 3, 0, .workoutDetails),
+    // 0x09 pool swimming: a sport without a summary table
+    for (t, s, d, k) in [(UInt8(1), UInt8(9), UInt8(1), ActivityFileKind.workoutSummary), (1, 3, 0, .workoutDetails),
                          (1, 23, 2, .workoutGPS), (1, 23, 3, .unknown), (0, 0x1F, 0, .unknown), (0, 0, 2, .unknown)] {
         let id = ActivityFileID(timestamp: 1_760_000_000, version: 9, type: t, subtype: s, detailType: d)
         let r = parsed(makeFile(id, body: [1, 2, 3]))
         e += expect(r.payload == .unsupported(.kind(k)) && r.crc?.ok == true && r.payloadLength == 3, "\(id): \(r.payload)")
     }
+    return e
+}
+
+check("workout summary: unknown version is unsupported, a short body is truncated, a route ride stays aligned") {
+    var e: [String] = []
+    let ride = [UInt8](fixtureBytes("workout summary OUTDOOR_CYCLING_V8"))
+    guard ride.count > 0x8D + 12, let id = ActivityFileID(bytes: ride[0 ..< 7]) else { return ["fixture"] }
+    let rideBody = Array(ride[8 ..< ride.count - 4])
+    for v: UInt8 in [0, 3, 7, 99] {
+        let other = ActivityFileID(timestamp: id.timestamp, version: v, type: 1, subtype: id.subtype, detailType: 1)
+        let r = parsed(makeFile(other, body: rideBody))
+        e += expect(r.payload == .unsupported(.version(.workoutSummary, v)), "v\(v): \(r.payload)")
+    }
+    for cut in [0, 1, 7, 40, 100] {
+        let r = parsed(makeFile(id, body: Array(rideBody.prefix(cut))))
+        if cut == 0 { e += expect(r.payload == .empty, "cut 0: \(r.payload)"); continue }
+        guard case .error(.truncated) = r.payload else { e.append("cut \(cut): \(r.payload)"); continue }
+    }
+    // Route byte at file offset 0x8D (docs 6.6): with 0xFF, eight more bytes follow it.
+    var route = rideBody
+    route[0x8D - 8] = 0xFF
+    route.insert(contentsOf: Array(repeating: 0x5A, count: 8), at: 0x8D - 8 + 1)
+    guard case let .workoutSummary(w) = parsed(makeFile(id, body: route)).payload else { return e + ["route ride"] }
+    e += expect(w.int("load") == 28 && w.int("vitality") == 7, "route ride load \(w.int("load") ?? -1) vitality \(w.int("vitality") ?? -1)")
     return e
 }
 

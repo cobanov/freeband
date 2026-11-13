@@ -206,7 +206,7 @@ def gb_daily_summary() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Gadgetbridge: WorkoutSummaryParserTest (captured SUMMARY files; envelope checks only)
+# Gadgetbridge: WorkoutSummaryParserTest (captured SUMMARY files and the values it asserts)
 
 WORKOUT_SUBTYPES = {"TREADMILL": 0x03, "ROWING": 0x0D, "FREESTYLE": 0x08, "OUTDOOR_CYCLING": 0x17,
                     "OUTDOOR_RUN": 0x16, "WALKING": 0x16, "INDOOR_CYCLING": 0x07, "ELLIPTICAL": 0x0B}
@@ -229,6 +229,38 @@ def workout_blobs(gb_root: str) -> list[tuple[str, int, str, bytes]]:
     return out
 
 
+# What WorkoutSummaryParserTest asserts for each blob, in activity_ref.py's field names
+# (floats to two decimals, as the reference rounds them).
+WORKOUT_EXPECT = {
+    "TREADMILL_V11_24APR": {"sport": "treadmill", "distance_m": 4479, "te_aerobic": 4.2, "hr_avg": 167, "cadence_avg": 163,
+                            "te_anaerobic": 1.8, "distance_calibrated_m": 4500, "load": 104, "vitality": 12},
+    "TREADMILL_V9_21JUN": {"sport": "treadmill", "calories": 192, "distance_m": 2720, "steps": 3216, "hr_avg": 135,
+                           "cadence_max": 180, "te_aerobic": 1.9, "recovery_h": 32, "load": 28, "vitality": 15},
+    "ROWING_V7_20APR": {"sport": "rowing", "hr_avg": 142, "active_s": 2549, "strokes": 1208, "stroke_rate_avg": 28,
+                        "te_aerobic": 3.4, "te_anaerobic": 0.4, "stroke_rate_max": 71, "recovery_h": 23, "load": 69,
+                        "vitality": 0},
+    "ROWING_V7_15APR": {"sport": "rowing", "te_anaerobic": 1.1, "te_aerobic": 3.5, "stroke_rate_max": 41},
+    "ROWING_V8_22AUG": {"sport": "rowing", "active_s": 147, "hr_avg": 129, "hr_max": 145, "hr_min": 106, "strokes": 46,
+                        "stroke_rate_avg": 18, "stroke_rate_max": 27, "load": 2},
+    "FREESTYLE_V10_FRISBEE": {"sport": "freestyle", "workout_type": 807, "te_anaerobic": 2.6, "te_aerobic": 4.0},
+    "OUTDOOR_CYCLING_V8_23SEP": {"sport": "outdoor_cycling", "active_s": 1579, "distance_m": 5282, "total_calories": 166,
+                                 "calories": 127, "pace_max": 76, "pace_min": 1036, "speed_avg": 12.04,
+                                 "speed_max": 46.93, "hr_avg": 133, "hr_max": 168, "hr_min": 80, "te_aerobic": 2.3,
+                                 "te_anaerobic": 0.8, "recovery_h": 13, "zone_anaerobic_s": 95, "zone_aerobic_s": 814,
+                                 "zone_fat_burn_s": 340, "zone_warm_up_s": 283, "load": 28, "vitality": 7},
+    "OUTDOOR_CYCLING_V6_23MAY": {"sport": "outdoor_cycling", "distance_m": 11982, "total_calories": 538, "calories": 439,
+                                 "pace_max": 104, "speed_max": 34.48, "zone_aerobic_s": 10, "zone_fat_burn_s": 97,
+                                 "zone_warm_up_s": 1110, "load": 5},
+    "OUTDOOR_RUN_V5_30SEP": {"sport": "outdoor_running", "active_s": 1704, "distance_m": 4189, "hr_min": 119,
+                             "hr_max": 200, "hr_avg": 162, "pace_max": 395, "pace_min": 782, "cadence_max": 178},
+    "WALKING_V6_29MAY": {"sport": "walking", "active_s": 1912, "hr_min": 131, "hr_max": 192, "hr_avg": 149},
+    "WALKING_V9_04JAN": {"sport": "walking", "hr_min": 99, "hr_max": 163, "hr_avg": 135, "load": 28, "vitality": 10},
+    "INDOOR_CYCLING_V9_22FEB": {"sport": "indoor_cycling", "hr_min": 94, "hr_max": 150, "hr_avg": 135},
+    "ELLIPTICAL_V6_10FEB": {"sport": "elliptical", "hr_min": 118, "hr_max": 156, "hr_avg": 147, "total_calories": 774,
+                            "te_anaerobic": 0.3, "load": 96, "vitality": 3},
+}
+
+
 MONTHS = {m: i + 1 for i, m in enumerate("JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC".split())}
 
 
@@ -245,6 +277,8 @@ def gb_workouts(blobs) -> list[dict]:
             year = re.search(r"20\d\d", comment)
             if year:
                 expect["file_id"]["local_date"] = f"{year.group(0)}-{MONTHS[day[2:]]:02d}-{int(day[:2]):02d}"
+        if name in WORKOUT_EXPECT:
+            expect["data"] = WORKOUT_EXPECT[name]
         cases.append({"name": f"workout summary {name}", "kind": "file", "hex": data.hex(),
                       "ref": f"{src}:{line}", "note": comment, "expect": expect})
     return cases
@@ -566,8 +600,8 @@ def main(argv):
           "Gadgetbridge d4bd8367 " + T + "impl/DailySummaryParserTest.java (Gadgetbridge's own synthetic inputs, "
           "rebuilt byte for byte; they carry no CRC trailer)", gb_daily_summary())
     write("gb_workout_summary_blobs.json",
-          "Gadgetbridge d4bd8367 " + T + "impl/WorkoutSummaryParserTest.java (captured SUMMARY files; only the "
-          "envelope is checked, the workout payload is not parsed by activity_ref.py)", gb_workouts(blobs))
+          "Gadgetbridge d4bd8367 " + T + "impl/WorkoutSummaryParserTest.java (captured SUMMARY files with the "
+          "values that test asserts)", gb_workouts(blobs))
     write("synthetic.json", "SYNTHETIC: built by make_fixtures.py from docs/ACTIVITY.md; not device data",
           [dd_v4(), dd_v2(), dd_v3_tail(), sd_v5(), sd_v5_breath(), sd_v6(), sd_v6_misaligned(), sd_v2(), ss_v2(), ss_v2(empty=True),
            ds_v5_short(), ms_v2()]

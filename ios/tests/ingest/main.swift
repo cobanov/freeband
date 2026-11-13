@@ -117,7 +117,10 @@ for c in cases {
         check("\(c.file) \(c.name): status", out.status != .error && out.status != .crc, "status \(out.status): \(out.note)")
     }
     if result.kind.isWorkout {
-        equal("\(c.name): workouts are raw only", out.status, .unsupported)
+        equal("\(c.name): one workout", out.workouts.count, 1)
+        check("\(c.name): workout has a sport, a duration and a heart rate",
+              out.workouts.first.map { !$0.sport.isEmpty && $0.activeSeconds > 0 && ($0.hrAvg ?? 0) > 40 } ?? false)
+        check("\(c.name): idempotent workout", IngestMapper.map(result).workouts == out.workouts)
     }
     // Idempotence: the same file mapped twice gives the same drafts.
     let again = IngestMapper.map(result)
@@ -133,7 +136,7 @@ for c in cases {
 }
 print("   statuses: \(statusCounts.map { "\($0.key.rawValue) \($0.value)" }.sorted().joined(separator: ", "))")
 check("some parsed", (statusCounts[.parsed] ?? 0) > 10)
-check("workouts unsupported", (statusCounts[.unsupported] ?? 0) >= 13)
+check("workouts parsed", allOutputs.filter { !$0.1.workouts.isEmpty }.count == 13)
 
 // MARK: - Daily details
 
