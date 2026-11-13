@@ -19,7 +19,6 @@ enum Route: Hashable {
     case settings
     case bands
     case profile
-    case webAccess
     case webhooks
     case shortcuts
     case diagnostics
@@ -109,7 +108,6 @@ private struct RouteView: View {
         case .settings: SettingsView()
         case .bands: BandsView()
         case .profile: ProfileView()
-        case .webAccess: WebAccessView()
         case .webhooks: WebhooksView()
         case .shortcuts: ShortcutsView()
         case .diagnostics: DiagnosticsView()

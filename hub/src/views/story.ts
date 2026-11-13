@@ -183,7 +183,6 @@ const STEPS_TR: Step[] = [
     title: "Ürün",
     body: html`<ul>
   <li>Freeband bu verilerden kendi Uyku, Toparlanma ve Yük skorlarını hesaplıyor; her skorun katkıları ve güveni görünüyor.</li>
-  <li>Yanında Cloudflare üzerinde isteğe bağlı bir API ve web paneli var.</li>
 </ul>`,
   },
   {
@@ -285,7 +284,6 @@ const STEPS_EN: Step[] = [
     title: "The product",
     body: html`<ul>
   <li>From this data Freeband works out its own Sleep, Recovery and Strain scores; each score shows its contributors and how confident it is.</li>
-  <li>Alongside it there is an optional API and web panel on Cloudflare.</li>
 </ul>`,
   },
   {

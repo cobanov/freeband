@@ -265,10 +265,6 @@ enum Vault {
     static func bandKey(_ bandID: UUID) -> String? { bandKeys(bandID).first }
     static func removeBandKey(_ bandID: UUID) { remove("band-key-\(bandID.uuidString)") }
 
-    static var hubToken: String? {
-        get { get("hub-token") }
-        set { if let newValue { set(newValue, for: "hub-token") } else { remove("hub-token") } }
-    }
 }
 
 extension BandKey {

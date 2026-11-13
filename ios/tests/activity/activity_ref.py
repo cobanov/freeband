@@ -659,8 +659,7 @@ WORKOUT_TYPES = {1: "outdoor_running", 2: "walking", 3: "hiking", 4: "trekking",
                  333: "indoor_walking", 399: "indoor_fitness"}
 # subtype -> (sport when no workout type decides, header bytes by version)
 WORKOUT_HEADERS = {
-    0x01: ("outdoor_running", {4: 4}),
-    0x02: ("outdoor_walking", {4: 4}),
+    # 0x01 and 0x02 (legacy outdoor run and walk, v4): documented, but no real file seen; they stay raw.
     0x03: ("treadmill", {5: 4, 9: 6, 10: 8, 11: 9}),
     0x07: ("indoor_cycling", {8: 7, 9: 8}),
     0x08: ("freestyle", {5: 3, 7: 5, 8: 6, 9: 6, 10: 6}),

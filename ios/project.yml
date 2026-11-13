@@ -43,9 +43,6 @@ targets:
         # fetch: background refresh runs a sync (AppModel.registerBackgroundRefresh).
         UIBackgroundModes: [bluetooth-central, audio, fetch]
         BGTaskSchedulerPermittedIdentifiers: [dev.cobanov.freeband.sync]
-        CFBundleURLTypes:
-          - CFBundleURLName: dev.cobanov.freeband
-            CFBundleURLSchemes: [freeband]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.cobanov.freeband

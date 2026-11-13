@@ -6077,6 +6077,16 @@
           }
         }
       }
+    },
+    "Experimental. After a night is synced, Freeband sends its summary to the band, as Mi Fitness does to fill the band's own sleep screen. Not tried on a band yet.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deneysel. Bir gece senkronlanınca Freeband özetini banda gönderir; Mi Fitness bandın uyku ekranını böyle dolduruyor. Bantta henüz denenmedi."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -156,7 +156,7 @@ struct AboutView: View {
             VStack(alignment: .leading, spacing: FBSpace.l) {
                 ListCard {
                     ListRow(title: String(localized: "Version"), value: Payload.appVersion, accessory: .none)
-                    Button { openURL(model.hubURL.appendingPathComponent("privacy")) } label: {
+                    Button { openURL(AppModel.siteURL.appendingPathComponent("privacy")) } label: {
                         ListRow(title: String(localized: "Privacy"), systemImage: nil)
                     }
                     .buttonStyle(.fbRow)

@@ -548,8 +548,11 @@ final class BandLink: NSObject, ObservableObject {
     /// without the vendor's server (verify mode 2), wants the server, or is already bound.
     /// Freeband sends no second step, so no key is agreed and nothing is stored.
     private var bindProbe: MiBind.Machine?
+    /// The band answered the probe: the session did its job though nothing logged in.
+    private var bindProbeAnswered = false
 
     private func startBindProbe() {
+        bindProbeAnswered = false
         guard var machine = MiBind.Machine(config: MiBind.Config(userID: "freeband-probe", appDeviceID: "freeband-probe", deviceName: "")) else { return finish() }
         let first = machine.start()
         bindProbe = machine
@@ -566,16 +569,19 @@ final class BandLink: NSObject, ObservableObject {
 
     private func bindProbeReply(_ body: Data) {
         guard var machine = bindProbe else { return }
-        note("← bind probe reply \(Self.hexPrefix(body, limit: 240))")
+        // The reply carries the band's address and serial (docs/BIND.md): only what the machine
+        // made of it goes to the log, never the bytes.
         switch machine.receive(body) {
         case .send(_, let confirmOnBand):
             note("bind probe: the band offers local pairing\(confirmOnBand ? ", confirmed on the band" : ""); stopping here")
         case .failed(let failure, _):
             note("bind probe: \(failure)")
         case .bound, .ignored:
+            note("bind probe: a reply of \(body.count) bytes that the probe doesn't read")
             return
         }
         bindProbe = nil
+        bindProbeAnswered = true
         finish()
     }
 
@@ -942,7 +948,7 @@ final class BandLink: NSObject, ObservableObject {
         let thisRun = run
         after(0.4, thisRun) { [weak self] in
             guard let self else { return }
-            let outcome = self.authed ? self.completion() : .failed(.notRead)
+            let outcome: Outcome = self.authed || self.bindProbeAnswered ? self.completion() : .failed(.notRead)
             self.release()
             switch outcome {
             case .complete: self.stage = .done
@@ -1321,6 +1327,11 @@ extension BandLink: CBPeripheralDelegate {
             return
         }
         transport = .v1
+        if purpose == .bindProbe {
+            note("bind probe: this band uses the older channel (V1); the probe is written for V2 bands")
+            finish()
+            return
+        }
         let maxWrite = peripheral.maximumWriteValueLength(for: .withoutResponse)
         note("BLE V1 channel, \(maxWrite)-byte writes")
         for uuid in Self.v1SubscribeOrder {

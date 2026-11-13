@@ -1,6 +1,6 @@
 # Sleep summary write-back (Fitness id 41, `SYNC_SLEEP_RESULT`)
 
-The band records sleep but the vendor app computes the night's summary on the phone and writes it back to the band, so the band's own sleep screen can show it. This note says what that message holds and how Mi Fitness fills it. Freeband has a builder for it (`MiAuth.sleepResultCommand`), with nothing sending it yet: nothing here has been tried on a band.
+The band records sleep but the vendor app computes the night's summary on the phone and writes it back to the band, so the band's own sleep screen can show it. This note says what that message holds and how Mi Fitness fills it. Freeband builds it (`MiAuth.sleepResultCommand`) and sends it once per night after the sync that brought the night, only while "Show sleep on the band" (Band › Connection and data) is on; it is off by default and marked experimental, because nothing here has been tried on a band yet.
 
 Marks:
 

@@ -46,7 +46,7 @@ struct BandOptionsView: View {
                             subtitle: String(localized: "The band deletes records Freeband has stored. Mi Fitness won't get them."),
                             systemImage: "tray.and.arrow.down", accessory: .toggle($clearBand))
                     ListRow(title: String(localized: "Show sleep on the band"),
-                            subtitle: String(localized: "After a night is synced, Freeband writes its summary to the band, so the band's own sleep screen fills in."),
+                            subtitle: String(localized: "Experimental. After a night is synced, Freeband sends its summary to the band, as Mi Fitness does to fill the band's own sleep screen. Not tried on a band yet."),
                             systemImage: "moon", accessory: .toggle($sleepToBand), showsDivider: false)
                 }
                 group(String(localized: "Phone")) {

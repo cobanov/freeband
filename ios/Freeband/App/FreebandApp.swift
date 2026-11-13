@@ -69,7 +69,6 @@ struct RootView: View {
                             .tag(AppTab.band)
                     }
                 }
-                .sheet(item: $model.pendingInvite) { JoinSheet(invite: $0) }
                 .sheet(isPresented: $router.showsLive) {
                     if let band { LiveSheet(band: band) }
                 }
@@ -83,7 +82,6 @@ struct RootView: View {
         .environmentObject(router)
         .tint(.textPrimary)
         .preferredColorScheme(AppearanceSetting(rawValue: appearance)?.colorScheme)
-        .onOpenURL { model.handle($0) }
         .onChange(of: scenePhase) { _, phase in
             // Live mode keeps the band measuring; never leave it running in the background.
             if phase == .background { model.enterBackground() }

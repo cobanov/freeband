@@ -1397,8 +1397,8 @@ struct WorkoutSummary: Equatable, Sendable {
     /// Sport name and validity header length by version, for the subtypes that have a table.
     static func headers(_ subtype: UInt8) -> (sport: String, sizes: [UInt8: Int])? {
         switch subtype {
-        case 0x01: return ("outdoor_running", [4: 4])
-        case 0x02: return ("outdoor_walking", [4: 4])
+        // 0x01 and 0x02 (the legacy outdoor run and walk, v4) are documented in docs/ACTIVITY.md
+        // 6.6 but no real file has been seen, so they stay raw until one is.
         case 0x03: return ("treadmill", [5: 4, 9: 6, 10: 8, 11: 9])
         case 0x07: return ("indoor_cycling", [8: 7, 9: 8])
         case 0x08: return ("freestyle", [5: 3, 7: 5, 8: 6, 9: 6, 10: 6])
