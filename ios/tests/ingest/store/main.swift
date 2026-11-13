@@ -240,6 +240,14 @@ func run() async {
     equal("rollup twice: no duplicates", count(DailyScore.self, ctx), 3)
     equal("steps helper", DailyRollup.steps(context: ctx, bandID: band, day: DayKey(string: "2025-10-14")!, now: then) != nil, true)
 
+    // The band sends a manual samples file again under the same id with other readings in it
+    // (measured on a Band 10 Pro): the new reading is added and the earlier ones stay.
+    store(ctx, band: band, hexData("0090a9650402180000a0a96511589fd678b1"))
+    _ = await ingest.ingestPending()
+    equal("manual file with new content: readings added", count(ManualReading.self, ctx), 6)
+    _ = await ingest.reparseAll()
+    equal("reparse all keeps earlier manual readings", count(ManualReading.self, ctx), 6)
+
     // MARK: wiping
 
     section("wipe")

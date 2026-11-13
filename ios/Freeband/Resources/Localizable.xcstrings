@@ -5588,6 +5588,26 @@
           }
         }
       }
+    },
+    "Active calories": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktif kalori"
+          }
+        }
+      }
+    },
+    "kcal": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kcal"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

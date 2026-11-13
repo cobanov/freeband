@@ -129,7 +129,7 @@ final class ActivityIngest {
     /// Drops every derived row (and scores), marks every file unparsed, parses them all again.
     func reparseAll() async -> IngestSummary {
         refileMisfiled()
-        Self.deleteDerived(context: context, bandID: nil, includingScores: true)
+        Self.deleteDerived(context: context, bandID: nil, includingScores: true, keepingManual: true)
         let blobs = (try? context.fetch(FetchDescriptor<ActivityBlob>())) ?? []
         for blob in blobs {
             blob.parserVersion = 0
@@ -184,7 +184,12 @@ final class ActivityIngest {
                 if s.rrBeats > 0 { context.insert(SleepRR(bandID: job.bandID, draft: s)) }
                 sleepBands.insert(job.bandID)
             }
-            for m in out.manual { context.insert(ManualReading(bandID: job.bandID, draft: m)) }
+            // A manual samples file keeps its id while its content changes: a Band 10 Pro hands
+            // over only the readings taken since the last fetch. So readings are added, never
+            // replaced, and one already stored (same time and kind) is not added twice.
+            for m in out.manual where !hasManualReading(job.bandID, m) {
+                context.insert(ManualReading(bandID: job.bandID, draft: m))
+            }
             if out.kind == .dailyDetails {
                 minuteHexes[job.bandID, default: []].insert(job.hex)
                 for part in out.minuteParts { minuteParts[job.bandID, default: [:]][part.day, default: []].append(part) }
@@ -223,12 +228,18 @@ final class ActivityIngest {
         try? context.fetch(FetchDescriptor<ActivityBlob>(predicate: #Predicate { $0.bandID == bandID && $0.fileID == hex })).first
     }
 
-    /// Rows that come from exactly one file.
+    private func hasManualReading(_ bandID: UUID, _ m: ManualReadingDraft) -> Bool {
+        let ts = m.ts
+        let kind = m.kind
+        let found = try? context.fetchCount(FetchDescriptor<ManualReading>(predicate: #Predicate { $0.bandID == bandID && $0.ts == ts && $0.kind == kind }))
+        return (found ?? 0) > 0
+    }
+
+    /// Rows that come from exactly one file. Manual readings are not among them (see ingest).
     private func deleteRows(bandID: UUID, sourceFileID hex: String) {
         try? context.delete(model: DaySummary.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
         try? context.delete(model: SleepRecord.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
         try? context.delete(model: SleepRR.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
-        try? context.delete(model: ManualReading.self, where: #Predicate { $0.bandID == bandID && $0.sourceFileID == hex })
     }
 
     /// Rebuilds every minute day a file of this batch feeds (now or before): the new parts plus
@@ -285,20 +296,22 @@ final class ActivityIngest {
     // MARK: wiping
 
     /// Deletes the derived rows of one band (or all bands), keeping the raw files.
-    static func deleteDerived(context: ModelContext, bandID: UUID?, includingScores: Bool) {
+    /// `keepingManual`: for parsing everything again. The stored manual samples file holds only
+    /// the band's newest batch, so earlier readings could not be rebuilt from it.
+    static func deleteDerived(context: ModelContext, bandID: UUID?, includingScores: Bool, keepingManual: Bool = false) {
         if let id = bandID {
             try? context.delete(model: MinuteDay.self, where: #Predicate { $0.bandID == id })
             try? context.delete(model: DaySummary.self, where: #Predicate { $0.bandID == id })
             try? context.delete(model: SleepRecord.self, where: #Predicate { $0.bandID == id })
             try? context.delete(model: SleepRR.self, where: #Predicate { $0.bandID == id })
-            try? context.delete(model: ManualReading.self, where: #Predicate { $0.bandID == id })
+            if !keepingManual { try? context.delete(model: ManualReading.self, where: #Predicate { $0.bandID == id }) }
             if includingScores { try? context.delete(model: DailyScore.self, where: #Predicate { $0.bandID == id }) }
         } else {
             try? context.delete(model: MinuteDay.self)
             try? context.delete(model: DaySummary.self)
             try? context.delete(model: SleepRecord.self)
             try? context.delete(model: SleepRR.self)
-            try? context.delete(model: ManualReading.self)
+            if !keepingManual { try? context.delete(model: ManualReading.self) }
             if includingScores { try? context.delete(model: DailyScore.self) }
         }
     }

@@ -340,6 +340,8 @@ Düzen: gövde = `bitmap | slot0 | slot1 | …`. **Her slot, bit'i kapalı olsa 
 
 \* Gövde ofseti bitmap'ten sonrasına göre. Dosyada mutlak ofset = 8 + bitmap boyu + gövde ofseti. Slot 27 ofseti 49 ve standing ofseti 22, Gadgetbridge testindeki hesapla aynı [TEST] `T/impl/DailySummaryParserTest.java:240`, `:258`.
 
+**Bandın ekranıyla karşılaştırma** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: `steps` 7452 ve `activeCalories` 940, bandın Adım ve Kalori ekranlarındaki sayılarla aynı (kalori hedefi 600 olan ekran), yani slot 1 bandın "Kalori" dediği değer. `calories` (slot 13) aynı anda 1052 idi. "Ayrılmış" slot 2'de 89 vardı; o sırada son nabız ölçümleri 86–89'du, son nabız olabilir [TAHMİN]. Bandın "Hareket" (Moving, 49 dk) değeri özetin hiçbir slotunda yok.
+
 Tüm alanlar işaretsiz. Gadgetbridge `steps` ve zaman damgalarını Java `int` (işaretli) okuyor; Swift `UInt32` kullanmalı. Gadgetbridge bu parser'da CRC'yi gövdeden düşmüyor, sadece sabit sayıda slot okuyor (`:166-184`).
 
 ### 6.3 Uyku detayı (ACTIVITY / SLEEP 0x08 / her detay tipi)
@@ -481,6 +483,8 @@ Bkz. bölüm 8.
 | değer | `0x11`/`0x12`/`0x13` → u8; `0x44` → u32 (gerçekte iki u16, `:95-98`) |
 
 - Değeri `0` olan kayıt atlanır (`:106-108`).
+- **Dosya kimliği aynı kalır, içerik değişir** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: günün manuel ölçüm dosyası (kimliğindeki zaman yerel gece yarısı) üç senkronda 3, 7 ve 21 kayıtla geldi; sonuncusunda öncekilerin hiçbiri yoktu. Bant yalnız son alımdan sonraki ölçümleri veriyor. Freeband bu yüzden manuel ölçümleri dosyaya göre silip yeniden yazmıyor: (zaman, tür) aynı değilse ekliyor, yeniden çözmede de eskileri koruyor.
+- **Süren ölçüm sıfır yazar** [ÖLÇÜM, aynı bant]: bir stres ölçümü boyunca 2 saniye arayla 20 kayıt `değer 0` ile, ardından sonuç (`38`) geldi. Sıfırların atlanması bu yüzden doğru.
 - Bilinmeyen tip → **parse durur**, dosyanın tamamı başarısız sayılır, çünkü kayıt boyu bilinmiyor (`:100-104`). Kan basıncı TODO (`:99`).
 - FIXME: "the type is actually composed of 2 nibbles that define the data length + type" (`:86-88`). Örneklerde üst nibble bayt sayısına uyuyor (`0x1x` → 1 bayt, `0x44` → 4 bayt). [TAHMİN] Bilinmeyen tipte üst nibble kadar bayt atlayıp devam etmek denenebilir, ama doğrulanmadı.
 - Sıcaklık: `(value & 0xFFFF) / 100` °C. [KOD] `XD/XiaomiTemperatureSampleProvider.java:108`. Üst 16 bitin anlamı bilinmiyor.

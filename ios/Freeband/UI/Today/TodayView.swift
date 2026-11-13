@@ -385,7 +385,23 @@ private struct TodayContent: View {
                      color: .heart, wide: true, note: heart.map { FBFormat.time($0.at) })
             tile(.steps, wide: true)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: FBSpace.xs), GridItem(.flexible())], spacing: FBSpace.xs) {
-                ForEach(TodayMetric.allCases.filter { $0 != .steps }) { tile($0) }
+                // From the band's own daily summary: what it counts as burned by moving, and stress.
+                let summary = history.summary(day)
+                StatTile(title: String(localized: "Active calories"), value: summary?.activeCalories.map { FBFormat.number($0) },
+                         unit: String(localized: "kcal"),
+                         trend: (0..<7).reversed().map { history.summary(day.adding(days: -$0))?.activeCalories.map(Double.init) },
+                         color: .activity)
+                tile(.activeMinutes)
+                tile(.restingHeartRate)
+                NavigationLink(value: Route.trend(.stress, day: day.index)) {
+                    StatTile(title: String(localized: "Stress"), value: summary?.stressAvg.map { FBFormat.number($0) },
+                             trend: (0..<7).reversed().map { history.value(.stress, on: day.adding(days: -$0)) },
+                             color: .textSecondary,
+                             note: summary.flatMap { s in s.stressMin.flatMap { low in s.stressMax.map { "\(low)–\($0)" } } })
+                }
+                .buttonStyle(.plain)
+                tile(.sleep)
+                tile(.bloodOxygen)
             }
             Footnote(String(localized: "Compared with your 7-day average."))
         }
