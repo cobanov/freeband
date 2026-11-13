@@ -424,7 +424,11 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 
 ## 9. Sağlık ayarları
 
-Hepsi telefon → bant, GET/SET çifti, arka plan gerektirmez. **Freeband'de 9.1–9.3 var** [FB] `FB/Band/MiProtocol.swift` (`MiMonitoring`, `PBFields`), `FB/UI/Band/MonitoringView.swift`: ekran açılınca GET, değişiklikte bandın döndürdüğü baytlar üzerinde yalnız bilinen alan değişip SET, ardından tekrar GET; ekran bandın cevabını gösterir. Bantta henüz denenmedi: ilk okumada cevabın baytları loga yazılıyor (`← 8/10 setting …`). [TAHMİN: bandın GET cevabındaki alan kümesi] Gadgetbridge hepsini her bağlantıda GET'liyor [KOD] `X/services/XiaomiHealthService.java:257-275`. Beyanlar statik (`supportsStressMeasurement`, `supportsSpo2`, `supportsHeartRateMeasurement` hepsi `true`) ve runtime (`FEAT_STRESS`, `FEAT_SPO2`, `FEAT_INACTIVITY`) [KOD] `XD/XiaomiCoordinator.java:344-352`, `:481-488`, `:610-619`.
+Hepsi telefon → bant, GET/SET çifti, arka plan gerektirmez. **Freeband'de 9.1–9.3 var** [FB] `FB/Band/MiProtocol.swift` (`MiMonitoring`, `PBFields`), `FB/UI/Band/MonitoringView.swift`: ekran açılınca GET, değişiklikte bandın döndürdüğü baytlar üzerinde yalnız bilinen alan değişip SET, ardından tekrar GET; ekran bandın cevabını gösterir. **Okuma bantta doğrulandı** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13; ekrandaki değerler doğru çıktı:
+  - `8/10` nabız: `08 00 10 00 18 00 20 64 2a 02 08 01 38 01 42 04 08 00 10 32 58 01` = `{disabled 1: 0, interval 2: 0 (akıllı), alarmHighEnabled 3: 0, alarmHighThreshold 4: 100, advancedMonitoring 5{1: 1}, unknown7 7: 1, heartRateAlarmLow 8{1: 0, 2: 50}, sleepRespiratoryRate 11: 1}`. 9 ve 10 hiç gelmiyor.
+  - `8/8` SpO2: `08 01 10 02 18 00 22 04 08 01 10 55` = `{unknown1 1: 1, mode 2: 2 (tüm gün), 3: 0 (belgelerde yok), alarmLow 4{1: 1, 2: 85}}`.
+  - `8/14` stres: `08 01 12 04 08 01 10 50` = `{allDayTracking 1: 1, relaxReminder 2{enabled 1: 1, unknown2 2: 80}}`.
+  - Yazma henüz denenmedi. Gadgetbridge hepsini her bağlantıda GET'liyor [KOD] `X/services/XiaomiHealthService.java:257-275`. Beyanlar statik (`supportsStressMeasurement`, `supportsSpo2`, `supportsHeartRateMeasurement` hepsi `true`) ve runtime (`FEAT_STRESS`, `FEAT_SPO2`, `FEAT_INACTIVITY`) [KOD] `XD/XiaomiCoordinator.java:344-352`, `:481-488`, `:610-619`.
 
 ### 9.1 Sürekli nabız, nabız uyarıları, uyku tespiti
 
@@ -470,6 +474,10 @@ Ayrı bir "uyku tespiti" komutu yok. Uyku davranışını etkileyenler: nabız a
   - Bant → `Command{2,79}` → `system(4).deviceState(49).{chargingState 1 (1 şarjda, 2 değil), wearingState 2 (1 takılı, 2 değil), sleepState 3 (1 uyku, 2 uyanık), warningState 4, activityState 5}`.
   - Pil: `Command{2,1}` → `system(4).power(2).battery(1).{level 1, state 2 (1 şarjda, 2/3 normal), lastCharge 3{state 1, timestampSeconds 2}}` [KOD] `P/xiaomi/wear_system.proto:88-101`, `X/services/XiaomiSystemService.java:370-405`. **Freeband'de seviye var**, `state` ve `lastCharge` okunmuyor.
   - AstroBox'a göre `2,79` itmesinin 4. alanı `waring` (sic): 1 nabız yüksek, 2 nabız düşük, 3 aktifken yüksek, 4 aktifken düşük; şarj alanı 1 başladı, 2 bıraktı, 3 doldu. Yani bant nabız alarmlarını telefona da bildiriyor [AB] `ABP/wear_system.proto:597-639`. Ek itmeler: `2,97` pil durumu (`battery_status(63)`), `2,91` uyarı durumu (`alert_status(58){battery 1, temperature 2, storage 3, ota 4, ..., wear 7}`, GET `2,90`) [AB] `:118-120`, `:691-732`.
+- **Ölçüm, Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13** [ÖLÇÜM]: bant bilekte, şarjda değil, pil %82 iken
+  - `2/78` cevabı `08 02 10 4e 22 0f 82 03 0c 08 01 10 00 18 00 20 00 2a 02 08 00` = `basicDeviceState(48){1: 1, 2: 0, 3: 0, 4: 0, 5{1: 0}}`. Gadgetbridge'in alan adlarıyla (şarjda, pil 0, takılı değil) üçü de yanlış çıkıyor; alanların bu yazılımdaki anlamı bilinmiyor. Freeband bu cevabı okumuyor (önceden okuyup bandı "şarjda" gösteriyordu). Çözmek için bant bilekten çıkarılmışken ve şarjdayken birer cevap gerekli. [TAHMİN: 1 = takılı olabilir]
+  - `2/1` cevabı `battery(1){level 1: 82, state 2: 2, lastCharge 3{state 1: 3, timestampSeconds 2}}`: `state 2` = şarjda değil, belgedekiyle uyumlu. Freeband şarj durumunu buradan alıyor.
+  - Bant her senkronda `16/3` (`08 10 10 03 92 01 00`) ve bildirimden sonra `7/16` (uygulama simgesi isteği) gönderiyor; ikisi de cevapsız bırakılıyor.
 - **Beyan:** runtime (`FEAT_DEVICE_ACTIONS`, bant `2,78`'e cevap verirse) [KOD] `X/services/XiaomiSystemService.java:774-779`.
 - **iOS:** GET kısa oturumla; değişiklik bildirimi (`2,79`) tutulan oturum ister. Freeband'de "bant takılı değil / şarjda / uyuyor" göstermek ve Freeband'in 24 saat kadranındaki boş saatleri açıklamak için kullanışlı.
 - **Efor / risk:** S / düşük.

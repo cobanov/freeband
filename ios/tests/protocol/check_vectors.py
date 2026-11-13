@@ -151,6 +151,14 @@ want.update({
     "mon_stress_parsed": False,
     "mon_stress_on": mon_set(15, 10, f_varint(1, 1) + f_bytes(2, f_varint(1, 1) + f_varint(2, 0))),
 })
+# The band's state: charging is battery state 1 (2 and 3 are not); the 2/78 reply is not read;
+# the 2/79 push is {charging 1: 1 yes / 2 no, wearing 2, sleep 3}.
+want.update({
+    "battery_charging": ["false", "true", "false", "nil"],
+    "battery_level_with_state": 82,
+    "state_basic_not_read": "nil",
+    "state_pushed": "false/true/false",
+})
 bad = [k for k in want if got.get(k) != want[k]]
 for k in want:
     print(("OK  " if k not in bad else "FAIL"), k)

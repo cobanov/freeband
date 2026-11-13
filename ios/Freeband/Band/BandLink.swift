@@ -627,6 +627,9 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 1):
             note("← 2/1 battery \(Self.hexPrefix(lastCommandBody))")
+            if let charging = MiAuth.batteryCharging(command) {
+                deviceState = MiAuth.DeviceState(charging: charging, worn: deviceState?.worn ?? true, asleep: deviceState?.asleep ?? false)
+            }
             guard let level = MiAuth.batteryLevel(command) else { return }
             battery = Int(level)
             emit(.battery(Int(level)))

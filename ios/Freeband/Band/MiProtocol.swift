@@ -366,6 +366,12 @@ enum MiAuth {
     static func batteryLevel(_ command: PBMessage) -> UInt64? {
         command.message(4)?.message(2)?.message(1)?.varints[1]
     }
+
+    /// Whether the band is on its charger, from the same reply: battery(1).state(2), 1 charging,
+    /// 2 or 3 not. Nil when the reply has no state.
+    static func batteryCharging(_ command: PBMessage) -> Bool? {
+        command.message(4)?.message(2)?.message(1)?.varints[2].map { $0 == 1 }
+    }
 }
 
 extension MiAuth {
@@ -564,13 +570,13 @@ extension MiAuth {
         let asleep: Bool
     }
 
-    /// Reply to Command{2,78}: system(4).basicDeviceState(48){isCharging 1, battery 2, isWorn 3, isUserAsleep 4}.
-    /// The band also pushes Command{2,79}: system(4).deviceState(49){charging 1 (1 yes, 2 no), wearing 2, sleep 3}.
+    /// The band's push Command{2,79}: system(4).deviceState(49){charging 1 (1 yes, 2 no), wearing 2, sleep 3}.
+    /// The reply to Command{2,78} (basicDeviceState 48) is not read: a Band 10 Pro on the wrist,
+    /// off its charger, at 82% answered {1: 1, 2: 0, 3: 0, 4: 0}, which is neither Gadgetbridge's
+    /// {isCharging, batteryLevel, isWorn, isUserAsleep} nor anything else settled yet
+    /// (docs/CAPABILITIES.md section 9.7). Charging comes from the battery reply instead.
     static func deviceState(_ command: PBMessage) -> DeviceState? {
         let system = command.message(4)
-        if let basic = system?.message(48) {
-            return DeviceState(charging: basic.varints[1] == 1, worn: basic.varints[3] == 1, asleep: basic.varints[4] == 1)
-        }
         if let pushed = system?.message(49) {
             return DeviceState(charging: pushed.varints[1] == 1, worn: pushed.varints[2] == 1, asleep: pushed.varints[3] == 1)
         }

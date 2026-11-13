@@ -87,7 +87,7 @@ Not checked on a band: whether a Band 10 sends `2/79` on an idle held session [U
 3. The session stays open for hours in the background, or the band drops it after some idle time. A newer Gadgetbridge than the one Freeband's notes started from adds a `wakeLink` that sends a battery request "so an idle link is awake". [CODE] `SYS:933-939` This hints that an idle link can need waking. [UNVERIFIED] Partly checked: after some hours locked and idle, Find Phone still rang (section 7). A whole night is not checked yet.
 4. Ringing from the background, with the screen locked, and with the silent switch on. Checked, section 7.
 5. What else the band sends while the session is idle: the `← held` lines.
-6. On a Band 10 (BLE V2), the same: the held session is the same code on the V2 channel. [UNVERIFIED]
+6. On a Band 10 (BLE V2), the same: the held session is the same code on the V2 channel. Checked in part: on a Band 10 Pro (`M2552B1`, firmware 3.201.026, 2026-11-13) the hold opens after iOS relaunches the app (`restored by iOS`), authenticates, and gives way to a sync and comes back [MEASURED]. Find Phone and a night on the hold are not checked on it.
 
 ## 7. Checked on the watch
 

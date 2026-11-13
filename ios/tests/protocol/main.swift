@@ -179,6 +179,21 @@ let monitoring: [String: Any] = [
     "mon_stress_on": hex(MiMonitoring.set(.stress, MiMonitoring.stress(stressBody, allDay: true)!)),
 ]
 
+// The band's state. batteryReply and basicState have the shape a Band 10 Pro sent (firmware 3.201.026).
+func batteryReply(_ state: UInt64?) -> PBMessage {
+    let battery = pb { $0.varint(1, 82); if let state { $0.varint(2, state) }; $0.message(3, pb { $0.varint(1, 3); $0.varint(2, 1_760_000_000) }) }
+    return PBMessage(pb { $0.varint(1, 2); $0.varint(2, 1); $0.message(4, pb { $0.message(2, pb { $0.message(1, battery) }) }) }.data)!
+}
+let basicState = pb { $0.varint(1, 2); $0.varint(2, 78); $0.message(4, pb { $0.message(48, pb { $0.varint(1, 1); $0.varint(2, 0); $0.varint(3, 0); $0.varint(4, 0) }) }) }.data
+let pushedState = pb { $0.varint(1, 2); $0.varint(2, 79); $0.message(4, pb { $0.message(49, pb { $0.varint(1, 2); $0.varint(2, 1); $0.varint(3, 2) }) }) }.data
+func stateText(_ s: MiAuth.DeviceState?) -> String { s.map { "\($0.charging)/\($0.worn)/\($0.asleep)" } ?? "nil" }
+let bandState: [String: Any] = [
+    "battery_charging": [batteryReply(2), batteryReply(1), batteryReply(3), batteryReply(nil)].map { MiAuth.batteryCharging($0).map { "\($0)" } ?? "nil" },
+    "battery_level_with_state": MiAuth.batteryLevel(batteryReply(2)) ?? 0,
+    "state_basic_not_read": stateText(MiAuth.deviceState(PBMessage(basicState)!)),
+    "state_pushed": stateText(MiAuth.deviceState(PBMessage(pushedState)!)),
+]
+
 let out: [String: Any] = [
     "crc_123456789": String(format: "%04x", MiFrame.crc16arc(Data("123456789".utf8))),
     "okm": hex(okm),
@@ -209,4 +224,4 @@ let out: [String: Any] = [
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
     "resend_seqs": [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)].map { MiFrame.resendSeqs(next: $0.0, nack: $0.1) },
 ]
-print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)
+print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }.merging(bandState) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)
