@@ -405,6 +405,10 @@ final class AppModel: ObservableObject {
     /// Show sleep on the band (docs/SLEEP-WRITEBACK.md): once per night, after the sync that
     /// brought it, the night's summary goes to the band (Command{8,41}), which is what fills the
     /// band's own sleep screen when Mi Fitness is around. Off by default.
+    /// The write-back that is on its way: marked as done only when its session completed, so a
+    /// band that was out of reach gets it at the next sync.
+    private var sleepWriteBack: (bandID: UUID, wake: TimeInterval)?
+
     private func writeBackSleep(_ bandID: UUID) {
         guard !isDemo, UserDefaults.standard.bool(forKey: Self.sleepToBandKey), let band = band(bandID) else { return }
         let today = DayKey.current(Date()).index
@@ -422,8 +426,8 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self, !self.link.phase.isBusy else { return }
             self.link.note("sleep summary → band: \(asleep) min asleep")
+            self.sleepWriteBack = (bandID, night.wakeTime.timeIntervalSince1970)
             self.start(band, .send([MiAuth.sleepResultCommand([section])]))
-            UserDefaults.standard.set(night.wakeTime.timeIntervalSince1970, forKey: "sleepToBandWake")
         }
     }
 
@@ -481,10 +485,16 @@ final class AppModel: ObservableObject {
     /// `lastSyncAt` moves only on a complete session. Files that arrived are parsed whatever the
     /// outcome; webhooks get `sync.completed` or `sync.partial`, nothing on failure.
     private func sessionEnded(_ id: UUID, _ outcome: BandLink.Outcome) {
+        if let sent = sleepWriteBack, sent.bandID == id {
+            sleepWriteBack = nil
+            if outcome == .complete { UserDefaults.standard.set(sent.wake, forKey: "sleepToBandWake") }
+            return  // a single command, not a sync: nothing to parse, score or report
+        }
         let drafts = sessionDrafts
         sessionDrafts = []
         guard let band = band(id) else { return }
-        if outcome == .complete {
+        // Only a sync is a sync: a notification, Find or a settings read ends "complete" too.
+        if outcome == .complete, link.purpose == .sync {
             band.lastSyncAt = Date()
             try? context.save()
         }

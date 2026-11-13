@@ -6,6 +6,7 @@ import SwiftUI
 struct DiagnosticsView: View {
     @EnvironmentObject private var link: BandLink
     @State private var askingBind = false
+    @State private var logLines: [String] = []
     @EnvironmentObject private var model: AppModel
     @Query(sort: \ActivityBlob.ts, order: .reverse) private var blobs: [ActivityBlob]
     @State private var share: ShareItem?
@@ -46,10 +47,10 @@ struct DiagnosticsView: View {
             .fbFormRow()
 
             Section {
-                if link.log.isEmpty {
+                if logLines.isEmpty {
                     Text("No session yet.").foregroundStyle(.textSecondary)
                 }
-                ForEach(Array(link.log.enumerated()), id: \.offset) { entry in
+                ForEach(Array(logLines.enumerated()), id: \.offset) { entry in
                     Text(verbatim: entry.element).font(.caption.monospaced()).foregroundStyle(.textBody)
                 }
             } header: {
@@ -59,11 +60,13 @@ struct DiagnosticsView: View {
         }
         .fbFormStyle()
         .navigationTitle(String(localized: "Diagnostics"))
+        .onAppear { logLines = link.log.lines }
+        .onReceive(link.log.$lines) { logLines = $0 }
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $share) { ActivitySheet(items: $0.urls) }
         .toolbar {
-            if !link.log.isEmpty {
-                ShareLink(item: link.log.joined(separator: "\n")) {
+            if !logLines.isEmpty {
+                ShareLink(item: logLines.joined(separator: "\n")) {
                     Label(String(localized: "Share log"), systemImage: "square.and.arrow.up")
                 }
             }

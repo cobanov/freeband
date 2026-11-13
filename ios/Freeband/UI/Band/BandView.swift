@@ -54,19 +54,6 @@ private struct BandPage: View {
     @State private var notifying = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(AppModel.stayConnectedKey) private var stayConnected = false
-    @AppStorage(AppModel.clearBandKey) private var clearBand = false
-    @AppStorage(AppModel.shareLocationKey) private var shareLocation = false
-
-    /// What Stay connected does, and while it's on, whether the session is open right now.
-    private var stayConnectedSubtitle: String {
-        guard stayConnected else {
-            return String(localized: "Lets \(band.shortName) find this phone and sync on its own. Mi Fitness can't connect while it's on.")
-        }
-        switch link.holdState {
-        case .connected where link.bandID == band.id: return String(localized: "Connected. \(band.shortName) can find this phone.")
-        default: return String(localized: "Waiting for \(band.shortName)…")
-        }
-    }
 
     var body: some View {
         ScrollView {
@@ -125,10 +112,6 @@ private struct BandPage: View {
                 }
 
                 ListCard {
-                    if BandFeatures.controls {
-                        ListRow(title: String(localized: "Alarms"), systemImage: "alarm")
-                        ListRow(title: String(localized: "Display & Do Not Disturb"), systemImage: "moon")
-                    }
                     NavigationLink(value: Route.monitoring(band.id)) {
                         ListRow(title: String(localized: "Health monitoring"), systemImage: "heart.text.square")
                     }

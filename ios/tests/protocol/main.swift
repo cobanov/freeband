@@ -319,7 +319,6 @@ let out: [String: Any] = [
     "clock_istanbul": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "Europe/Istanbul")!, is24Hour: true)),
     "clock_newyork_12h": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "America/New_York")!, is24Hour: false)),
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
-    "live_intensity": live.intensity.map { Int($0) } ?? -1,
     "gps_info": hex(MiAuth.gpsInfoCommand(at: Date(timeIntervalSince1970: 1_760_000_000), latitude: 41.0082, longitude: 28.9784, altitude: 35.5)),
     "gps_info_no_altitude": hex(MiAuth.gpsInfoCommand(at: Date(timeIntervalSince1970: 1_760_000_000), latitude: -33.8688, longitude: 151.2093, altitude: nil)),
     "resend_seqs": [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)].map { MiFrame.resendSeqs(next: $0.0, nack: $0.1) },

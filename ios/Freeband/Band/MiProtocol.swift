@@ -394,9 +394,6 @@ extension MiAuth {
         let calories: UInt64
         let heartRate: UInt64
         let standingHours: UInt64
-        /// Field 5, `intensity` in AstroBox's BasicData. Not the band's Moving minutes: it read 7
-        /// while the band showed 49 (those are counted from the minute files, ActivityFiles).
-        var intensity: UInt64?
     }
 
     /// Command{type 8 (Health), subtype 45 start | 46 stop}: the band then sends subtype 47
@@ -409,11 +406,12 @@ extension MiAuth {
     }
 
     /// Command.health(10).realTimeStats(39){steps 1, calories 2, heartRate 4, standingHours 6}
+    /// Fields 3 (`distance`) and 5 (`intensity` in AstroBox's BasicData) are not read; 5 is not
+    /// the band's Moving minutes (it read 7 while the band showed 49, docs/CAPABILITIES.md 9.7).
     static func liveStats(_ command: PBMessage) -> LiveStats? {
         guard let stats = command.message(10)?.message(39) else { return nil }
         return LiveStats(steps: stats.varints[1] ?? 0, calories: stats.varints[2] ?? 0,
-                         heartRate: stats.varints[4] ?? 0, standingHours: stats.varints[6] ?? 0,
-                         intensity: stats.varints[5])
+                         heartRate: stats.varints[4] ?? 0, standingHours: stats.varints[6] ?? 0)
     }
 }
 

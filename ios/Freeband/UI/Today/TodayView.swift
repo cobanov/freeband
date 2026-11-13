@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// Home: the day's verdict, the band in one line, the score triad, context while it is true,
-/// quick actions and today's metrics against the 7-day average.
+/// Home: the day's verdict, the band in one line, the Recovery card with Sleep and Strain, the
+/// day's trace, what stands out, the day's workouts and its numbers as tiles.
 struct TodayView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var router: AppRouter
@@ -335,25 +335,6 @@ private struct TodayContent: View {
                             confidenceMarker(kind)
                         }
                     }
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private var triad: some View {
-        let rows = dynamicTypeSize >= .xxLarge
-        let layout = rows ? AnyLayout(VStackLayout(alignment: .leading, spacing: FBSpace.s))
-                          : AnyLayout(HStackLayout(alignment: .top, spacing: 0))
-        return layout {
-            ForEach([ScoreKind.sleep, .recovery, .strain]) { kind in
-                NavigationLink(value: Route.score(kind, day: day.index)) {
-                    VStack(alignment: rows ? .leading : .center, spacing: FBSpace.xxs) {
-                        ScoreTile(kind: kind, value: history.score(kind, day), layout: rows ? .row : .column)
-                        confidenceMarker(kind)
-                    }
-                    .frame(maxWidth: .infinity, alignment: rows ? .leading : .center)
-                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

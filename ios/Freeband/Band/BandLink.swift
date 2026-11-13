@@ -11,6 +11,16 @@ struct BandTarget {
     let keys: [Data]
 }
 
+/// The diagnostics log. Only the screen that shows it watches it.
+final class BandLog: ObservableObject {
+    @Published private(set) var lines: [String] = []
+
+    fileprivate func append(_ line: String, limit: Int) {
+        lines.append(line)
+        if lines.count > limit { lines.removeFirst(lines.count - limit) }
+    }
+}
+
 /// One BLE session with a band at a time: find it (iOS connection or advertisement), open an
 /// SPP v2 session on FE95/005E/005F (or, on older bands, the V1 channel 0051/0052/0053),
 /// authenticate as an iOS companion, read battery and live stats, then always hand the channel
@@ -188,7 +198,9 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var bandID: UUID?
     @Published private(set) var stats: MiAuth.LiveStats?
     @Published private(set) var battery: Int?
-    @Published private(set) var log: [String] = []
+    /// Not a published property of the link: as one, every line redrew every screen that
+    /// watches the link, and Today recomputes its insights and tiles when it redraws.
+    let log = BandLog()
     /// Bands iOS holds a connection to right now (no session needed to know this).
     @Published private(set) var nearby: Set<UUID> = []
     @Published private(set) var bluetooth: CBManagerState = .unknown
@@ -225,7 +237,7 @@ final class BandLink: NSObject, ObservableObject {
 
     private var central: CBCentralManager!
     private var target: BandTarget?
-    private var purpose = Purpose.sync
+    private(set) var purpose = Purpose.sync
     /// Where the running session is; `phase` follows it except on a held session.
     private var stage = Phase.idle {
         didSet { if purpose != .hold { phase = stage } }
@@ -1186,8 +1198,7 @@ final class BandLink: NSObject, ObservableObject {
     /// Adds a line to the log Diagnostics shows. It runs across sessions (a held session's lines
     /// stay after a sync), newest last.
     func note(_ text: String) {
-        log.append("\(Date().formatted(date: .omitted, time: .standard))  \(text)")
-        if log.count > Self.logLimit { log.removeFirst(log.count - Self.logLimit) }
+        log.append("\(Date().formatted(date: .omitted, time: .standard))  \(text)", limit: Self.logLimit)
     }
 
     /// "write-without-response, notify": what a characteristic allows, for the log.

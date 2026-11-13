@@ -176,7 +176,6 @@ want = {
     "realtime_start": (f_varint(1, 8) + f_varint(2, 45)).hex(),
     "realtime_stop": (f_varint(1, 8) + f_varint(2, 46)).hex(),
     "live_parsed": "8421/312/74/9",
-    "live_intensity": 49,  # realTimeStats field 5
     # gnss(18).gps_info(3){timestamp 1, longitude 2, latitude 3, altitude 4}; doubles are wire type 1, little-endian
     "gps_info": (f_varint(1, 16) + f_varint(2, 2) + f_bytes(18, f_bytes(3, f_varint(1, 1760000000)
                  + varint(2 << 3 | 1) + struct.pack("<d", 28.9784) + varint(3 << 3 | 1) + struct.pack("<d", 41.0082)

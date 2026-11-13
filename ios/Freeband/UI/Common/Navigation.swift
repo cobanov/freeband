@@ -1,12 +1,6 @@
 import SwiftData
 import SwiftUI
 
-/// Band control commands (alarms, health monitoring, display and Do Not Disturb) land in a
-/// later phase. Their rows stay hidden until then.
-enum BandFeatures {
-    static let controls = false
-}
-
 enum AppTab: String, Hashable, CaseIterable {
     case today, sleep, trends, band
 }

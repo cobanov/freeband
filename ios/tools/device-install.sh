@@ -20,22 +20,7 @@ P8=${ASC_KEY_PATH:-$HOME/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8}
 [ -f "$P8" ] || P8=$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8
 BUILD=${BUILD_DIR:-/tmp/freeband-device}
 
-LIST=$(mktemp)
-xcrun devicectl list devices --json-output "$LIST" >/dev/null 2>&1
-DEVICE=$(python3 -I - "$LIST" "$1" <<'PY'
-import json, sys
-devices = json.load(open(sys.argv[1]))["result"]["devices"]
-want = sys.argv[2] if len(sys.argv) > 2 else ""
-for d in devices:
-    name = d.get("deviceProperties", {}).get("name", "")
-    if d.get("hardwareProperties", {}).get("deviceType") != "iPhone": continue
-    if d.get("hardwareProperties", {}).get("reality") != "physical": continue
-    if name == want: print(d["identifier"]); break
-    if not want: print("  " + name, file=sys.stderr)
-PY
-)
-rm -f "$LIST"
-[ -n "$DEVICE" ] || { echo "name one of the iPhones above${1:+: no iPhone is called $1}" >&2; exit 1; }
+DEVICE=$(sh "$(dirname "$0")/device-find.sh" "$1")
 
 cd "$IOS"
 xcodegen generate --quiet
