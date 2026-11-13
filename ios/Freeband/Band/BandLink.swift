@@ -626,6 +626,7 @@ final class BandLink: NSObject, ObservableObject {
             didAuthenticate()
 
         case (2, 1):
+            note("← 2/1 battery \(Self.hexPrefix(lastCommandBody))")
             guard let level = MiAuth.batteryLevel(command) else { return }
             battery = Int(level)
             emit(.battery(Int(level)))
@@ -680,6 +681,8 @@ final class BandLink: NSObject, ObservableObject {
             }
 
         case (2, 78), (2, 79):
+            // Logged whole until the fields are settled: a Band 10 Pro on the wrist read as charging.
+            note("← 2/\(subtype) state \(Self.hexPrefix(lastCommandBody))")
             if let state = MiAuth.deviceState(command) { deviceState = state }
 
         case (2, 3):
