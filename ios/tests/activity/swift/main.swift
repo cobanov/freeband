@@ -941,7 +941,7 @@ check("finished minute files: every daily details id but the newest; other kinds
     return e
 }
 
-check("sync plan: settled files are fetched once and are the only ones acknowledged") {
+check("sync plan: a file is left alone or acknowledged only with a final copy on the phone") {
     // "now" is 2023-11-15 10:00 UTC. ids: ts u32 LE | tz 0 | version | flags (00 minute file,
     // 01 summary, 20 sleep details, 18 manual samples).
     let now = Date(timeIntervalSince1970: 1_700_042_400)
@@ -950,22 +950,30 @@ check("sync plan: settled files are fetched once and are the only ones acknowled
         let bytes = withUnsafeBytes(of: &le) { Data($0) } + hexData("00" + versionAndFlags)
         return ActivityFileID(bytes)!
     }
+    func copy(hoursAfterFileTime h: Double, of file: ActivityFileID, fromToday: Bool = true) -> ActivitySyncPlan.StoredCopy {
+        ActivitySyncPlan.StoredCopy(fetchedAt: file.ts.addingTimeInterval(h * 3600), fromToday: fromToday)
+    }
     let minuteA = fid(1_700_040_000, "0400"), minuteB = fid(1_700_040_600, "0400"), minuteNewest = fid(1_700_041_200, "0400")
-    let summaryToday = fid(1_700_006_400, "0501")              // today 00:00, 10 h old
-    let sleepOld = fid(1_700_042_400 - 40 * 3600, "0620")      // 40 h old: settled
+    let summaryToday = fid(1_700_006_400, "0501")                  // today 00:00, 10 h old
+    let sleepOld = fid(1_700_042_400 - 60 * 3600, "0620")          // 60 h old, copy fetched 40 h after it began: final
+    let summaryOldEvening = fid(1_700_042_400 - 58 * 3600, "0501") // 58 h old, but the copy is from its own evening (20 h)
     let sleepLastNight = fid(1_700_042_400 - 11 * 3600, "0620")
     let pastStored = fid(1_699_900_000, "0501"), pastNew = fid(1_699_900_000, "0218")
-    let stored: Set<ActivityFileID> = [minuteA, summaryToday, sleepOld, pastStored]
-    let parsed: Set<ActivityFileID> = [minuteA, minuteB, summaryToday, sleepOld, sleepLastNight, pastStored]
+    let stored: [ActivityFileID: ActivitySyncPlan.StoredCopy] = [
+        minuteA: copy(hoursAfterFileTime: 0.1, of: minuteA), summaryToday: copy(hoursAfterFileTime: 9, of: summaryToday),
+        sleepOld: copy(hoursAfterFileTime: 40, of: sleepOld), summaryOldEvening: copy(hoursAfterFileTime: 20, of: summaryOldEvening),
+        sleepLastNight: copy(hoursAfterFileTime: 8, of: sleepLastNight), pastStored: copy(hoursAfterFileTime: 1, of: pastStored, fromToday: false),
+    ]
     func plan(clear: Bool) -> ActivitySyncPlan {
-        ActivitySyncPlan.make(today: [summaryToday, minuteA, minuteB, minuteNewest, sleepOld, sleepLastNight], past: [pastStored, pastNew],
-                              now: now, isStored: { stored.contains($0) }, mayAcknowledge: { clear && stored.contains($0) && parsed.contains($0) })
+        ActivitySyncPlan.make(today: [summaryToday, minuteA, minuteB, minuteNewest, sleepOld, summaryOldEvening, sleepLastNight],
+                              past: [pastStored, pastNew], now: now, stored: { stored[$0] }, mayAcknowledge: { _ in clear })
     }
     var e: [String] = []
-    // Not fetched: minuteA (finished, stored), sleepOld (over 36 h, stored), pastStored.
-    let wantFetch = [minuteB, minuteNewest, summaryToday, sleepLastNight, pastNew].sorted()
+    // Left alone: minuteA (finished, stored), sleepOld (settled, final copy), pastStored (copy from the past list).
+    // Fetched again though old and stored: summaryOldEvening, whose copy is of an unfinished day.
+    let wantFetch = [minuteB, minuteNewest, summaryToday, summaryOldEvening, sleepLastNight, pastNew].sorted()
     if plan(clear: true).fetch != wantFetch { e.append("fetch \(plan(clear: true).fetch.map(\.hex))") }
-    // Acknowledged: only settled or past files; never today's summary, last night or the newest minute file.
+    // Acknowledged: exactly the files left alone. Never one that is being fetched in this sync.
     if plan(clear: true).acknowledge != [minuteA, sleepOld, pastStored].sorted() { e.append("ack \(plan(clear: true).acknowledge.map(\.hex))") }
     if !plan(clear: false).acknowledge.isEmpty { e.append("acknowledged with clearing off") }
     if plan(clear: false).fetch != wantFetch { e.append("fetch changes with clearing") }

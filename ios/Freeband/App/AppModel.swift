@@ -66,7 +66,9 @@ final class AppModel: ObservableObject {
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
-        link.hasActivityFile = { [weak self] id, hex in self?.hasActivityFile(id, hex) ?? false }
+        link.storedActivityFile = { [weak self] id, hex in
+            self?.blob(id, hex).map { ActivitySyncPlan.StoredCopy(fetchedAt: $0.fetchedAt, fromToday: $0.fetchedFromToday) }
+        }
         link.onDeviceInfo = { [weak self] id, info in
             guard let self, let band = self.band(id) else { return }
             band.firmware = info.firmware.isEmpty ? band.firmware : info.firmware
@@ -463,10 +465,6 @@ final class AppModel: ObservableObject {
     /// it was last fetched from the "today" list. Such a file kept growing after that fetch (the
     /// rest of its day), so it is fetched once more now that its day is over; the copy fetched
     /// from the past list is final.
-    private func hasActivityFile(_ bandID: UUID, _ hex: String) -> Bool {
-        guard let blob = blob(bandID, hex) else { return false }
-        return !blob.fetchedFromToday
-    }
 
     /// Stores (or replaces: today's files grow during the day) a raw file, then parses it.
     private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data, today: Bool) {

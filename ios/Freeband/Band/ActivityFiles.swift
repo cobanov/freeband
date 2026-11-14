@@ -1670,23 +1670,41 @@ struct ActivitySyncPlan: Equatable, Sendable {
     /// A night that began yesterday evening can still grow until the morning; nothing older can.
     static let settledAfter: TimeInterval = 36 * 3600
 
+    /// The copy of a file that is already on the phone.
+    struct StoredCopy: Equatable, Sendable {
+        var fetchedAt: Date
+        /// Fetched from the band's "today" list (a file from the past list is final by definition).
+        var fromToday: Bool
+    }
+
     /// A file is settled when it can no longer change on the band: a minute file that a later
     /// one on today's list follows (`finishedDetails`), or any file whose time is more than 36
     /// hours before `now`. A Band 10 Pro keeps everything unacknowledged on today's list, so
     /// without this every old night, summary and workout would be fetched again at every sync.
     ///
-    /// - A settled file that is stored is not fetched again; every other file on today's list
-    ///   is fetched each time (it may have changed). A past file is fetched when not stored.
-    /// - Only settled or past files are acknowledged, and only when `mayAcknowledge` says so
-    ///   (the user turned clearing on, and the file is stored here and fully parsed).
+    /// A stored copy is final when the file could not change after it was fetched: the copy
+    /// came from the past list, or the file is a finished minute file (the band closes it at
+    /// the fetch), or the copy was fetched after the file's 36 hours. A summary fetched in the
+    /// evening is a copy of an unfinished day, however old the file is now.
+    ///
+    /// - A file is fetched unless it is settled (or past) and its stored copy is final.
+    /// - A file is acknowledged only when it is settled (or past), its stored copy is final,
+    ///   and `mayAcknowledge` says so (clearing is on and the copy parsed fully). So the band
+    ///   never deletes a file of which the phone holds only an earlier, shorter copy.
     static func make(today: [ActivityFileID], past: [ActivityFileID], now: Date,
-                     isStored: (ActivityFileID) -> Bool, mayAcknowledge: (ActivityFileID) -> Bool) -> ActivitySyncPlan {
+                     stored: (ActivityFileID) -> StoredCopy?, mayAcknowledge: (ActivityFileID) -> Bool) -> ActivitySyncPlan {
         let listedToday = Set(today)
-        var settled = ActivityFileID.finishedDetails(in: today)
-        for file in today where now.timeIntervalSince(file.ts) > settledAfter { settled.insert(file) }
-        let pastOnly = past.filter { !listedToday.contains($0) }
-        let fetch = today.filter { !(settled.contains($0) && isStored($0)) } + pastOnly.filter { !isStored($0) }
-        let acknowledge = (settled.sorted() + pastOnly).filter(mayAcknowledge)
-        return ActivitySyncPlan(fetch: Array(Set(fetch)).sorted(), acknowledge: Array(Set(acknowledge)).sorted())
+        let finished = ActivityFileID.finishedDetails(in: today)
+        let pastOnly = Set(past.filter { !listedToday.contains($0) })
+        func hasFinalCopy(_ file: ActivityFileID) -> Bool {
+            guard let copy = stored(file) else { return false }
+            return !copy.fromToday || finished.contains(file) || copy.fetchedAt.timeIntervalSince(file.ts) > settledAfter
+        }
+        func isSettled(_ file: ActivityFileID) -> Bool {
+            pastOnly.contains(file) || finished.contains(file) || now.timeIntervalSince(file.ts) > settledAfter
+        }
+        let all = listedToday.union(pastOnly)
+        let done = all.filter { isSettled($0) && hasFinalCopy($0) }
+        return ActivitySyncPlan(fetch: all.subtracting(done).sorted(), acknowledge: done.filter(mayAcknowledge).sorted())
     }
 }
