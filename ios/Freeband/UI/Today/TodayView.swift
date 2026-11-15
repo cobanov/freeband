@@ -137,6 +137,13 @@ private struct TodayContent: View {
         return best
     }
 
+    /// Heart rate the band recorded in the sleep files that touch the shown day.
+    private var dayNightHeart: [(at: Date, bpm: Int)] {
+        let next = day.adding(days: 1)
+        let records = [history.mainSleep(day), history.mainSleep(next)].compactMap { $0 } + history.naps(day) + history.naps(next)
+        return records.flatMap { $0.heartRatePoints.map { (at: $0.date, bpm: Int($0.value)) } }
+    }
+
     /// When the shown day's workouts ran, for the shading on the day trace.
     private var dayWorkouts: [ClosedRange<Date>] {
         let id = band.id
@@ -180,13 +187,35 @@ private struct TodayContent: View {
                         pillars
                         Card {
                             DayTrace(minutes: dayMinutes, sleep: daySleep, dayStart: day.date, now: isToday ? Date() : nil,
-                                     workouts: dayWorkouts)
+                                     nightHeart: dayNightHeart, workouts: dayWorkouts)
                         }
                     }
                     .opacity(syncing ? 0.5 : 1)
                     .fbStateAnimation(syncing)
                     WorkoutsSection(bandID: band.id, day: day)
                     InsightList(insights: history.insights(day, sleepNeedMinutes: Profile.load().sleepNeed), day: day)
+                }
+                if isToday, !Profile.load().maxHRIsKnown {
+                    NavigationLink(value: Route.profile) {
+                        Card {
+                            HStack(alignment: .firstTextBaseline, spacing: FBSpace.s) {
+                                Image(systemName: "person.crop.circle")
+                                    .foregroundStyle(.textSecondary)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: FBSpace.xxs) {
+                                    Text("Add your birth year")
+                                        .textStyle(.headline)
+                                        .foregroundStyle(.textPrimary)
+                                    Text("Strain is worked out from your maximum heart rate, which depends on your age. Until you add it, Freeband assumes one.")
+                                        .textStyle(.subhead)
+                                        .foregroundStyle(.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
                 if isToday {
                     BandContextCard(band: band)

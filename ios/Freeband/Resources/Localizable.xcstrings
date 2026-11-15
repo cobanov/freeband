@@ -6087,6 +6087,36 @@
           }
         }
       }
+    },
+    "Battery, about %@ left": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pil, yaklaşık %@ kaldı"
+          }
+        }
+      }
+    },
+    "Add your birth year": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğum yılını ekle"
+          }
+        }
+      }
+    },
+    "Strain is worked out from your maximum heart rate, which depends on your age. Until you add it, Freeband assumes one.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yük, yaşına bağlı olan en yüksek nabzından hesaplanır. Sen ekleyene kadar Freeband bir yaş varsayar."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

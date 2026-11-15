@@ -13,6 +13,9 @@ struct DayTrace: View {
     let dayStart: Date
     /// For today: where the day has got to. Nothing is drawn after it.
     var now: Date?
+    /// Heart rate from the sleep files. While asleep the band writes it there and not into the
+    /// minute file, so without these the line has a hole every night.
+    var nightHeart: [(at: Date, bpm: Int)] = []
     /// Workouts recorded on the band that day: each is shaded behind the heart rate and steps.
     var workouts: [ClosedRange<Date>] = []
 
@@ -32,10 +35,19 @@ struct DayTrace: View {
     private func minute(_ date: Date) -> Double { date.timeIntervalSince(dayStart) / 60 }
 
     private var heart: [Reading] {
-        guard let minutes else { return [] }
-        return (0 ..< MinuteSeries.slots).compactMap { i in
-            ValidRange.hr(minutes.heartRate[i]).map { Reading(minute: minute(minutes.time(ofMinute: i)), value: Double($0)) }
-        }.filter { (0 ..< 1440).contains($0.minute) }
+        var byMinute: [Int: Double] = [:]
+        for night in nightHeart where ValidRange.hr(night.bpm) != nil {
+            let at = minute(night.at)
+            if (0 ..< 1440).contains(at) { byMinute[Int(at)] = Double(night.bpm) }
+        }
+        if let minutes {
+            for i in 0 ..< MinuteSeries.slots {
+                guard let bpm = ValidRange.hr(minutes.heartRate[i]) else { continue }
+                let at = minute(minutes.time(ofMinute: i))
+                if (0 ..< 1440).contains(at) { byMinute[Int(at)] = Double(bpm) }  // the minute file wins
+            }
+        }
+        return byMinute.keys.sorted().map { Reading(minute: Double($0), value: byMinute[$0] ?? 0) }
     }
 
     private var stepBins: [Double] {
