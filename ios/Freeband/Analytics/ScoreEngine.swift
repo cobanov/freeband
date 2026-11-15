@@ -77,7 +77,8 @@ struct DayScoreResult: Codable, Equatable, Sendable {
 enum ScoreEngine {
     /// Bump when any formula or constant in Analytics/ changes; stored scores with an older
     /// version are recomputed at launch.
-    static let algoVersion = 1
+    /// 2: the sleep score is capped at its duration sub-score + 10 (SleepScore.durationLead).
+    static let algoVersion = 2
 
     static func score(_ input: DayInputs, history: [HistoryPoint], profile: Profile) -> DayScoreResult {
         let day = input.day

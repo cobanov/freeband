@@ -117,6 +117,8 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 - **Uyku skoru:** mevcut katkıların ağırlıklı ortalaması.
   - Süre 35, verimlilik 15, derin 10, REM 10, huzur 10 (uyanma ve WASO), düzen 10 (7 gecelik uyku ortası sapması), nabız düşüşü 10.
   - Süre yoksa skor yok. Mevcut ağırlık 60'ın altındaysa skor "tahmini" olarak gösterilir.
+  - **v2 (2026-11-16): skor, süre alt skorunun en fazla 10 puan üstünde olabilir.** Ölçülen gece: 4 sa 52 dk uyku (ihtiyaç 8 sa), süre alt skoru 61, öbür katkıların hepsi 100'e yakın, ağırlıklı ortalama 76 çıktı. Kısa ama derli toplu bir gecenin "iyi" görünmesi yanıltıcı; sınırla aynı gece 71 eder. 10 bir seçimdir, doğrulanmış değil. `ScoreEngine.algoVersion` 2 oldu, saklı skorlar yeniden hesaplanır.
+  - Uyku borcu (içgörü) gündüz uykularını da sayar: o günün `naps` dakikaları gece süresine eklenir.
 - **Toparlanma:** f(z) = 60 + 20z (0–100'e sınırlı), yani "senin normalin" 60 eder.
   - RR varsa ağırlıklar: HRV 40, dinlenik nabız 25, uyku 25, dünkü yük 10.
   - RR yoksa: dinlenik nabız 45, uyku 40, yük 15; güven en fazla "orta".

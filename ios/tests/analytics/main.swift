@@ -222,6 +222,10 @@ equal("full score", s1.score, 93)
 check("not estimated", !s1.estimated)
 equal("high confidence", s1.confidence.level, .high)
 near("duration sub", s1.contributors.first { $0.name == .duration }?.subscore, 430.0 / 480 * 100)
+// v2: the same night against a need of 12 h. Duration 430/720 -> 59.72; the other six are as above,
+// so the weighted mean is (35x59.72 + 15x98.611 + 1000 + 1000 + 770 + 1000 + 957.34) / 100 = 82.97,
+// but a score may stand at most 10 above its duration sub-score: 69.72 -> 70.
+equal("a short night can't be rescued by the rest", SleepScore.score(m1, sleepNeedMinutes: 720, previousMidSleeps: [180, 190, 170, 200]).score, 70)
 near("restfulness sub", s1.contributors.first { $0.name == .restfulness }?.subscore, 77)
 near("regularity value", s1.contributors.first { $0.name == .regularity }?.value, 5)
 near("regularity across midnight", SleepScore.regularityDeviation(10, previous: [1430, 1435, 5]), 15)
@@ -512,7 +516,7 @@ var inputs = (0 ..< 10).map { engineDay($0, rr: $0 >= 5) }
 for i in 1 ..< inputs.count { inputs[i].previousMinutes = inputs[i - 1].minutes; inputs[i].previousSleeps = inputs[i - 1].sleeps }
 let run = ScoreEngine.scoreRange(inputs, history: [], profile: athlete)
 equal("ten results", run.count, 10)
-equal("algorithm version", run[0].algoVersion, 1)
+equal("algorithm version", run[0].algoVersion, 2)
 check("day 0: no baseline, no recovery", run[0].recovery.score == nil && run[0].recovery.confidence.level == ConfidenceLevel.none)
 check("day 0: sleep scored", run[0].sleep.score != nil)
 equal("resting HR from sleep", run[0].restingHR?.source, .sleep)
