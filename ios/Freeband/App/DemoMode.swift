@@ -13,6 +13,9 @@ final class AppSession: ObservableObject {
 
     var isDemo: Bool { model.isDemo }
 
+    /// The one session; FreebandApp creates it at launch.
+    @MainActor static let shared = AppSession()
+
     init() {
         (container, model) = Self.make(demo: DemoMode.isOn)
     }
@@ -22,6 +25,8 @@ final class AppSession: ObservableObject {
     func setDemo(_ on: Bool) {
         model.stop()
         model.healthExport.invalidate()
+        // The old model's link goes away with it; let go of a held session first.
+        model.link.hold(nil)
         DemoMode.isOn = on
         (container, model) = Self.make(demo: on)
         if !on, ((try? container.mainContext.fetchCount(FetchDescriptor<Band>())) ?? 0) > 0 {

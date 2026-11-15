@@ -23,6 +23,7 @@ struct FindBandIntent: AppIntent {
         guard let model = AppModel.shared, let band = model.selectedBand() else {
             return .result(dialog: "There's no band in Freeband yet.")
         }
+        guard band.supportsFind else { return .result(dialog: "\(band.shortName) can't vibrate on request.") }
         model.findBand(band, start: true)
         return .result(dialog: "\(band.shortName) is vibrating.")
     }

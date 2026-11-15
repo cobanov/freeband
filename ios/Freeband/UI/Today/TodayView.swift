@@ -148,9 +148,11 @@ private struct TodayContent: View {
                                       isOn: BandPresentation.isLive(link, band)) {
                         router.startLive(band, model: model)
                     }
-                    QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
-                                      isOn: router.isFinding) {
-                        if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
+                    if band.supportsFind {
+                        QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
+                                          isOn: router.isFinding) {
+                            if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
+                        }
                     }
                     if BandFeatures.controls {
                         QuickActionButton(title: String(localized: "Alarms"), systemImage: "alarm") {}

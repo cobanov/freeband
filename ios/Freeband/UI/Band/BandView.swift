@@ -53,6 +53,18 @@ private struct BandPage: View {
     @EnvironmentObject private var router: AppRouter
     @State private var notifying = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage(AppModel.stayConnectedKey) private var stayConnected = false
+
+    /// What Stay connected does, and while it's on, whether the session is open right now.
+    private var stayConnectedSubtitle: String {
+        guard stayConnected else {
+            return String(localized: "Lets \(band.shortName) find this phone. Mi Fitness can't connect while it's on.")
+        }
+        switch link.holdState {
+        case .connected where link.bandID == band.id: return String(localized: "Connected. \(band.shortName) can find this phone.")
+        default: return String(localized: "Waiting for \(band.shortName)…")
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -91,9 +103,11 @@ private struct BandPage: View {
                     QuickActionButton(title: String(localized: "Sync"), systemImage: "arrow.triangle.2.circlepath",
                                       isBusy: BandPresentation.isSyncing(link, band)) { model.start(band, .sync) }
                         .disabled(link.phase.isBusy)
-                    QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
-                                      isOn: router.isFinding) {
-                        if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
+                    if band.supportsFind {
+                        QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
+                                          isOn: router.isFinding) {
+                            if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
+                        }
                     }
                     QuickActionButton(title: String(localized: "Notify"), systemImage: "text.bubble") { notifying = true }
                     QuickActionButton(title: String(localized: "Live HR"), systemImage: "heart",
@@ -106,6 +120,9 @@ private struct BandPage: View {
                         ListRow(title: String(localized: "Health monitoring"), systemImage: "heart.text.square")
                         ListRow(title: String(localized: "Display & Do Not Disturb"), systemImage: "moon")
                     }
+                    ListRow(title: String(localized: "Stay connected"), subtitle: stayConnectedSubtitle,
+                            systemImage: "link",
+                            accessory: .toggle(Binding(get: { stayConnected }, set: { model.setStayConnected($0) })))
                     NavigationLink(value: Route.aboutBand(band.id)) {
                         ListRow(title: String(localized: "About this band"), value: band.firmware,
                                 systemImage: "info.circle", showsDivider: false)

@@ -75,7 +75,7 @@ private struct WelcomeStep: View {
                     .padding(.vertical, FBSpace.m)
                     .accessibilityHidden(true)
                 StepTitle(text: String(localized: "Your band, only yours."))
-                Text("Freeband talks to your Xiaomi Smart Band 10 or 10 Pro directly. No account: your data stays on this phone and only leaves it if you turn that on.")
+                Text("Freeband talks to your Xiaomi band or watch directly. No account: your data stays on this phone and only leaves it if you turn that on.")
                     .textStyle(.body)
                     .foregroundStyle(.textBody)
                     .fixedSize(horizontal: false, vertical: true)

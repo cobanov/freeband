@@ -41,9 +41,14 @@ enum BandPresentation {
     }
 
     static func model(_ band: Band) -> BandRender.Model {
-        // By name, like Band.shortName: the watch shares the band10 model code.
-        if band.name.localizedCaseInsensitiveContains(Band.redmiWatch5Active) { return .redmiWatch5Active }
-        return band.model == "band10pro" ? .band10Pro : .band10
+        // By name, like Band.shortName: the watches and the Band 8 share the band10 model code.
+        switch Band.family(name: band.name, model: band.model) {
+        case .band10: .band10
+        case .band10Pro: .band10Pro
+        case .band8: .band8
+        case .redmiWatch5Active: .redmiWatch5Active
+        case .watchS1Active: .watchS1Active
+        }
     }
 
     /// The latest battery: the running session's, else the stored one.

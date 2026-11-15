@@ -50,7 +50,10 @@ struct IngestSummary {
 final class ActivityIngest {
     /// Bump when ActivityFiles.swift or IngestMapper changes what a file yields; stored files with
     /// an older version are parsed again at launch.
-    static let parserVersion = 2
+    /// 3: empty files (id, pad, CRC) parse as empty.
+    /// 4: sleep details without a summary or stages take their session from the fell-asleep and
+    /// woke-up events (Xiaomi Watch S1 Active).
+    static let parserVersion = 4
 
     let context: ModelContext
 

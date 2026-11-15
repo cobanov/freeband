@@ -2,7 +2,7 @@
 
 # Freeband
 
-Read your Xiaomi Smart Band 10 / 10 Pro or Redmi Watch 5 Active on iPhone without Mi Fitness or a Xiaomi account. Freeband talks to the band directly over Bluetooth LE, and your data stays on your phone.
+Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1 Active on iPhone without Mi Fitness or a Xiaomi account. Freeband talks to the band directly over Bluetooth LE, and your data stays on your phone.
 
 <p>
   <img src="docs/img/today.png" width="200" alt="Today: sleep, recovery and strain scores">
@@ -24,13 +24,15 @@ Read your Xiaomi Smart Band 10 / 10 Pro or Redmi Watch 5 Active on iPhone withou
 | Notifications from Freeband, find band (vibrate), clock sync | verified |
 | Listing and fetching the band's activity files | verified |
 | Redmi Watch 5 Active: authentication, battery, live stats, and fetching and parsing its daily summary, per-minute and sleep files | verified on firmware 2.2.105 |
+| Xiaomi Watch S1 Active, on the older BLE V1 channel: authentication, battery, live stats, notifications, its activity files, and sleep sessions from the watch's fell-asleep and woke-up events. The watch ignores Find, so Freeband hides it | verified on firmware 1.4.174 |
+| Find Phone: with Stay connected on (Band tab), Freeband keeps a session open in the background, and the watch's Find Phone rings the iPhone, also locked and on silent. Mi Fitness can't connect while it's on ([docs/STAY-CONNECTED.md](docs/STAY-CONNECTED.md)) | verified on a Xiaomi Watch S1 Active, firmware 1.4.174; a whole night idle not tested yet |
+| Mi Band 8, on BLE V1 | expected to work: Gadgetbridge puts it on the same channel as the Watch S1 Active. Not tested on a band yet ([#4](https://github.com/cobanov/freeband/issues/4)) |
 | Parsing them: per-minute data, daily summary, sleep and sleep stages, manual readings | implemented and tested against fixtures; not yet checked with real files from a Band 10 |
 | Sleep, Recovery and Strain scores with contributors and confidence | implemented (algorithm v1) |
 | English and Turkish, light and dark themes | done |
 | Optional web hub: REST API, web panel, webhooks, CSV/JSON export | live at freeband.cobanov.dev |
 | Alarms, health monitoring settings, Do Not Disturb, weather, watch faces | not built yet |
 | Replacing Mi Fitness entirely (background connection, file acknowledgement) | not built yet |
-| Mi Band 8 and older, which use the older BLE V1 channel | not supported; Freeband speaks only BLE V2 ([#4](https://github.com/cobanov/freeband/issues/4)) |
 
 **Band 10 Pro parsing note:** While the table says real files have not been checked,
 [`docs/ACTIVITY.md` section 11.1](docs/ACTIVITY.md#111-gerçek-band-10-pro-dosyaları-2026-10-14) records that
@@ -43,7 +45,7 @@ not establish measurement accuracy or verify Apple Health export.
 
 ## How it works
 
-1. iOS keeps the band connected, so the app picks it up again without pairing: service `FE95` with characteristics `005E` (notify) and `005F` (write).
+1. iOS keeps the band connected, so the app picks it up again without pairing: service `FE95` with characteristics `005E` (notify) and `005F` (write). Older bands such as the Watch S1 Active offer the BLE V1 channel instead (`0051`, `0052`, `0053`), which has its own framing and encrypts each message with AES-CCM ([`docs/BLE-V1.md`](docs/BLE-V1.md)) in place of step 4; the key, the handshake and the activity files are the same.
 2. The 16-byte auth key is created by Xiaomi's server when the band is first paired in Mi Fitness. On iPhone it sits in the Mi Fitness folder in the Files app. Freeband asks you to pick that folder, reads the key on the phone and keeps it in the Keychain.
 3. Handshake:
    - The phone and band swap nonces.
@@ -59,8 +61,10 @@ The full write-up, with source references:
 - [`docs/CAPABILITIES.md`](docs/CAPABILITIES.md): command map.
 - [`docs/ACTIVITY.md`](docs/ACTIVITY.md): activity file formats.
 - [`docs/PLAN.md`](docs/PLAN.md): product plan and score formulas.
+- [`docs/BLE-V1.md`](docs/BLE-V1.md): the older BLE V1 channel, and what the Watch S1 Active showed.
+- [`docs/STAY-CONNECTED.md`](docs/STAY-CONNECTED.md): Stay connected (the held session) and Find Phone.
 
-The docs are in Turkish.
+The docs are in Turkish, except `docs/BLE-V1.md` and `docs/STAY-CONNECTED.md`.
 
 ## Apple Health
 
@@ -116,7 +120,7 @@ sh ios/tests/health-export/migration/test.sh
 
 ## Try it yourself
 
-Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10, 10 Pro or Redmi Watch 5 Active, and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
+Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10, 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1 Active (a Mi Band 8 should work too, untested), and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
 
 1. **Pair the band with Mi Fitness once**, if it isn't already, and let it sync. This is the only time you need Mi Fitness: Xiaomi's server creates the band's key during pairing.
 2. **Check the key folder.** In the Files app, On My iPhone should show a `Mi Fitness` folder.
@@ -138,6 +142,8 @@ Freeband isn't on the App Store yet, so for now you build it from source. You ne
    - Turn on Developer Mode on the iPhone.
    - Pick the iPhone as the run destination and press Run.
    - Trust your developer certificate under Settings → General → VPN & Device Management.
+
+   With SideStore or AltStore on the iPhone, you can skip steps 4 and 5: `sh tools/build-ipa.sh` (from `ios/`) writes an unsigned `build/Freeband.ipa`, which they sign with your Apple ID when you install it. AirDropped to the iPhone, the file lands in Files › Downloads.
 6. **Read the key.** In Freeband, tap Get started, then Choose folder, then go to Browse → On My iPhone → Mi Fitness → Open.
 7. **Connect.** Close Mi Fitness from the app switcher, keep the band close and tap Connect.
 8. **Keep Mi Fitness out of the way.** Turn off its Background App Refresh or offload it (see below).

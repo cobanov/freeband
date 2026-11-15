@@ -376,6 +376,14 @@ private struct GalleryContent: View {
                 BandRender(model: .band10, state: .init(time: DesignSamples.now, battery: 41, worn: false), height: 200)
                 Spacer(minLength: 0)
             }
+            label("Watches and the Band 8")
+            HStack(alignment: .bottom, spacing: FBSpace.l) {
+                Spacer(minLength: 0)
+                BandRender(model: .watchS1Active, state: .init(time: DesignSamples.now, battery: 30, heartRate: 52), height: 200)
+                BandRender(model: .redmiWatch5Active, state: .init(time: DesignSamples.now, battery: 39), height: 200)
+                BandRender(model: .band8, state: .init(time: DesignSamples.now, battery: 64), height: 200)
+                Spacer(minLength: 0)
+            }
             VStack(alignment: .leading, spacing: FBSpace.xxs) {
                 Text("Band 10 Pro")
                     .textStyle(.headline)

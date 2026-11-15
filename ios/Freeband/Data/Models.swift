@@ -36,18 +36,50 @@ final class Band {
     var shortName: String { Self.shortName(name: name, model: model) }
     var displayName: String { Self.displayName(name: name, mac: mac) }
 
-    /// A Redmi Watch 5 Active gets band10 too: the hub accepts only band10 and band10pro
-    /// (hub/src/lib/validate.ts), so its pages call it Band 10.
+    /// The watches and the Band 8 get band10 too: the hub accepts only band10 and band10pro
+    /// (hub/src/lib/validate.ts), so its pages call them Band 10. `family` tells them apart.
     static func modelCode(for name: String) -> String {
         name.localizedCaseInsensitiveContains("pro") ? "band10pro" : "band10"
     }
 
-    /// The watch advertises as "Redmi Watch 5 Active D3DD". Other Xiaomi watches get the Band 10 name and drawing.
-    static let redmiWatch5Active = "Redmi Watch 5 Active"
+    /// What the band is, for its name and drawing.
+    enum Family: Sendable, CaseIterable {
+        case band10, band10Pro, band8, redmiWatch5Active, watchS1Active
+
+        var shortName: String {
+            switch self {
+            case .band10: "Band 10"
+            case .band10Pro: "Band 10 Pro"
+            case .band8: "Band 8"
+            case .redmiWatch5Active: "Redmi Watch 5 Active"
+            case .watchS1Active: "Watch S1 Active"
+            }
+        }
+
+        /// Whether the band vibrates on Find (Command{2, 18}). A Watch S1 Active accepts the
+        /// command and does nothing (firmware 1.4.174); Gadgetbridge marks Find unsupported on it.
+        var supportsFind: Bool { self != .watchS1Active }
+    }
+
+    var supportsFind: Bool { Self.family(name: name, model: model).supportsFind }
+
+    /// From Mi Fitness's name or the Bluetooth one: "Redmi Watch 5 Active D3DD", "Xiaomi Watch S1
+    /// Active" or "XiaomiWatchS1Active 5E6F", "Xiaomi Smart Band 8 A1B2" (not the 8 Pro, which
+    /// speaks only Bluetooth Classic, nor the 8 Active). Anything else is a Band 10 or 10 Pro by
+    /// its model code.
+    static func family(name: String, model: String? = nil) -> Family {
+        let compact = name.lowercased().filter { !$0.isWhitespace }
+        if compact.contains("redmiwatch5active") { return .redmiWatch5Active }
+        if compact.contains("watchs1active") { return .watchS1Active }
+        if name.range(of: "band ?8(?![0-9])", options: [.regularExpression, .caseInsensitive]) != nil,
+           !compact.contains("pro"), !compact.contains("active") {
+            return .band8
+        }
+        return (model ?? modelCode(for: name)) == "band10pro" ? .band10Pro : .band10
+    }
 
     static func shortName(name: String, model: String) -> String {
-        if name.localizedCaseInsensitiveContains(redmiWatch5Active) { return redmiWatch5Active }
-        return model == "band10pro" ? "Band 10 Pro" : "Band 10"
+        family(name: name, model: model).shortName
     }
 
     /// "Band 10 Pro (D9B9)": the suffix is what the band shows in its own Bluetooth name.

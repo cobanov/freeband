@@ -144,7 +144,7 @@ struct ActivityByteReader {
 // MARK: - Errors
 
 enum ActivityParseError: Error, Equatable, Sendable, CustomStringConvertible {
-    /// Fewer bytes than id + pad (+ 1 + CRC when the file carries one).
+    /// Fewer bytes than id + pad (+ CRC when the file carries one).
     case fileTooShort(length: Int, minimum: Int)
     case crcMismatch(stored: UInt32, computed: UInt32)
     /// A read ran past the end of the payload; offset is relative to the payload start.
@@ -448,7 +448,7 @@ enum ActivityAssemblyError: Error, Equatable, Sendable, CustomStringConvertible 
     /// The total changed in the middle of a file.
     case totalChanged(num: Int, total: Int, expectedTotal: Int)
     case fileTooLarge(limit: Int)
-    /// Assembled file below id(7) + pad(1) + 1 + CRC(4).
+    /// Assembled file below id(7) + pad(1) + CRC(4).
     case fileTooShort(length: Int)
     case crcMismatch(stored: UInt32, computed: UInt32)
 
@@ -465,7 +465,7 @@ enum ActivityAssemblyError: Error, Equatable, Sendable, CustomStringConvertible 
         case let .fileTooLarge(limit):
             return "file grew past \(limit) bytes"
         case let .fileTooShort(length):
-            return "file of \(length) bytes is shorter than the 13-byte minimum"
+            return "file of \(length) bytes is shorter than the \(ActivityAssembler.minimumFileLength)-byte minimum"
         case let .crcMismatch(stored, computed):
             return "crc stored \(String(stored, radix: 16)) computed \(String(computed, radix: 16))"
         }
@@ -477,7 +477,10 @@ enum ActivityAssemblyError: Error, Equatable, Sendable, CustomStringConvertible 
 /// Stricter than the band requires: any chunk other than the expected next one, or a change of
 /// total, drops the buffer and fails the file. A num == 1 chunk always starts a new file.
 struct ActivityAssembler {
-    static let minimumFileLength = 13
+    /// id(7) + pad(1) + CRC(4). A file with nothing between the pad and the CRC is empty: the band
+    /// has no records of its kind (a Xiaomi Watch S1 Active sends a 12-byte manual-readings file
+    /// for a day without manual readings). Gadgetbridge drops files under 13 bytes.
+    static let minimumFileLength = 12
     static let defaultMaxFileSize = 16 << 20
 
     let maxFileSize: Int
@@ -840,7 +843,8 @@ struct SleepSampleBlock<Value: Equatable & Sendable>: Equatable, Sendable {
 /// One packet of the magic-synchronised stream at the end of a sleep details file.
 struct SleepPacket: Equatable, Sendable {
     let type: UInt8
-    /// i64; seconds for types 16 and 17, unit unclear for others (type 1 looks like ms).
+    /// i64 in a unit that depends on the type: seconds for 16 and 17; in a Xiaomi Watch S1 Active
+    /// file, ms for 1, 2, 3 and 101 and ns for 0, 9 and 10 (SleepDetails.packetSeconds).
     let tsRaw: Int64
     let parity: UInt8
     let headerLength: UInt8
@@ -910,6 +914,8 @@ struct SleepDetails: Equatable, Sendable {
     let nightStages: [SleepStageSample]
     let summaries: [SleepSummaryPacket]
     let rrIntervals: [SleepRRPacket]
+    /// Fell-asleep (type 2) and woke-up (type 3) events paired into spans of sleep, in time order.
+    let sleepSpans: [DateInterval]
     /// Bytes skipped while looking for the packet magic.
     let skippedBytes: Int
     /// Bytes after the last packet (too few for a header, or no magic found).
@@ -917,10 +923,24 @@ struct SleepDetails: Equatable, Sendable {
     /// Set when a packet ran past the end of the file; packets before it are kept.
     let streamError: String?
 
-    /// Minutes come from the last type-16 summary (several can appear; the last one wins), else
-    /// from summing the type-17 stage durations, else nil. Nil when bed or wake time is 0 or
-    /// the wake time precedes the bed time.
+    /// A file with neither a summary nor stages but with fell-asleep/woke-up events takes its
+    /// session from the events. A Xiaomi Watch S1 Active writes such files, and their header can
+    /// start at a later fall-asleep than the session (header 09:52-12:38, events 08:52-09:24,
+    /// 09:52-11:48 and 11:50-12:38, which the watch shows as 08:52-12:38, 3 h 16 min asleep).
+    var sessionFromSpans: Bool { summaries.isEmpty && nightStages.isEmpty && !sleepSpans.isEmpty }
+
+    /// From the events (`sessionFromSpans`): first fall-asleep to last wake-up, with the gaps
+    /// between spans as awake minutes and no stages. Otherwise from the header: minutes from the
+    /// last type-16 summary (several can appear; the last one wins), else from summing the
+    /// type-17 stage durations, else nil; nil when bed or wake time is 0 or the wake time
+    /// precedes the bed time.
     var session: SleepSession? {
+        if sessionFromSpans, let first = sleepSpans.first, let last = sleepSpans.last {
+            let asleep = sleepSpans.reduce(0.0) { $0 + $1.duration }
+            let awake = Int(((last.end.timeIntervalSince(first.start) - asleep) / 60).rounded())
+            return SleepSession(bedTime: first.start, wakeTime: last.end, deepMinutes: nil, lightMinutes: nil,
+                                remMinutes: nil, awakeMinutes: awake, stages: [])
+        }
         guard bedTime.timeIntervalSince1970 > 0, wakeTime.timeIntervalSince1970 > 0, wakeTime >= bedTime else { return nil }
         var deep: Int?, light: Int?, rem: Int?, awake: Int?
         if let s = summaries.last {
@@ -1017,9 +1037,40 @@ struct SleepDetails: Equatable, Sendable {
             heartRate: hr, spo2: spo2, snore: snore, blocksError: blocksError,
             packets: stream.packets, stages: stream.stages,
             nightStages: stream.lastStagesByTs.keys.sorted().flatMap { stream.lastStagesByTs[$0] ?? [] },
-            summaries: stream.summaries, rrIntervals: stream.rr,
+            summaries: stream.summaries, rrIntervals: stream.rr, sleepSpans: sleepSpans(stream.packets),
             skippedBytes: stream.skipped, trailingBytes: stream.trailing, streamError: stream.error
         )
+    }
+
+    /// Packet timestamps to Unix seconds. They come in several units: in a Xiaomi Watch S1 Active
+    /// file, types 1, 2, 3 and 101 are in milliseconds and types 0, 9 and 10 in nanoseconds;
+    /// type 17 is read as seconds, as Gadgetbridge does. The unit is told by the magnitude.
+    static func packetSeconds(_ raw: Int64) -> Int64 {
+        switch raw.magnitude {
+        case 100_000_000_000_000_000...: return raw / 1_000_000_000
+        case 100_000_000_000_000...: return raw / 1_000_000
+        case 100_000_000_000...: return raw / 1_000
+        default: return raw
+        }
+    }
+
+    /// Fell-asleep (type 2) and woke-up (type 3) events paired in time order. A second fall-asleep
+    /// before a wake-up keeps the first; a wake-up with no open span is dropped.
+    static func sleepSpans(_ packets: [SleepPacket]) -> [DateInterval] {
+        let events = packets.filter { $0.type == 2 || $0.type == 3 }
+            .map { (seconds: packetSeconds($0.tsRaw), type: $0.type) }
+            .sorted { ($0.seconds, $0.type) < ($1.seconds, $1.type) }
+        var spans: [DateInterval] = []
+        var start: Int64?
+        for event in events {
+            if event.type == 2 {
+                if start == nil { start = event.seconds }
+            } else if let open = start {
+                if event.seconds > open { spans.append(DateInterval(start: unixDate(open), end: unixDate(event.seconds))) }
+                start = nil
+            }
+        }
+        return spans
     }
 
     private struct Stream {
@@ -1314,6 +1365,8 @@ enum ActivityPayload: Equatable, Sendable {
     case sleepDetails(SleepDetails)
     case sleepStages(SleepStages)
     case manualSamples(ManualSamples)
+    /// Nothing between the pad and a matching CRC: the band has no records of this kind.
+    case empty
     case unsupported(ActivityUnsupported)
     case error(ActivityParseError)
 }
@@ -1358,6 +1411,7 @@ struct ActivityParseResult: Sendable, CustomStringConvertible {
         case let .sleepDetails(d): body = "\(d.stages.count) stage(s), \(d.packets.count) packet(s)"
         case let .sleepStages(d): body = d.noData ? "no data" : "\(d.stages.count) phase change(s)"
         case let .manualSamples(d): body = "\(d.samples.count) sample(s)"
+        case .empty: body = "empty"
         case let .unsupported(u): body = u.description
         case let .error(e): body = "error: \(e)"
         }
@@ -1404,7 +1458,10 @@ enum ActivityParser {
 
         let kind = id.kind
         let payload: ActivityPayload
-        if kind.supportedVersions.isEmpty {
+        if body.isEmpty, crc?.ok == true {
+            // Only a checked CRC tells an empty file from one cut short after the pad.
+            payload = .empty
+        } else if kind.supportedVersions.isEmpty {
             payload = .unsupported(.kind(kind))
         } else if !kind.supportedVersions.contains(id.version) {
             payload = .unsupported(.version(kind, id.version))

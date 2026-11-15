@@ -230,8 +230,9 @@ def open_file(data: bytes, has_crc: bool = True):
     crc = None
     end = len(data)
     if has_crc:
-        if len(data) < 13:
-            raise FormatError(f"file of {len(data)} bytes is shorter than the 13-byte minimum")
+        # 12 = id + pad + CRC: an empty file (no records of its kind); Gadgetbridge drops under 13
+        if len(data) < 12:
+            raise FormatError(f"file of {len(data)} bytes is shorter than the 12-byte minimum")
         stored = int.from_bytes(data[-4:], "little")
         computed = crc32(data[:-4])
         crc = {"stored": f"{stored:08x}", "computed": f"{computed:08x}", "ok": stored == computed}
@@ -525,7 +526,33 @@ def parse_sleep_details(fid: FileId, body: bytes) -> dict:
     out["stages"] = stages
     out["summaries"] = summaries
     out["rr"] = rr
+    out["sleep_spans"] = sleep_spans(packets)
     return out
+
+
+def packet_seconds(ts: int) -> int:
+    """Packet timestamp to Unix seconds, the unit told by the magnitude: a Xiaomi Watch S1 Active
+    writes types 1, 2, 3 and 101 in milliseconds and 0, 9, 10 in nanoseconds; type 17 is seconds."""
+    for limit, scale in ((10**17, 10**9), (10**14, 10**6), (10**11, 10**3)):
+        if abs(ts) >= limit:
+            return abs(ts) // scale * (1 if ts >= 0 else -1)  # truncates toward zero, as Swift does
+    return ts
+
+
+def sleep_spans(packets: list) -> list:
+    """Fell-asleep (type 2) and woke-up (type 3) events paired in time order, as [start, end]
+    Unix seconds. A second fall-asleep before a wake-up keeps the first; a lone wake-up is dropped."""
+    events = sorted((packet_seconds(p["ts"]), p["type"]) for p in packets if p["type"] in (2, 3))
+    spans, start = [], None
+    for t, kind in events:
+        if kind == 2:
+            if start is None:
+                start = t
+        elif start is not None:
+            if t > start:
+                spans.append([start, t])
+            start = None
+    return spans
 
 
 # ---------------------------------------------------------------------------
@@ -638,7 +665,10 @@ def parse_file(data: bytes, has_crc: bool = True) -> dict:
     fid, pad, body, crc = open_file(data, has_crc)
     kind = kind_of(fid)
     out = {"file_id": fid.to_json(), "kind": kind, "pad": pad, "crc": crc, "payload_len": len(body)}
-    if kind == "daily_details":
+    if not body and crc is not None:
+        # empty file (no records of its kind); only a checked CRC tells it from a cut-off one
+        out["data"] = None
+    elif kind == "daily_details":
         out["data"] = parse_daily_details(fid, body)
     elif kind == "daily_summary":
         out["data"] = parse_daily_summary(fid, body)
