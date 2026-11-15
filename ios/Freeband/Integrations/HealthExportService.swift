@@ -16,6 +16,7 @@ final class HealthExportService: ObservableObject {
     private var generation = 0
     private var task: Task<Void, Never>?
     private var reschedule = false
+    private var paused = false
 
     init(context: ModelContext, demo: Bool, writer: any HealthKitWriting = HealthKitWriter()) {
         self.context = context; self.demo = demo; self.writer = writer
@@ -49,6 +50,16 @@ final class HealthExportService: ObservableObject {
     }
     func invalidate() { generation += 1 }
 
+    /// Stop starting work after a background time limit; ledger rows remain retryable.
+    func pause() { paused = true; reschedule = false; invalidate() }
+    func resume() { paused = false }
+
+    func waitUntilIdle() async {
+        while task != nil && !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
     /// Called before local deletion. A global cutoff is conservative: another band's older,
     /// not-yet-exported history is withheld too, preventing re-import after a band is re-added.
     func suppressHistory() throws {
@@ -59,7 +70,7 @@ final class HealthExportService: ObservableObject {
     }
     func schedule() {
         refresh()
-        guard enabled, available else { return }
+        guard enabled, available, !paused else { return }
         if task != nil { reschedule = true; return }
         let current = generation
         task = Task { [weak self] in

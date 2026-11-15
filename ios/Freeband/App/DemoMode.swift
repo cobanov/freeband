@@ -23,6 +23,7 @@ final class AppSession: ObservableObject {
     /// Demo mode never touches the real store or the onboarding flag; leaving it returns to the
     /// app as it was, and to the app proper whenever a real band is already set up.
     func setDemo(_ on: Bool) {
+        BackgroundSync.shared.sessionWillChange()
         model.stop()
         model.healthExport.invalidate()
         // The old model's link goes away with it; let go of a held session first.

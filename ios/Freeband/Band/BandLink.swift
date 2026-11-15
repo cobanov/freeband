@@ -194,6 +194,9 @@ final class BandLink: NSObject, ObservableObject {
     var onSample: ((UUID, SampleDraft) -> Void)?
     /// Once per session, on the main queue.
     var onFinish: ((UUID, Outcome) -> Void)?
+    /// A held connection authenticated; a background sync may be due.
+    var onHoldConnected: ((UUID) -> Void)?
+    var onBluetoothReady: (() -> Void)?
     /// How the last session ended.
     @Published private(set) var lastOutcome: Outcome?
     /// After authentication: which candidate key worked and the band's own Bluetooth name.
@@ -546,6 +549,7 @@ final class BandLink: NSObject, ObservableObject {
             holdState = .connected
             holdFailures = 0
             note("auth ok → holding the session")
+            if let id = target?.id { onHoldConnected?(id) }
             return
         }
         if case .send(let commands) = purpose {
@@ -1174,6 +1178,7 @@ extension BandLink: CBCentralManagerDelegate {
             // Bluetooth is back on: a held session waiting for it opens again.
             resumeHold()
         }
+        if central.state == .poweredOn { onBluetoothReady?() }
     }
 
     /// iOS relaunched the app in the background for the held session (docs/STAY-CONNECTED.md

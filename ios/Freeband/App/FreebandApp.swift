@@ -12,6 +12,7 @@ struct FreebandApp: App {
         // the held session there is no window, and the Bluetooth manager must exist at launch
         // (docs/STAY-CONNECTED.md section 3).
         _ = AppSession.shared
+        BackgroundSync.shared.register()
     }
 
     var body: some Scene {
@@ -85,8 +86,9 @@ struct RootView: View {
         .onOpenURL { model.handle($0) }
         .onChange(of: scenePhase) { _, phase in
             // Live mode keeps the band measuring; never leave it running in the background.
-            if phase == .background { model.enterBackground(); model.healthExport.invalidate() }
+            if phase == .background { model.enterBackground() }
             if phase == .active {
+                model.healthExport.resume()
                 autoSync()
                 model.healthExport.schedule()
                 // A held session waiting out a retry opens now (after the sync, if one started).
@@ -94,7 +96,7 @@ struct RootView: View {
             }
         }
         .onChange(of: link.bluetooth) { _, state in
-            if state == .poweredOn { autoSync() }
+            if state == .poweredOn && scenePhase == .active { autoSync() }
         }
         .onChange(of: selectedBand) { model.updateHold() }
         .onChange(of: bands.count) { model.updateHold() }

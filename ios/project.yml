@@ -50,7 +50,8 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [bluetooth-le]
         # Stay connected (docs/STAY-CONNECTED.md): Bluetooth events in the background, and ringing for Find Phone.
-        UIBackgroundModes: [bluetooth-central, audio]
+        UIBackgroundModes: [bluetooth-central, audio, fetch]
+        BGTaskSchedulerPermittedIdentifiers: ["$(PRODUCT_BUNDLE_IDENTIFIER).background-sync"]
         CFBundleURLTypes:
           - CFBundleURLName: com.rfivesix.freeband
             CFBundleURLSchemes: [freeband]

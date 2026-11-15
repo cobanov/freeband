@@ -54,6 +54,7 @@ private struct BandPage: View {
     @State private var notifying = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(AppModel.stayConnectedKey) private var stayConnected = false
+    @AppStorage(BackgroundSync.settingKey) private var backgroundSync = false
 
     /// What Stay connected does, and while it's on, whether the session is open right now.
     private var stayConnectedSubtitle: String {
@@ -123,6 +124,10 @@ private struct BandPage: View {
                     ListRow(title: String(localized: "Stay connected"), subtitle: stayConnectedSubtitle,
                             systemImage: "link",
                             accessory: .toggle(Binding(get: { stayConnected }, set: { model.setStayConnected($0) })))
+                    ListRow(title: String(localized: "Sync in background"),
+                            subtitle: String(localized: "Syncs when iOS allows. Timing is not guaranteed."),
+                            systemImage: "arrow.triangle.2.circlepath",
+                            accessory: .toggle(Binding(get: { backgroundSync }, set: { BackgroundSync.shared.setEnabled($0) })))
                     NavigationLink(value: Route.aboutBand(band.id)) {
                         ListRow(title: String(localized: "About this band"), value: band.firmware,
                                 systemImage: "info.circle", showsDivider: false)

@@ -47,6 +47,9 @@ final class AppModel: ObservableObject {
     /// Earliest day per band whose scores must be recomputed once no session is running.
     private var pendingRollup: [UUID: DayKey] = [:]
     private var ingestTask: Task<Void, Never>?
+    private var sessionProcessingTask: Task<Void, Never>?
+    private var sessionProcessingID: UUID?
+    private var backgroundSyncRunID: UUID?
     private var ingestAgain = false
     /// Health records waiting for the hub (only while hubAcceptsHealthTypes).
     private var pendingHubRecords: [UUID: [[String: Any]]] = [:]
@@ -76,6 +79,13 @@ final class AppModel: ObservableObject {
         healthExport = HealthExportService(context: context, demo: isDemo)
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
+        link.onHoldConnected = { id in
+            // didAuthenticate must finish before another session takes over the link.
+            DispatchQueue.main.async { BackgroundSync.shared.bluetoothOpportunity(bandID: id) }
+        }
+        link.onBluetoothReady = {
+            DispatchQueue.main.async { BackgroundSync.shared.bluetoothOpportunity() }
+        }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
         link.hasActivityFile = { [weak self] id, hex in self?.hasActivityFile(id, hex) ?? false }
         link.onDeviceInfo = { [weak self] id, info in
@@ -172,7 +182,7 @@ final class AppModel: ObservableObject {
     /// don't run in a suspended app. Once it is open, Bluetooth events wake the app
     /// (docs/STAY-CONNECTED.md section 3).
     func enterBackground() {
-        stop()
+        if backgroundSyncRunID == nil { stop() }
         guard !isDemo, UserDefaults.standard.bool(forKey: Self.stayConnectedKey) else { return }
         endBackgroundTask()
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Stay connected") { [weak self] in
@@ -199,7 +209,7 @@ final class AppModel: ObservableObject {
     }
 
     /// The band on the Band tab: the one picked there, else the first added.
-    private func selectedBand() -> Band? {
+    func selectedBand() -> Band? {
         let bands = (try? context.fetch(FetchDescriptor<Band>(sortBy: [SortDescriptor(\.addedAt)]))) ?? []
         let selected = UserDefaults.standard.string(forKey: "selectedBand") ?? ""
         return bands.first { $0.id.uuidString == selected } ?? bands.first
@@ -249,6 +259,60 @@ final class AppModel: ObservableObject {
 
     static let autoSyncAfter: TimeInterval = 15 * 60
 
+    func expireBackgroundSync() {
+        link.note("background sync: time expired or disabled")
+        healthExport.pause()
+        if backgroundSyncRunID != nil { stop(); backgroundSyncRunID = nil }
+    }
+
+    /// Runs only inside a granted background opportunity. All continuations are retryable.
+    func runBackgroundSync() async -> Bool {
+        guard !isDemo, UserDefaults.standard.bool(forKey: "onboarded") else {
+            link.note("background sync: demo or onboarding"); return false
+        }
+        // The central can still be initializing after a background launch.
+        for _ in 0..<40 where link.bluetooth == .unknown || link.bluetooth == .resetting {
+            if Task.isCancelled { return false }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        for _ in 0..<50 where ingestBusy {
+            if Task.isCancelled { return false }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        guard !Task.isCancelled, let band = selectedBand() else {
+            link.note("background sync: no selected band"); return false
+        }
+        let reason = BackgroundSyncPolicy.skipReason(enabled: UserDefaults.standard.bool(forKey: BackgroundSync.settingKey),
+            bluetoothReady: link.bluetooth == .poweredOn, hasKey: target(for: band) != nil,
+            busy: link.phase.isBusy || ingestBusy || ingestTask != nil || sessionProcessingID != nil,
+            lastSync: band.lastSyncAt, now: Date())
+        if let reason {
+            link.note("background sync: \(reason)")
+            if reason == "not due" {
+                healthExport.resume()
+                healthExport.schedule()
+                await healthExport.waitUntilIdle()
+                return !Task.isCancelled
+            }
+            return false
+        }
+        healthExport.resume()
+        let runID = UUID()
+        backgroundSyncRunID = runID
+        defer { if backgroundSyncRunID == runID { backgroundSyncRunID = nil } }
+        link.note("background sync: started")
+        start(band, .sync)
+        while link.phase.isBusy && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(100)) }
+        if Task.isCancelled { return false }
+        if let processing = sessionProcessingTask { await processing.value }
+        if Task.isCancelled { return false }
+        await healthExport.waitUntilIdle()
+        if Task.isCancelled { return false }
+        let complete = link.lastOutcome == .complete
+        link.note(complete ? "background sync: finished" : "background sync: incomplete")
+        return complete
+    }
+
     /// For pull to refresh: starts a sync and returns when the session has ended.
     func syncAndWait(_ band: Band) async {
         guard !link.phase.isBusy else { return }
@@ -275,7 +339,10 @@ final class AppModel: ObservableObject {
             try? context.save()
         }
         let device = Payload.Device(band)
-        Task {
+        let processingID = UUID()
+        sessionProcessingID = processingID
+        sessionProcessingTask = Task {
+            defer { if sessionProcessingID == processingID { sessionProcessingID = nil } }
             await waitForIngest()
             let parsed = sessionIngest
             sessionIngest = IngestSummary()
@@ -290,9 +357,11 @@ final class AppModel: ObservableObject {
             let records = healthRecords(bandID: id, parsed)
             guard !drafts.isEmpty || !records.isEmpty else { return }
             if Self.hubAcceptsHealthTypes, !records.isEmpty { pendingHubRecords[id, default: []] += records }
-            await deliverWebhooks(event: outcome == .complete ? "sync.completed" : "sync.partial", device: device,
-                                  drafts: drafts, records: records)
-            await pushToHub()
+            Task {
+                await deliverWebhooks(event: outcome == .complete ? "sync.completed" : "sync.partial", device: device,
+                                      drafts: drafts, records: records)
+                await pushToHub()
+            }
         }
     }
 

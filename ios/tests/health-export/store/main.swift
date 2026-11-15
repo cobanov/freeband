@@ -13,6 +13,7 @@ final class FakeWriter: HealthKitWriting {
     var available = true
     var failNext = false
     var failNextDelete = false
+    var delay: Duration?
     var saves: [(String, Int)] = []
     var deletes: [String] = []
     var allowed: Set<HealthExportKind> = Set(HealthExportKind.allCases)
@@ -20,6 +21,7 @@ final class FakeWriter: HealthKitWriting {
     func requestAuthorization() async throws { }
     func save(_ sample: HealthExportSample, version: Int) async throws {
         saves.append((sample.identifier, version))
+        if let delay { try await Task.sleep(for: delay) }
         if failNext { failNext = false; throw Failure.injected }
     }
     func delete(identifier: String, kind: HealthExportKind) async throws {
@@ -66,7 +68,19 @@ final class FakeWriter: HealthKitWriting {
         check(blob.parseStatus == ParseStatus.parsed.rawValue, "fixture must be authoritative")
         let fake = FakeWriter(); fake.failNext = true
         let service = HealthExportService(context: context, demo: false, writer: fake)
+        service.pause()
         await service.enable(); await settle(service)
+        check(fake.saves.isEmpty, "paused background export does not start")
+        fake.delay = .milliseconds(100)
+        service.resume(); service.schedule()
+        while fake.saves.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        let interrupted = fake.saves[0]
+        service.pause(); await settle(service)
+        let interruptedRows = try context.fetch(FetchDescriptor<HealthExportLedgerRow>())
+        check(interruptedRows.contains { $0.identifier == interrupted.0 && $0.state == "savePending" },
+              "interrupted export keeps its retryable ledger entry")
+        fake.delay = nil; fake.failNext = true
+        service.resume(); service.schedule(); await settle(service)
         let first = fake.saves.first
         check(first != nil, "an eligible sample is attempted")
         let pending = try context.fetch(FetchDescriptor<HealthExportLedgerRow>())

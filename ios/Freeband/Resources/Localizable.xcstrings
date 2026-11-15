@@ -4600,6 +4600,16 @@
         }
       }
     },
+    "Sync in background": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arka planda senkronize et"
+          }
+        }
+      }
+    },
     "Sync now": {
       "localizations": {
         "en": {
@@ -4712,6 +4722,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eşzamanlanıyor…"
+          }
+        }
+      }
+    },
+    "Syncs when iOS allows. Timing is not guaranteed.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS izin verdiğinde senkronize eder. Zamanlama garanti edilmez."
           }
         }
       }
