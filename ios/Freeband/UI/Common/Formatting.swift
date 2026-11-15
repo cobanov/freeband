@@ -1,5 +1,38 @@
 import SwiftUI
 
+/// Metric or imperial for heights, weights, distances and speeds. `system` is what iOS has for
+/// the phone's region, which is not always what its owner reads (a phone set to the United
+/// States in Turkey shows feet and pounds).
+enum UnitSetting: String, CaseIterable, Identifiable {
+    case system, metric, imperial
+
+    var id: String { rawValue }
+
+    static let storageKey = "units"
+
+    static var current: UnitSetting {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(UnitSetting.init) ?? .system
+    }
+
+    var title: String {
+        switch self {
+        case .system: String(localized: "units.system", defaultValue: "System", comment: "Units option")
+        case .metric: String(localized: "units.metric", defaultValue: "Metric", comment: "Units option")
+        case .imperial: String(localized: "units.imperial", defaultValue: "Imperial", comment: "Units option")
+        }
+    }
+
+    /// The current locale with the chosen measurement system; measurements are formatted in it.
+    var locale: Locale {
+        guard self != .system else { return .current }
+        var components = Locale.Components(locale: .current)
+        components.measurementSystem = self == .metric ? .metric : .us
+        return Locale(components: components)
+    }
+
+    var usesMiles: Bool { locale.measurementSystem != .metric }
+}
+
 /// Number, duration and date formats. Everything follows `Locale.current`: "7h 12m" / "7 sa 12 dk",
 /// "96%" / "%96", "6,412" / "6.412".
 enum FBFormat {

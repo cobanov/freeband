@@ -204,6 +204,9 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft = Profile.load()
     @State private var saved = Profile.load()
+    @AppStorage(UnitSetting.storageKey) private var units = UnitSetting.system.rawValue
+
+    private var unitSetting: UnitSetting { UnitSetting(rawValue: units) ?? .system }
 
     private static let currentYear = Calendar.current.component(.year, from: Date())
 
@@ -232,18 +235,21 @@ struct ProfileView: View {
                     Text("Female").tag(Profile.Sex.female)
                     Text("Male").tag(Profile.Sex.male)
                 }
+                Picker(String(localized: "Units"), selection: $units) {
+                    ForEach(UnitSetting.allCases) { Text($0.title).tag($0.rawValue) }
+                }
                 Picker(String(localized: "Height"), selection: optionalDouble(\.heightCm)) {
                     Text("Not set").tag(0)
                     ForEach(120...220, id: \.self) { cm in
                         Text(Measurement(value: Double(cm), unit: UnitLength.centimeters)
-                            .formatted(.measurement(width: .abbreviated, usage: .personHeight))).tag(cm)
+                            .formatted(.measurement(width: .abbreviated, usage: .personHeight).locale(unitSetting.locale))).tag(cm)
                     }
                 }
                 Picker(String(localized: "Weight"), selection: optionalDouble(\.weightKg)) {
                     Text("Not set").tag(0)
                     ForEach(35...200, id: \.self) { kg in
                         Text(Measurement(value: Double(kg), unit: UnitMass.kilograms)
-                            .formatted(.measurement(width: .abbreviated, usage: .personWeight))).tag(kg)
+                            .formatted(.measurement(width: .abbreviated, usage: .personWeight).locale(unitSetting.locale))).tag(kg)
                     }
                 }
             } footer: {

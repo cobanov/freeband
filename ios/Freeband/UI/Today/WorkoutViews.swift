@@ -41,11 +41,12 @@ extension Workout {
 
     var durationText: String { FBFormat.duration(minutes: Double(activeSeconds) / 60) }
 
-    /// Kilometres or miles, as the region has them.
+    /// Kilometres or miles, as Settings > Units has them.
     var distanceText: String? {
         distanceMeters.map {
             Measurement(value: Double($0), unit: UnitLength.meters)
-                .formatted(.measurement(width: .abbreviated, usage: .road, numberFormatStyle: .number.precision(.fractionLength(0 ... 2))))
+                .formatted(.measurement(width: .abbreviated, usage: .road, numberFormatStyle: .number.precision(.fractionLength(0 ... 2)))
+                    .locale(UnitSetting.current.locale))
         }
     }
 
@@ -53,18 +54,21 @@ extension Workout {
         value.map { "\(FBFormat.number($0)) \(String(localized: "kcal"))" }
     }
 
-    /// Seconds per kilometre as "5:42 /km".
+    /// Seconds per kilometre as "5:42 /km", or per mile as "9:10 /mi".
     static func pace(_ secondsPerKm: Int?) -> String? {
         secondsPerKm.map {
-            let time = Duration.seconds($0).formatted(.time(pattern: .minuteSecond))
-            return String(localized: "\(time) /km", comment: "Pace: minutes and seconds per kilometre")
+            let miles = UnitSetting.current.usesMiles
+            let time = Duration.seconds(miles ? (Double($0) * 1.609344).rounded() : Double($0)).formatted(.time(pattern: .minuteSecond))
+            return miles ? String(localized: "\(time) /mi", comment: "Pace: minutes and seconds per mile")
+                : String(localized: "\(time) /km", comment: "Pace: minutes and seconds per kilometre")
         }
     }
 
     static func speed(_ kmh: Double?) -> String? {
         kmh.map {
             Measurement(value: $0, unit: UnitSpeed.kilometersPerHour)
-                .formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(1))))
+                .formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(1)))
+                    .locale(UnitSetting.current.locale))
         }
     }
 
