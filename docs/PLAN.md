@@ -122,6 +122,7 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 - **Toparlanma:** f(z) = 60 + 20z (0–100'e sınırlı), yani "senin normalin" 60 eder.
   - RR varsa ağırlıklar: HRV 40, dinlenik nabız 25, uyku 25, dünkü yük 10.
   - RR yoksa: dinlenik nabız 45, uyku 40, yük 15; güven en fazla "orta".
+  - **v3 (2026-11-16): gecesi olmayan günün toparlanma skoru yok.** Ölçüm: 16 Kasım 02:00'de, o gecenin uykusu henüz yokken, bandın günlük özetindeki dinlenik nabız 75 idi (akan gündüz değeri); 64'lük normale karşı bu, toparlanmayı 0 yaptı. Toparlanma geceden okunur; gece yoksa skor yok, neden "uyku kaydı yok". `ScoreEngine.algoVersion` 3.
 - **Yük (0–21):**
   - Maksimum nabız = 208 − 0,7 × yaş. Nabız rezervi oranı r = (nabız − dinlenik) / (maks. − dinlenik).
   - Bölgeler (r'ye göre): Z1 0,5–0,6, Z2 0,6–0,7, Z3 0,7–0,8, Z4 0,8–0,9, Z5 ≥ 0,9.
@@ -142,6 +143,18 @@ Bugün ekranında, skorların altında, en çok üç satır; önce uyarılar. He
 - **Uyku açığı:** son 7 gecede (en az 5'i verili) ihtiyaçtan toplam 5 saat eksik; 10 saat ise uyarı.
 - **Uyku saati kaydı:** gecenin ortası, önceki gecelerin (en az 4) medyanından 90 dakika ileri ya da geri; saat gece yarısında sarılır.
 - **Yoğun günler, düşük toparlanma:** önceki 3 günün her birinde yük bazalın 1σ üstünde ve bugünkü toparlanma düşük bantta (34'ün altı).
+
+### 5.2 Analiz ekranları (v1, 2026-11-16)
+
+Kod: `ios/Freeband/Analytics/Analysis.swift` (saf, testi `ios/tests/analytics`), görünümler `UI/Trends/AnalysisViews.swift` ve `UI/Sleep/SleepAnalysis.swift`. Bütün eşikler seçimdir, bir nüfusa karşı doğrulanmadı.
+
+- **Dönem değerlendirmesi** (Eğilimler'in başı; 7, 30 ya da 90 gün, bir önceki eş uzunluktaki dönemle): uyku (gece + şekerleme), toparlanma, yük, dinlenik nabız, HRV ve adımın günlük ortalamaları. Ortalama tek günden de verilir ve kaç güne dayandığını söyler; cümle (bulgu) ve değişim için iki tarafta da 3 gün gerekir. Bulgu eşikleri: uyku 30 dk, dinlenik nabız 2 bpm, HRV %10, toparlanma 8 puan, yük 1,5. Uyku ortalaması ihtiyacın 45 dk altındaysa "eksik" (90'da uyarı).
+- **Uyku saatleri:** yatış ve kalkış, bir önceki günün öğlesinden başlayan saatte (23:30 = 690) tutulur; ortalamaları ve ortalamadan ortalama uzaklıkları (dk) verilir. 60 dk ve üstü "oynuyor", 5 gecede 30 dk ve altı "düzenli". Yüzdeye çevrilmiş bir "tutarlılık skoru" bilerek yok: uydurma olurdu.
+- **Sağlık monitörü:** dinlenik nabız, HRV, kan oksijeni, stres; kişinin kendi aralığı = 14 günlük medyan ± 2σ (`Baseline`), 3 gün olmadan "aralığın öğreniliyor". Bu gecenin uykusu gelmeden önce son tam gün gösterilir. Dinlenik nabızda bandın günlük değeri yalnız bitmiş günler için kullanılır (`settledRestingHR`).
+- **Grafikler:** yük (çubuk, 0–21) ile toparlanma (bandının renginde nokta, 0–100) aynı ızgarada, üçte birler çakışır (7/14 ↔ 33/67); geceler evre evre yığılmış çubuk, ihtiyaç çizgisine karşı; yatış–kalkış çubukları; günlük nabız bölgesi dakikaları.
+- **Gece notları** (Uyku ekranı, ilk geceden itibaren; kişinin geçmişine değil genel ölçülere bakar): ihtiyaca 15 dk kala "karşılandı", 45 dk altı "altında" (2 saatte uyarı); derin + REM payı %40 ve üstü "bol", %30 altı "az" (yetişkinler için sık anılan aralıklar: derin %13–23, REM %20–25); verim %85 altı "huzursuz"; nabız akşama göre %10'dan az düştüyse "yüksek kaldı".
+- **Gece boyunca HRV** (Uyku ekranı): her kullanılabilir 5 dakikalık pencerenin RMSSD'si; gecenin değeri gölgeli ikinci yarının medyanı (bölüm 5, HRV).
+- **Uyku ihtiyacı kartı:** gece + şekerleme / ihtiyaç, ve son 7 günün dengesi (`Analysis.sleepDebt`).
 
 ## 6. Veri hattı ve hata düzeltmeleri
 

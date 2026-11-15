@@ -71,7 +71,8 @@ Where the facts come from, so they need not be looked up again:
 Other things that cost time once:
 
 - Turkish for new strings: `python3 -I ios/tools/add-turkish.py ios/Freeband/Resources/Localizable.xcstrings` with a JSON object on stdin; it keeps the catalog's formatting.
-- Screens with demo data in the simulator: `xcrun simctl launch <id> dev.cobanov.freeband -freeband-demo full -freeband-screen today|sleep|trends|band|score-recovery [-freeband-day -1]`, then `xcrun simctl io <id> screenshot`. Wait about 7 seconds first, or the picture catches the opening animation.
+- Screens with demo data in the simulator: `xcrun simctl launch <id> dev.cobanov.freeband -freeband-demo full -freeband-screen today|sleep|trends|band|score-recovery [-freeband-day -1]`, then `xcrun simctl io <id> screenshot`. Wait about 7 seconds first, or the picture catches the opening animation. `-freeband-scroll <section>` jumps to a section below the fold on Trends and Sleep (the section's English title on Trends; `need` or `hrv` on Sleep). `-freeband-demo` in a DEBUG build writes the demo rows into the simulator's real store.
+- The maintainer's real data in the simulator: checkpoint a copy of the pulled database into one file (`sqlite3 copy/default.store "PRAGMA wal_checkpoint(TRUNCATE)"`), put it at `Library/Application Support/default.store` in the app's data container (`xcrun simctl get_app_container <id> dev.cobanov.freeband data`), and launch without `-freeband-demo`. Copying the `-wal` and `-shm` files along makes the store fail to open.
 - `python3 check_vectors.py` needs `cryptography`: `uv run -q --no-project --with cryptography python check_vectors.py`.
 
 ## Committing

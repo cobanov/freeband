@@ -172,3 +172,58 @@ struct BandHealthReader<Content: View>: View {
         content(HealthHistory(bandID: band.id, scores: scores, summaries: summaries, sleeps: sleeps))
     }
 }
+
+/// One calendar day as the analysis charts draw it.
+struct AnalysisRow: Identifiable {
+    var day: AnalysisDay
+    /// Local midnight.
+    var date: Date
+    /// The night's stages, minutes; nil when the band sent none.
+    var deep: Double?
+    var rem: Double?
+    var light: Double?
+    /// Minutes in heart-rate zones 1...5.
+    var zones: [Int]?
+    var stress: Double?
+    var spo2: Double?
+
+    var id: Int { day.day.index }
+}
+
+extension HealthHistory {
+    /// Resting heart rate for analysis: the night's. The band's own daily value stands in only
+    /// for a day that is over (a later day has data): early in a day it is a running daytime
+    /// value, not a resting one.
+    func settledRestingHR(_ d: DayKey) -> Double? {
+        let over = d.index < (lastDay?.index ?? d.index)
+        guard let stored = score(d), let rhr = stored.rhr else {
+            return over ? summary(d)?.hrResting.map(Double.init) : nil
+        }
+        return stored.rhrSource == "sleep" || over ? rhr : nil
+    }
+
+    func analysisDay(_ d: DayKey) -> AnalysisDay {
+        let night = mainSleep(d)
+        let bed = night.map { Analysis.clockMinute($0.bedTime, offsetMinutes: $0.tzOffsetMinutes) }
+        let wake = night.flatMap { n in bed.map { $0 + n.wakeTime.timeIntervalSince(n.bedTime) / 60 } }
+        let naps = result(d)?.naps.reduce(0) { $0 + $1.minutes } ?? 0
+        return AnalysisDay(day: d, sleepMinutes: sleepMinutes(d), napMinutes: naps, bedMinute: bed, wakeMinute: wake,
+                           sleepScore: score(.sleep, d), recovery: score(.recovery, d), strain: score(.strain, d),
+                           restingHR: settledRestingHR(d), hrv: score(d)?.hrv, steps: value(.steps, on: d))
+    }
+
+    /// `count` days ending on `end`, oldest first.
+    func analysisRows(ending end: DayKey, count: Int) -> [AnalysisRow] {
+        (0 ..< count).reversed().map { back in
+            let d = end.adding(days: -back)
+            let metrics = result(d)?.sleep.metrics
+            let night = mainSleep(d)
+            return AnalysisRow(day: analysisDay(d), date: d.date,
+                               deep: metrics?.deepMinutes ?? night?.deepMinutes.map(Double.init),
+                               rem: metrics?.remMinutes ?? night?.remMinutes.map(Double.init),
+                               light: metrics?.lightMinutes ?? night?.lightMinutes.map(Double.init),
+                               zones: result(d)?.strain.map { Array($0.zoneMinutes.dropFirst()) },
+                               stress: value(.stress, on: d), spo2: value(.bloodOxygen, on: d))
+        }
+    }
+}
