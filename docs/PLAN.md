@@ -122,6 +122,7 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 - **Toparlanma:** f(z) = 60 + 20z (0–100'e sınırlı), yani "senin normalin" 60 eder.
   - RR varsa ağırlıklar: HRV 40, dinlenik nabız 25, uyku 25, dünkü yük 10.
   - RR yoksa: dinlenik nabız 45, uyku 40, yük 15; güven en fazla "orta".
+  - **v3 (2026-11-16): gecesi olmayan günün toparlanma skoru yok.** Ölçüm: 16 Kasım 02:00'de, o gecenin uykusu henüz yokken, bandın günlük özetindeki dinlenik nabız 75 idi (akan gündüz değeri); 64'lük normale karşı bu, toparlanmayı 0 yaptı. Toparlanma geceden okunur; gece yoksa skor yok, neden "uyku kaydı yok". `ScoreEngine.algoVersion` 3.
 - **Yük (0–21):**
   - Maksimum nabız = 208 − 0,7 × yaş. Nabız rezervi oranı r = (nabız − dinlenik) / (maks. − dinlenik).
   - Bölgeler (r'ye göre): Z1 0,5–0,6, Z2 0,6–0,7, Z3 0,7–0,8, Z4 0,8–0,9, Z5 ≥ 0,9.

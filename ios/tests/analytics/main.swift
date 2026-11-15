@@ -516,7 +516,7 @@ var inputs = (0 ..< 10).map { engineDay($0, rr: $0 >= 5) }
 for i in 1 ..< inputs.count { inputs[i].previousMinutes = inputs[i - 1].minutes; inputs[i].previousSleeps = inputs[i - 1].sleeps }
 let run = ScoreEngine.scoreRange(inputs, history: [], profile: athlete)
 equal("ten results", run.count, 10)
-equal("algorithm version", run[0].algoVersion, 2)
+equal("algorithm version", run[0].algoVersion, 3)
 check("day 0: no baseline, no recovery", run[0].recovery.score == nil && run[0].recovery.confidence.level == ConfidenceLevel.none)
 check("day 0: sleep scored", run[0].sleep.score != nil)
 equal("resting HR from sleep", run[0].restingHR?.source, .sleep)
@@ -550,6 +550,13 @@ noNightHR.sleeps[0].heartRate = []
 noNightHR.minutes = nil
 let bandOnly = ScoreEngine.score(noNightHR, history: [], profile: athlete)
 equal("band resting HR fallback", bandOnly.restingHR?.source, .band)
+// No night, only the band's running resting HR, and a full baseline that would otherwise score it:
+// 75 against a normal of 64 with sigma 1.92 (the 3% floor) is z = -5.7, f = 0. No night, no recovery.
+let restHistory = (1 ... 7).map { HistoryPoint(day: day0.adding(days: -$0), restingHR: 64) }
+let noNight = ScoreEngine.score(DayInputs(day: day0, bandRestingHR: 75), history: restHistory, profile: athlete)
+equal("the band's value is still the day's resting HR", noNight.restingHR?.value, 75)
+check("no night: no recovery", noNight.recovery.score == nil && noNight.recovery.confidence.level == ConfidenceLevel.none)
+equal("and the reason is the missing night", noNight.recovery.confidence.reasons.map(\.code), [.noSleep])
 
 // MARK: - Insights
 
