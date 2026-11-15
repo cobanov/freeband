@@ -635,6 +635,18 @@ var mixed = insightDays(InsightDay(day: day0, restingHR: 53.5, sleepMinutes: 390
 for i in 1 ... 6 { mixed[i].sleepMinutes = 390 }
 equal("warnings first", insights(mixed).map(\.kind), [.sleepDebt, .restingHRHigh])
 
+// MARK: - Battery estimate
+
+section("battery estimate")
+func reading(_ hours: Double, _ level: Int) -> (at: Date, level: Int) { (at(hours), level) }
+// 80% -> 68% in 24 h is 0.5% an hour; 68 / 0.5 = 136 h = 5.67 days.
+near("days left from one day of discharge", BatteryEstimate.daysLeft([reading(0, 80), reading(8, 76), reading(24, 68)]), 68 / 0.5 / 24, 1e-9)
+// A charge in between: only the readings after it count. 100 -> 94 in 12 h = 0.5% an hour; 94 / 0.5 / 24 = 7.83.
+near("only since the last charge", BatteryEstimate.daysLeft([reading(0, 60), reading(10, 40), reading(11, 100), reading(23, 94)]), 94 / 0.5 / 24, 1e-9)
+check("under 12 hours says nothing", BatteryEstimate.daysLeft([reading(0, 80), reading(6, 70)]) == nil)
+check("under 3 points says nothing", BatteryEstimate.daysLeft([reading(0, 80), reading(24, 78)]) == nil)
+check("no readings", BatteryEstimate.daysLeft([]) == nil)
+
 // MARK: - Done
 
 print("\(passed) passed, \(failed) failed")

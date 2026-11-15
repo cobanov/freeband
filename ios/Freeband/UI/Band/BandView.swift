@@ -79,9 +79,7 @@ private struct BandPage: View {
                                 Text(BandPresentation.battery(link, band).map { FBFormat.percent(Double($0) / 100) } ?? "–")
                                     .textStyle(.figureL)
                                     .foregroundStyle(.textPrimary)
-                                Text("Battery")
-                                    .textStyle(.subhead)
-                                    .foregroundStyle(.textSecondary)
+                                BatteryLabel(bandID: band.id, charging: BandPresentation.isCharging(link, band))
                             }
                             .accessibilityElement(children: .combine)
                             StatusLine(name: band.macSuffix.map { String(localized: "ID \($0)") } ?? band.shortName,
@@ -308,5 +306,38 @@ struct AboutBandView: View {
             (String(localized: "Last sync"), band.lastSyncAt.map { $0.formatted(date: .abbreviated, time: .shortened) }
                 ?? String(localized: "Not synced yet")),
         ].compactMap { $0 }
+    }
+}
+
+/// "Battery", and how long it will last at the rate it has been going down since the last charge.
+private struct BatteryLabel: View {
+    @Query private var readings: [Sample]
+    private let charging: Bool
+
+    init(bandID: UUID, charging: Bool) {
+        self.charging = charging
+        let start = Date().addingTimeInterval(-30 * 86400)
+        _readings = Query(filter: #Predicate<Sample> { $0.bandID == bandID && $0.kind == "battery" && $0.ts >= start },
+                          sort: \.ts)
+    }
+
+    private var left: String? {
+        guard !charging, let days = BatteryEstimate.daysLeft(readings.map { ($0.ts, $0.level) }) else { return nil }
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        formatter.allowedUnits = days >= 1 ? [.day] : [.hour]
+        return formatter.string(from: days * 86400)
+    }
+
+    var body: some View {
+        Group {
+            if let left {
+                Text("Battery, about \(left) left", comment: "Under the battery percentage; the value is a duration such as '4 days'")
+            } else {
+                Text("Battery")
+            }
+        }
+        .textStyle(.subhead)
+        .foregroundStyle(.textSecondary)
     }
 }
