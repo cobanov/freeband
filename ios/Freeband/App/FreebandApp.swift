@@ -163,6 +163,17 @@ enum DebugScreen: String {
         #endif
     }
 
+    /// DEBUG `-freeband-scroll <id>`: the section a screen scrolls to, to screenshot what is below the fold.
+    static var scrollTarget: String? {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-freeband-scroll"), i + 1 < args.count else { return nil }
+        return args[i + 1]
+        #else
+        return nil
+        #endif
+    }
+
     static var current: DebugScreen? {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments

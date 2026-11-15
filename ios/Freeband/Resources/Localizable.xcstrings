@@ -6188,6 +6188,736 @@
           }
         }
       }
+    },
+    "Last %lld days": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son %lld gün"
+          }
+        }
+      }
+    },
+    "Daily averages, against the %lld days before": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günlük ortalamalar, önceki %lld güne göre"
+          }
+        }
+      }
+    },
+    "Nothing recorded in these days yet.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu günlerde henüz kayıt yok."
+          }
+        }
+      }
+    },
+    "No change": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişim yok"
+          }
+        }
+      }
+    },
+    "%lld of %lld days": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld günün %1$lld'i"
+          }
+        }
+      }
+    },
+    "Sleep is running short": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku eksik gidiyor"
+          }
+        }
+      }
+    },
+    "More sleep than before": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Öncekinden daha çok uyku"
+          }
+        }
+      }
+    },
+    "Less sleep than before": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Öncekinden daha az uyku"
+          }
+        }
+      }
+    },
+    "Resting heart rate is up": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dinlenik nabız yükseldi"
+          }
+        }
+      }
+    },
+    "Resting heart rate is down": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dinlenik nabız düştü"
+          }
+        }
+      }
+    },
+    "Heart rate variability is up": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nabız değişkenliği arttı"
+          }
+        }
+      }
+    },
+    "Heart rate variability is down": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nabız değişkenliği azaldı"
+          }
+        }
+      }
+    },
+    "Recovery is up": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toparlanma yükseldi"
+          }
+        }
+      }
+    },
+    "Recovery is down": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toparlanma düştü"
+          }
+        }
+      }
+    },
+    "Days were harder": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günler daha yoğundu"
+          }
+        }
+      }
+    },
+    "Days were easier": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günler daha hafifti"
+          }
+        }
+      }
+    },
+    "Sleep times move around": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku saatleri oynuyor"
+          }
+        }
+      }
+    },
+    "Sleep times are steady": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku saatleri düzenli"
+          }
+        }
+      }
+    },
+    "%@ a day on average, against a need of %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde ortalama %1$@, ihtiyaç %2$@"
+          }
+        }
+      }
+    },
+    "%@ a day on average, was %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde ortalama %1$@, önceki %2$@"
+          }
+        }
+      }
+    },
+    "%@ on average, was %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama %1$@, önceki %2$@."
+          }
+        }
+      }
+    },
+    "%@ ms on average, was %@ ms.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama %1$@ ms, önceki %2$@ ms."
+          }
+        }
+      }
+    },
+    "Strain %@ on average, was %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yük ortalama %1$@, önceki %2$@."
+          }
+        }
+      }
+    },
+    "Bed and wake times shift by about %@ min from night to night.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yatış ve kalkış saatleri geceden geceye yaklaşık %@ dk oynuyor."
+          }
+        }
+      }
+    },
+    "Bed and wake times stay within about %@ min.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yatış ve kalkış saatleri yaklaşık %@ dk içinde kalıyor."
+          }
+        }
+      }
+    },
+    "Strain and recovery by day": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günlere göre yük ve toparlanma"
+          }
+        }
+      }
+    },
+    "Strain, left": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yük, sol"
+          }
+        }
+      }
+    },
+    "Recovery, right": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toparlanma, sağ"
+          }
+        }
+      }
+    },
+    "No strain or recovery in these days yet.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu günlerde henüz yük ya da toparlanma yok."
+          }
+        }
+      }
+    },
+    "Hours slept each night, against the need": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her gece uyunan saat, ihtiyaca göre"
+          }
+        }
+      }
+    },
+    "Nap": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şekerleme"
+          }
+        }
+      }
+    },
+    "No nights in these days yet.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu günlerde henüz gece yok."
+          }
+        }
+      }
+    },
+    "Bed and wake time each night": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her gecenin yatış ve kalkış saati"
+          }
+        }
+      }
+    },
+    "Usual bedtime": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olağan yatış"
+          }
+        }
+      }
+    },
+    "Usual wake time": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olağan kalkış"
+          }
+        }
+      }
+    },
+    "± %@ min": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "± %@ dk"
+          }
+        }
+      }
+    },
+    "Usual %@–%@": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olağan %1$@–%2$@"
+          }
+        }
+      }
+    },
+    "No reading today": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugün ölçüm yok"
+          }
+        }
+      }
+    },
+    "Learning your range: %lld of %lld days": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aralığın öğreniliyor: %2$lld günün %1$lld'i"
+          }
+        }
+      }
+    },
+    "In your range": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aralığında"
+          }
+        }
+      }
+    },
+    "Above your range": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aralığının üstünde"
+          }
+        }
+      }
+    },
+    "Below your range": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aralığının altında"
+          }
+        }
+      }
+    },
+    "Minutes in each heart-rate zone by day": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günlere göre her nabız bölgesindeki dakika"
+          }
+        }
+      }
+    },
+    "No time in heart-rate zones in these days yet.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu günlerde henüz nabız bölgesinde geçen süre yok."
+          }
+        }
+      }
+    },
+    "of your need": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ihtiyacın karşılandı"
+          }
+        }
+      }
+    },
+    "Needed": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İhtiyaç"
+          }
+        }
+      }
+    },
+    "Slept": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyunan"
+          }
+        }
+      }
+    },
+    "Napped": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şekerleme"
+          }
+        }
+      }
+    },
+    "Last %lld nights": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son %lld gece"
+          }
+        }
+      }
+    },
+    "%@ short": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ eksik"
+          }
+        }
+      }
+    },
+    "%@ over": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ fazla"
+          }
+        }
+      }
+    },
+    "On target": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hedefte"
+          }
+        }
+      }
+    },
+    "Heart rate variability, ms": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nabız değişkenliği, ms"
+          }
+        }
+      }
+    },
+    "Heart rate variability through the night": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gece boyunca nabız değişkenliği"
+          }
+        }
+      }
+    },
+    "Each point is five minutes. The night's value is the middle one of the shaded second half, when the body is most settled.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her nokta beş dakikadır. Gecenin değeri, vücudun en sakin olduğu gölgeli ikinci yarının ortanca değeridir."
+          }
+        }
+      }
+    },
+    "You met your sleep need": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku ihtiyacını karşıladın"
+          }
+        }
+      }
+    },
+    "Under your sleep need": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku ihtiyacının altında"
+          }
+        }
+      }
+    },
+    "Plenty of deep and REM sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bol derin ve REM uykusu"
+          }
+        }
+      }
+    },
+    "Little deep and REM sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Az derin ve REM uykusu"
+          }
+        }
+      }
+    },
+    "A restless night": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Huzursuz bir gece"
+          }
+        }
+      }
+    },
+    "Heart rate stayed up": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nabız yüksek kaldı"
+          }
+        }
+      }
+    },
+    "%@ with the day's naps, against a need of %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günün şekerlemeleriyle %1$@, ihtiyaç %2$@"
+          }
+        }
+      }
+    },
+    "%@ against a need of %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, ihtiyaç %2$@"
+          }
+        }
+      }
+    },
+    "%@ together, %@ of the night.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birlikte %1$@, gecenin %2$@ kadarı."
+          }
+        }
+      }
+    },
+    "%@ awake in bed; %@ of the time in bed was sleep.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yatakta %1$@ uyanık; yatakta geçen sürenin %2$@ kadarı uyku."
+          }
+        }
+      }
+    },
+    "Every metric": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm ölçümler"
+          }
+        }
+      }
+    },
+    "Strain and recovery": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yük ve toparlanma"
+          }
+        }
+      }
+    },
+    "Sleep against need": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İhtiyaca göre uyku"
+          }
+        }
+      }
+    },
+    "Need %@": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İhtiyaç %@"
+          }
+        }
+      }
+    },
+    "Sleep timing": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku saatleri"
+          }
+        }
+      }
+    },
+    "Health monitor": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlık monitörü"
+          }
+        }
+      }
+    },
+    "Minutes a day": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde dakika"
+          }
+        }
+      }
+    },
+    "It fell %@ from the evening before bed; a fall of 10%% or more is usual.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yatmadan önceki akşama göre %@ düştü; %%10 ve üstü düşüş olağandır."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

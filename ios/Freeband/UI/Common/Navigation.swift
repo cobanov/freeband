@@ -133,3 +133,13 @@ private struct RouteView: View {
         }
     }
 }
+
+extension View {
+    /// Inside a ScrollViewReader: jumps to the section named by DEBUG `-freeband-scroll`.
+    func debugScroll(_ proxy: ScrollViewProxy) -> some View {
+        onAppear {
+            guard let target = DebugScreen.scrollTarget else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { proxy.scrollTo(target, anchor: .top) }
+        }
+    }
+}

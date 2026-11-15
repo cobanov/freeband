@@ -41,6 +41,7 @@ struct SleepNightScreen: View {
     private var day: DayKey? { selected ?? initialDay ?? nights.last }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.l) {
                 if let day, let night = history.mainSleep(day) {
@@ -52,6 +53,8 @@ struct SleepNightScreen: View {
             }
             .padding(.horizontal, FBSpace.gutter)
             .padding(.bottom, FBSpace.xl)
+        }
+        .debugScroll(proxy)
         }
         .fbScreen()
         .navigationTitle(String(localized: "Sleep"))
@@ -104,6 +107,17 @@ struct SleepNightScreen: View {
             }
         }
         .buttonStyle(.plain)
+        let need = Double(Profile.load().sleepNeed)
+        let napMinutes = result?.naps.reduce(0) { $0 + $1.minutes } ?? 0
+        if let metrics {
+            NightReviewCard(notes: Analysis.nightNotes(metrics, napMinutes: napMinutes, sleepNeedMinutes: need), napped: napMinutes > 0)
+        }
+        VStack(alignment: .leading, spacing: FBSpace.xs) {
+            SectionHeader(title: String(localized: "Sleep need"))
+            SleepNeedCard(slept: asleep, naps: napMinutes, need: need,
+                          debt: Analysis.sleepDebt(history.analysisRows(ending: day, count: 7).map(\.day), ending: day, sleepNeedMinutes: need))
+        }
+        .id("need")
         let segments = night.hypnogramSegments
         if !segments.isEmpty {
             VStack(alignment: .leading, spacing: FBSpace.xs) {
@@ -123,6 +137,9 @@ struct SleepNightScreen: View {
                 Card { NightLineChart(points: hr, tint: .heart, label: String(localized: "Heart rate")) }
             }
         }
+
+        NightHRVSection(night: night, value: result?.hrv?.rmssd)
+            .id("hrv")
 
         let spo2 = night.spo2Points
         if spo2.count > 1 {

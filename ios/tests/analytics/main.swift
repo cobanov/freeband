@@ -654,6 +654,114 @@ check("under 12 hours says nothing", BatteryEstimate.daysLeft([reading(0, 80), r
 check("under 3 points says nothing", BatteryEstimate.daysLeft([reading(0, 80), reading(24, 78)]) == nil)
 check("no readings", BatteryEstimate.daysLeft([]) == nil)
 
+// MARK: - Analysis
+
+section("analysis")
+near("23:30 on the noon clock", Analysis.clockMinute(at(23.5), offsetMinutes: 0), 690)
+near("00:30 on the noon clock", Analysis.clockMinute(at(24.5), offsetMinutes: 0), 750)
+near("the file's own zone decides", Analysis.clockMinute(at(21.5), offsetMinutes: 180), 750)
+near("11:00 in the morning", Analysis.clockMinute(at(11), offsetMinutes: 0), 1380)
+
+// Beds 690, 720, 660 -> mean 690, distances 0, 30, 30 -> spread 20; wakes the same shape.
+let steady = Analysis.timing([(690, 1140), (720, 1170), (660, 1110)])
+near("mean bed", steady?.meanBed, 690)
+near("mean wake", steady?.meanWake, 1140)
+near("bed spread", steady?.bedSpread, 20)
+near("wake spread", steady?.wakeSpread, 20)
+check("two nights say nothing", Analysis.timing([(690, 1140), (720, 1170)]) == nil)
+
+// The 7 days ending on day0 against the 7 before.
+func aDay(_ back: Int, sleep: Double? = nil, nap: Double = 0, bed: Double? = nil, wake: Double? = nil,
+          recovery: Double? = nil, strain: Double? = nil, rhr: Double? = nil, hrv: Double? = nil) -> AnalysisDay {
+    AnalysisDay(day: day0.adding(days: -back), sleepMinutes: sleep, napMinutes: nap, bedMinute: bed, wakeMinute: wake,
+                sleepScore: nil, recovery: recovery, strain: strain, restingHR: rhr, hrv: hrv, steps: nil)
+}
+let reviewDays = [
+    // Now: sleep with naps 400, 420, 380, 440 -> 410; RHR 58, 60, 62 -> 60; HRV 40, 44, 42 -> 42;
+    // recovery 70, 72, 74 -> 72; strain on two days only. Beds 600, 720, 840 (spread 80), wakes 1080, 1140, 1200 (40).
+    aDay(0, sleep: 400, bed: 600, wake: 1080, recovery: 70, strain: 9, rhr: 58, hrv: 40),
+    aDay(1, sleep: 420, bed: 720, wake: 1140, recovery: 72, strain: 11, rhr: 60, hrv: 44),
+    aDay(3, sleep: 380, bed: 840, wake: 1200, recovery: 74, rhr: 62, hrv: 42),
+    aDay(6, sleep: 400, nap: 40),
+    // Before: sleep 460, RHR 56, HRV 45, recovery 60 on three days.
+    aDay(7, sleep: 460, recovery: 60, rhr: 56, hrv: 45),
+    aDay(9, sleep: 460, recovery: 60, rhr: 56, hrv: 45),
+    aDay(13, sleep: 460, recovery: 60, rhr: 56, hrv: 45),
+    // Outside both periods.
+    aDay(14, sleep: 900, recovery: 5, rhr: 90, hrv: 5),
+]
+let review = Analysis.review(reviewDays, ending: day0, length: 7, sleepNeedMinutes: 480)
+near("sleep mean counts naps", review.change(.sleep)?.current, 410)
+near("sleep before", review.change(.sleep)?.previous, 460)
+near("sleep delta", review.change(.sleep)?.delta, -50)
+equal("sleep days", review.change(.sleep)?.days, 4)
+near("resting HR mean", review.change(.restingHR)?.current, 60)
+near("two days still have a mean", review.change(.strain)?.current, 10)
+check("but no change is read from them", review.change(.strain)?.delta == nil && review.change(.strain)?.settled == false)
+// Two short nights alone: a mean of 300 against 480, and nothing said yet.
+let twoNights = Analysis.review([aDay(0, sleep: 300), aDay(1, sleep: 300)], ending: day0, length: 7, sleepNeedMinutes: 480)
+near("two nights have a mean", twoNights.change(.sleep)?.current, 300)
+check("two nights are not a finding", twoNights.findings.isEmpty)
+equal("strain days", review.change(.strain)?.days, 2)
+check("no steps", review.change(.steps)?.current == nil)
+// 480 - 410 = 70: short, a notice (a warning from 90). Sleep fell 50. RHR +4. HRV 42 against 45 is
+// 3 under, less than 10% (4.5): silent. Recovery +12. Timing spread (80 + 40) / 2 = 60: irregular.
+equal("findings, notices before good news", review.findings.map(\.kind),
+      [.sleepShort, .sleepDown, .restingHRUp, .timingIrregular, .recoveryUp])
+equal("tones", review.findings.map(\.tone), [.notice, .notice, .notice, .notice, .good])
+near("irregular by", review.findings.first { $0.kind == .timingIrregular }?.value, 60)
+equal("a deficit of 90 is a warning", Analysis.review(reviewDays, ending: day0, length: 7, sleepNeedMinutes: 500).findings.first?.tone, .warning)
+check("nothing to say about an empty period", Analysis.review([], ending: day0, length: 7, sleepNeedMinutes: 480).findings.isEmpty)
+
+// Four nights in the week: 480 - 400, - 420, - 380, - 440 = 80 + 60 + 100 + 40.
+let debt = Analysis.sleepDebt(reviewDays, ending: day0, sleepNeedMinutes: 480)
+near("debt over the week", debt?.minutes, 280)
+equal("debt nights", debt?.nights, 4)
+check("no nights, no debt", Analysis.sleepDebt([aDay(0, recovery: 50)], ending: day0, sleepNeedMinutes: 480) == nil)
+
+// One night on its own. 470 of 480 is within 15: met. Deep 90 + REM 110 = 200 of 470 = 42.6%: a good share.
+var goodNight = m1
+goodNight.totalSleepMinutes = 470
+goodNight.inBedMinutes = 495
+goodNight.stagesAvailable = true
+goodNight.deepMinutes = 90
+goodNight.remMinutes = 110
+goodNight.efficiency = 0.95
+goodNight.hrDip = 0.2
+equal("a good night", Analysis.nightNotes(goodNight, napMinutes: 0, sleepNeedMinutes: 480).map(\.kind), [.needMet, .restorativeHigh])
+// 300 of 480 is 3 h under: a warning. Deep 40 + REM 40 = 26.7%: small. 300 of 380 in bed = 78.9%: restless,
+// 80 min awake. Heart rate fell 5%: stayed up.
+var poorNight = goodNight
+poorNight.totalSleepMinutes = 300
+poorNight.inBedMinutes = 380
+poorNight.deepMinutes = 40
+poorNight.remMinutes = 40
+poorNight.efficiency = 300.0 / 380
+poorNight.hrDip = 0.05
+let poorNotes = Analysis.nightNotes(poorNight, napMinutes: 0, sleepNeedMinutes: 480)
+equal("a poor night, the warning first", poorNotes.map(\.kind), [.short, .restorativeLow, .restless, .heartRateStayedUp])
+equal("three hours short is a warning", poorNotes.first?.tone, .warning)
+near("minutes awake in bed", poorNotes.first { $0.kind == .restless }?.value, 80)
+near("restorative share", poorNotes.first { $0.kind == .restorativeLow }?.reference, 80.0 / 300)
+// A 150-minute nap brings the day to 450: 30 under, neither met nor short. No stages, no efficiency, no dip: silent.
+var plainNight = poorNight
+plainNight.stagesAvailable = false
+plainNight.efficiency = nil
+plainNight.hrDip = nil
+check("a nap counts, and nothing is said without data", Analysis.nightNotes(plainNight, napMinutes: 150, sleepNeedMinutes: 480).isEmpty)
+
+// Median 60, MAD 1, sigma 1.4826: the range is 60 +- 2.9652.
+let normal = [60.0, 62, 58, 61, 59]
+let inRange = Analysis.range(60, previous: normal, floor: .zero)
+near("range low", inRange.low, 60 - 2 * 1.4826)
+near("range high", inRange.high, 60 + 2 * 1.4826)
+equal("within", inRange.status, .within)
+equal("above", Analysis.range(64, previous: normal, floor: .zero).status, .above)
+equal("below", Analysis.range(56, previous: normal, floor: .zero).status, .below)
+equal("two days are calibrating", Analysis.range(64, previous: [60, 62], floor: .zero).status, .calibrating)
+equal("no value", Analysis.range(nil, previous: normal, floor: .zero).status, .calibrating)
+check("no history", Analysis.range(60, previous: [], floor: .zero).median == nil)
+
 // MARK: - Done
 
 print("\(passed) passed, \(failed) failed")
