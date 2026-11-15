@@ -67,7 +67,7 @@ final class AppModel: ObservableObject {
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
         link.storedActivityFile = { [weak self] id, hex in
-            self?.blob(id, hex).map { ActivitySyncPlan.StoredCopy(fetchedAt: $0.fetchedAt, fromToday: $0.fetchedFromToday) }
+            self?.blob(id, hex)?.fetchedAt
         }
         link.onDeviceInfo = { [weak self] id, info in
             guard let self, let band = self.band(id) else { return }

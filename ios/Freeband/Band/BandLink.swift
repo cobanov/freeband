@@ -214,7 +214,8 @@ final class BandLink: NSObject, ObservableObject {
     /// After authentication: which candidate key worked and the band's own Bluetooth name.
     var onIdentified: ((UUID, Int, String?) -> Void)?
     /// Past activity files already stored need not be fetched again (today's always are).
-    var storedActivityFile: ((UUID, String) -> ActivitySyncPlan.StoredCopy?)?
+    /// When the copy of a file on the phone was fetched; nil when there is none.
+    var storedActivityFile: ((UUID, String) -> Date?)?
     /// A complete, CRC-checked activity file; `today` when it came from the band's today list.
     var onActivityFile: ((UUID, ActivityFileID, Data, Bool) -> Void)?
 
@@ -717,7 +718,7 @@ final class BandLink: NSObject, ObservableObject {
             // Which files to ask for and which to let the band delete: ActivitySyncPlan.
             let plan = ActivitySyncPlan.make(
                 today: todayIDs, past: past, now: Date(),
-                stored: { file in id.flatMap { self.storedActivityFile?($0, file.hex) } },
+                storedAt: { file in id.flatMap { self.storedActivityFile?($0, file.hex) } },
                 mayAcknowledge: { file in id.flatMap { self.canAcknowledge?($0, file.hex) } ?? false })
             for file in plan.acknowledge { sendCommand(MiAuth.activityAckCommand(file.data), encrypted: true) }
             if !plan.acknowledge.isEmpty { note("→ acknowledged \(plan.acknowledge.count) stored file(s); the band deletes them") }
