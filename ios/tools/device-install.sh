@@ -34,4 +34,8 @@ xcodebuild -quiet -project Freeband.xcodeproj -scheme Freeband -configuration Re
 # The build rewrites the string catalogs (AGENTS.md, "Committing").
 git -C "$IOS" checkout -- Freeband/Resources/Localizable.xcstrings Freeband/Resources/AppShortcuts.xcstrings 2>/dev/null || true
 xcrun devicectl device install app --device "$DEVICE" "$BUILD/Build/Products/Release-iphoneos/Freeband.app" >/dev/null
+# An installed app does not run until it is opened, and until then nothing holds the band or
+# syncs in the background (2026-11-15: 22 hours without a sync after an install).
+xcrun devicectl device process launch --device "$DEVICE" dev.cobanov.freeband >/dev/null 2>&1 \
+  || echo "installed, but couldn't open it (phone locked?): open Freeband on the phone once" >&2
 xcrun devicectl device info apps --device "$DEVICE" --bundle-id dev.cobanov.freeband 2>/dev/null | grep Freeband
