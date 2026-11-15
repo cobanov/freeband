@@ -378,6 +378,11 @@ if let (r, out) = output("daily details v4"), let id = r.fileID, let records = o
     let fetched = id.ts.addingTimeInterval(TimeInterval(records * 60 + 30))
     equal("records match elapsed", Calibration.recordCountCheck(fileID: id, records: records, fetchedAt: fetched).status, .pass)
     equal("records far short", Calibration.recordCountCheck(fileID: id, records: records, fetchedAt: id.ts.addingTimeInterval(600 * 60)).status, .fail)
+    // A Band 10 Pro closes the file at a fetch and opens the next: the file ends where the next begins,
+    // however much later this copy was fetched (measured 2026-11-15: every fragment failed without this).
+    equal("a fragment ends where the next file starts", Calibration.recordCountCheck(
+        fileID: id, records: records, fetchedAt: id.ts.addingTimeInterval(600 * 60),
+        nextStart: id.ts.addingTimeInterval(TimeInterval(records * 60))).status, .pass)
     // A past day: expected ends at the local day end (1440 minutes after a midnight start).
     let check1440 = Calibration.recordCountCheck(fileID: id, records: 1440, fetchedAt: id.ts.addingTimeInterval(3 * 86_400))
     equal("past day expects the whole day", check1440.status, .pass)

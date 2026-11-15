@@ -128,11 +128,13 @@ enum Calibration {
 
     /// A minute file should hold one record per minute from its start to when it was fetched
     /// (or to the end of its local day, whichever comes first).
-    static func recordCountCheck(fileID: ActivityFileID, records: Int, fetchedAt: Date) -> CalibrationReport.Check {
+    /// `nextStart`: when the next minute file begins. A Band 10 Pro closes the minute file at
+    /// every fetch and opens a new one, so a file ends where its successor starts.
+    static func recordCountCheck(fileID: ActivityFileID, records: Int, fetchedAt: Date, nextStart: Date? = nil) -> CalibrationReport.Check {
         let tz = fileID.utcOffsetMinutes
         let day = DayKey(date: fileID.ts, offsetMinutes: tz)
         let dayEnd = day.adding(days: 1).start(offsetMinutes: tz)
-        let until = min(fetchedAt, dayEnd)
+        let until = min(fetchedAt, dayEnd, nextStart ?? .distantFuture)
         let expected = max(Int((until.timeIntervalSince(fileID.ts) / 60).rounded(.down)), 0)
         let diff = records - expected
         let tolerance = max(5, expected / 100)
@@ -211,8 +213,10 @@ enum Calibration {
         for minutes in minuteDays.sorted(by: { $0.day < $1.day }) {
             checks.append(heartRateCoverageCheck(minutes))
         }
-        for f in minuteFiles.sorted(by: { $0.fileID < $1.fileID }) {
-            checks.append(recordCountCheck(fileID: f.fileID, records: f.records, fetchedAt: f.fetchedAt))
+        let ordered = minuteFiles.sorted(by: { $0.fileID.ts < $1.fileID.ts })
+        for (i, f) in ordered.enumerated() {
+            let next = i + 1 < ordered.count ? ordered[i + 1].fileID.ts : nil
+            checks.append(recordCountCheck(fileID: f.fileID, records: f.records, fetchedAt: f.fetchedAt, nextStart: next))
         }
         for s in sleeps.sorted(by: { $0.bedTime < $1.bedTime }) {
             checks.append(sleepCheck(s, fetchedAt: fetchedAt[s.sourceFileID]))
