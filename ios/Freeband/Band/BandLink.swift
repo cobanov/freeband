@@ -11,6 +11,16 @@ struct BandTarget {
     let keys: [Data]
 }
 
+/// The diagnostics log. Only the screen that shows it watches it.
+final class BandLog: ObservableObject {
+    @Published private(set) var lines: [String] = []
+
+    fileprivate func append(_ line: String, limit: Int) {
+        lines.append(line)
+        if lines.count > limit { lines.removeFirst(lines.count - limit) }
+    }
+}
+
 /// One BLE session with a band at a time: find it (iOS connection or advertisement), open an
 /// SPP v2 session on FE95/005E/005F (or, on older bands, the V1 channel 0051/0052/0053),
 /// authenticate as an iOS companion, read battery and live stats, then always hand the channel
@@ -25,6 +35,8 @@ final class BandLink: NSObject, ObservableObject {
     /// `hold` is the held session; it starts only through `hold(_:)`.
     enum Purpose: Equatable {
         case check, sync, live, send([Data]), hold
+        /// Asks the band how it would pair (docs/BIND.md step 1) and stops there.
+        case bindProbe
 
         var label: String {
             switch self {
@@ -33,6 +45,7 @@ final class BandLink: NSObject, ObservableObject {
             case .live: return "live"
             case .send: return "send"
             case .hold: return "hold"
+            case .bindProbe: return "bind probe"
             }
         }
     }
@@ -185,7 +198,9 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var bandID: UUID?
     @Published private(set) var stats: MiAuth.LiveStats?
     @Published private(set) var battery: Int?
-    @Published private(set) var log: [String] = []
+    /// Not a published property of the link: as one, every line redrew every screen that
+    /// watches the link, and Today recomputes its insights and tiles when it redraws.
+    let log = BandLog()
     /// Bands iOS holds a connection to right now (no session needed to know this).
     @Published private(set) var nearby: Set<UUID> = []
     @Published private(set) var bluetooth: CBManagerState = .unknown
@@ -199,7 +214,8 @@ final class BandLink: NSObject, ObservableObject {
     /// After authentication: which candidate key worked and the band's own Bluetooth name.
     var onIdentified: ((UUID, Int, String?) -> Void)?
     /// Past activity files already stored need not be fetched again (today's always are).
-    var hasActivityFile: ((UUID, String) -> Bool)?
+    /// When the copy of a file on the phone was fetched; nil when there is none.
+    var storedActivityFile: ((UUID, String) -> Date?)?
     /// A complete, CRC-checked activity file; `today` when it came from the band's today list.
     var onActivityFile: ((UUID, ActivityFileID, Data, Bool) -> Void)?
 
@@ -209,13 +225,20 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var deviceState: MiAuth.DeviceState?
     /// The band's Find Phone (Command{2,17}): true to start ringing, false to stop.
     var onFindPhone: ((UUID, Bool) -> Void)?
+    /// The phone's last known location, when the user lets the band have it; nil otherwise.
+    var phoneLocation: (() -> (at: Date, latitude: Double, longitude: Double, altitude: Double?)?)?
+    /// Whether a file on the band's past list may be acknowledged, which makes the band delete
+    /// it: the user turned that on, and the file is stored here and fully parsed.
+    var canAcknowledge: ((UUID, String) -> Bool)?
+    /// A health monitoring setting as the band returned it (MiMonitoring).
+    var onMonitoring: ((UUID, MiMonitoring.Setting, Data) -> Void)?
 
     /// Activity files fetched / requested in this sync.
     @Published private(set) var fileProgress: (done: Int, total: Int)?
 
     private var central: CBCentralManager!
     private var target: BandTarget?
-    private var purpose = Purpose.sync
+    private(set) var purpose = Purpose.sync
     /// Where the running session is; `phase` follows it except on a held session.
     private var stage = Phase.idle {
         didSet { if purpose != .hold { phase = stage } }
@@ -522,6 +545,47 @@ final class BandLink: NSObject, ObservableObject {
         send(MiFrame.encode(kind: MiFrame.kindSessionConfig, seq: 0, payload: MiFrame.startSessionPayload))
     }
 
+    /// Step 1 of a local bind and nothing more: the band's answer says whether it would pair
+    /// without the vendor's server (verify mode 2), wants the server, or is already bound.
+    /// Freeband sends no second step, so no key is agreed and nothing is stored.
+    private var bindProbe: MiBind.Machine?
+    /// The band answered the probe: the session did its job though nothing logged in.
+    private var bindProbeAnswered = false
+
+    private func startBindProbe() {
+        bindProbeAnswered = false
+        guard var machine = MiBind.Machine(config: MiBind.Config(userID: "freeband-probe", appDeviceID: "freeband-probe", deviceName: "")) else { return finish() }
+        let first = machine.start()
+        bindProbe = machine
+        stage = .reading
+        note("→ bind probe 1/17 \(Self.hexPrefix(first, limit: 80))")
+        sendCommand(first, encrypted: false)
+        let thisRun = run
+        after(6, thisRun) { [weak self] in
+            guard let self, self.purpose == .bindProbe else { return }
+            self.note("bind probe: no answer")
+            self.finish()
+        }
+    }
+
+    private func bindProbeReply(_ body: Data) {
+        guard var machine = bindProbe else { return }
+        // The reply carries the band's address and serial (docs/BIND.md): only what the machine
+        // made of it goes to the log, never the bytes.
+        switch machine.receive(body) {
+        case .send(_, let confirmOnBand):
+            note("bind probe: the band offers local pairing\(confirmOnBand ? ", confirmed on the band" : ""); stopping here")
+        case .failed(let failure, _):
+            note("bind probe: \(failure)")
+        case .bound, .ignored:
+            note("bind probe: a reply of \(body.count) bytes that the probe doesn't read")
+            return
+        }
+        bindProbe = nil
+        bindProbeAnswered = true
+        finish()
+    }
+
     private func startAuth() {
         var nonce = Data(count: 16)
         _ = nonce.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
@@ -621,6 +685,10 @@ final class BandLink: NSObject, ObservableObject {
             didAuthenticate()
 
         case (2, 1):
+            note("← 2/1 battery \(Self.hexPrefix(lastCommandBody))")
+            if let charging = MiAuth.batteryCharging(command) {
+                deviceState = MiAuth.DeviceState(charging: charging, worn: deviceState?.worn ?? true, asleep: deviceState?.asleep ?? false)
+            }
             guard let level = MiAuth.batteryLevel(command) else { return }
             battery = Int(level)
             emit(.battery(Int(level)))
@@ -628,6 +696,8 @@ final class BandLink: NSObject, ObservableObject {
 
         case (8, 47):
             guard let live = MiAuth.liveStats(command) else { return }
+            // The first of a session whole: fields 3 and 5 are read on AstroBox's names only.
+            if stats == nil { note("← 8/47 live \(Self.hexPrefix(lastCommandBody))") }
             stats = live
             emit(.live(live))
             switch purpose {
@@ -645,13 +715,18 @@ final class BandLink: NSObject, ObservableObject {
         case (8, 2) where fileStage == .listingPast:
             let past = ActivityFileID.list(MiAuth.activityFileIDBytes(command))
             let id = target?.id
-            let wanted = past.filter { file in
-                guard let id, let has = hasActivityFile else { return true }
-                return !has(id, file.hex)
-            }
-            requestedFiles = Set(todayIDs + wanted)
+            // Which files to ask for and which to let the band delete: ActivitySyncPlan.
+            let plan = ActivitySyncPlan.make(
+                today: todayIDs, past: past, now: Date(),
+                storedAt: { file in id.flatMap { self.storedActivityFile?($0, file.hex) } },
+                mayAcknowledge: { file in id.flatMap { self.canAcknowledge?($0, file.hex) } ?? false })
+            for file in plan.acknowledge { sendCommand(MiAuth.activityAckCommand(file.data), encrypted: true) }
+            if !plan.acknowledge.isEmpty { note("→ acknowledged \(plan.acknowledge.count) stored file(s); the band deletes them") }
+            let listed = Set(todayIDs + past).count
+            if plan.fetch.count < listed { note("\(listed - plan.fetch.count) settled file(s) already stored, not fetched again") }
+            requestedFiles = Set(plan.fetch)
             fileQueue = requestedFiles.sorted()
-            note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")
+            note("← past \(past.count) file(s); \(fileQueue.count) to request")
             fileProgress = (0, fileQueue.count)
             fileStage = .fetching
             fetchNextFile()
@@ -666,7 +741,13 @@ final class BandLink: NSObject, ObservableObject {
             }
 
         case (2, 78), (2, 79):
-            if let state = MiAuth.deviceState(command) { deviceState = state }
+            // Logged whole until the fields are settled: a Band 10 Pro on the wrist read as charging.
+            note("← 2/\(subtype) state \(Self.hexPrefix(lastCommandBody))")
+            if let change = MiAuth.deviceStateChange(command) {
+                deviceState = MiAuth.DeviceState(charging: change.charging ?? deviceState?.charging ?? false,
+                                                 worn: change.worn ?? deviceState?.worn ?? true,
+                                                 asleep: change.asleep ?? deviceState?.asleep ?? false)
+            }
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
@@ -680,14 +761,43 @@ final class BandLink: NSObject, ObservableObject {
             let label = name.map { "\"\($0)\"" } ?? "fields \(command.fieldNumbers)"
             if factoryDumps.insert(label).inserted { note("← 13/2 factory file dump \(label), not used") }
 
+        case (8, 8), (8, 10), (8, 14):
+            // The bytes are logged whole: the first reads on a new band show what it really sends.
+            guard let setting = MiMonitoring.Setting(rawValue: subtype), let body = MiMonitoring.reply(command, setting) else {
+                note("← 8/\(subtype) without its setting: \(Self.hexPrefix(lastCommandBody))")
+                return
+            }
+            note("← 8/\(subtype) setting \(Self.hexPrefix(body, limit: 64))")
+            if let id = target?.id { onMonitoring?(id, setting, body) }
+
+        case (8, 9), (8, 11), (8, 15):
+            note("← 8/\(subtype) setting written (status \(command.varints[100] ?? 0))")
+
         case (2, 17):
             // Find Phone from the band (docs/STAY-CONNECTED.md section 1).
             guard let ring = MiAuth.findPhoneRequest(command) else { return }
             note("← find phone: \(ring ? "ring" : "stop") \(Self.hexPrefix(lastCommandBody))")
             if let id = target?.id { onFindPhone?(id, ring) }
 
+        case (16, 3) where phoneLocation?() != nil:
+            // The band asks where the phone is; answered only when the user turned that on.
+            if let l = phoneLocation?() {
+                sendCommand(MiAuth.gpsInfoCommand(at: l.at, latitude: l.latitude, longitude: l.longitude, altitude: l.altitude), encrypted: true)
+                note("← 16/3 the band asks for the phone's location → sent")
+            }
+
         default:
-            note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 40))")
+            // Things the band asks or reports that Freeband leaves unanswered (docs/CAPABILITIES.md 9.7).
+            let known: [String: String] = [
+                "16/3": "the band asks for the phone's location", "23/0": "the band asks for the phone's status",
+                "23/17": "the band registers for phone usage", "4/1": "the band changed its watch face",
+                "2/18": "the band acknowledged Find", "7/16": "the band asks for the app's icon",
+            ]
+            if let what = known["\(type)/\(subtype)"] {
+                note("← \(type)/\(subtype) \(what) (not answered)")
+            } else {
+                note("← \(type)/\(subtype) not handled: \(Self.hexPrefix(lastCommandBody, limit: 240))")
+            }
         }
     }
 
@@ -750,6 +860,7 @@ final class BandLink: NSObject, ObservableObject {
             // so file the data under that id (as Gadgetbridge does), not under the one awaited;
             // that one is still owed, so its timer restarts.
             let got = ActivityFileID(data.prefix(7)) ?? file
+            note("← file \(got.hex), \(data.count) bytes")
             let queued = fileQueue.contains(got)
             fileQueue.removeAll { $0 == got }
             if receivedFiles.insert(got).inserted, let id = target?.id {
@@ -838,7 +949,7 @@ final class BandLink: NSObject, ObservableObject {
         let thisRun = run
         after(0.4, thisRun) { [weak self] in
             guard let self else { return }
-            let outcome = self.authed ? self.completion() : .failed(.notRead)
+            let outcome: Outcome = self.authed || self.bindProbeAnswered ? self.completion() : .failed(.notRead)
             self.release()
             switch outcome {
             case .complete: self.stage = .done
@@ -967,7 +1078,7 @@ final class BandLink: NSObject, ObservableObject {
         for packet in MiFrame.drain(&buffer) {
             switch packet.kind {
             case MiFrame.kindSessionConfig:
-                if phoneNonce.isEmpty { startAuth() }
+                if purpose == .bindProbe { startBindProbe() } else if phoneNonce.isEmpty { startAuth() }
             case MiFrame.kindData:
                 send(MiFrame.encode(kind: MiFrame.kindAck, seq: packet.seq, payload: Data()))
                 decode(packet)
@@ -1006,6 +1117,7 @@ final class BandLink: NSObject, ObservableObject {
     private func handleCommandBytes(_ body: Data) {
         guard let command = PBMessage(body) else { return }
         lastCommandBody = body
+        if purpose == .bindProbe, command.varints[1] == 1 { return bindProbeReply(body) }
         if purpose == .hold, authed {
             // What the band sends on its own while the session is idle (docs/STAY-CONNECTED.md section 6).
             note("← held \(command.varints[1] ?? 0)/\(command.varints[2] ?? 0), \(body.count) bytes")
@@ -1093,8 +1205,7 @@ final class BandLink: NSObject, ObservableObject {
     /// Adds a line to the log Diagnostics shows. It runs across sessions (a held session's lines
     /// stay after a sync), newest last.
     func note(_ text: String) {
-        log.append("\(Date().formatted(date: .omitted, time: .standard))  \(text)")
-        if log.count > Self.logLimit { log.removeFirst(log.count - Self.logLimit) }
+        log.append("\(Date().formatted(date: .omitted, time: .standard))  \(text)", limit: Self.logLimit)
     }
 
     /// "write-without-response, notify": what a characteristic allows, for the log.
@@ -1217,6 +1328,11 @@ extension BandLink: CBPeripheralDelegate {
             return
         }
         transport = .v1
+        if purpose == .bindProbe {
+            note("bind probe: this band uses the older channel (V1); the probe is written for V2 bands")
+            finish()
+            return
+        }
         let maxWrite = peripheral.maximumWriteValueLength(for: .withoutResponse)
         note("BLE V1 channel, \(maxWrite)-byte writes")
         for uuid in Self.v1SubscribeOrder {

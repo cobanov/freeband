@@ -117,7 +117,10 @@ for c in cases {
         check("\(c.file) \(c.name): status", out.status != .error && out.status != .crc, "status \(out.status): \(out.note)")
     }
     if result.kind.isWorkout {
-        equal("\(c.name): workouts are raw only", out.status, .unsupported)
+        equal("\(c.name): one workout", out.workouts.count, 1)
+        check("\(c.name): workout has a sport, a duration and a heart rate",
+              out.workouts.first.map { !$0.sport.isEmpty && $0.activeSeconds > 0 && ($0.hrAvg ?? 0) > 40 } ?? false)
+        check("\(c.name): idempotent workout", IngestMapper.map(result).workouts == out.workouts)
     }
     // Idempotence: the same file mapped twice gives the same drafts.
     let again = IngestMapper.map(result)
@@ -133,7 +136,7 @@ for c in cases {
 }
 print("   statuses: \(statusCounts.map { "\($0.key.rawValue) \($0.value)" }.sorted().joined(separator: ", "))")
 check("some parsed", (statusCounts[.parsed] ?? 0) > 10)
-check("workouts unsupported", (statusCounts[.unsupported] ?? 0) >= 13)
+check("workouts parsed", allOutputs.filter { !$0.1.workouts.isEmpty }.count == 13)
 
 // MARK: - Daily details
 
@@ -356,11 +359,30 @@ badHR.heartRate[0] = 250
 badHR.heartRate[1] = 60
 equal("HR outside 30-220", Calibration.heartRateCheck(minuteDays: [MinuteDayDraft(series: badHR, sourceFileIDs: [])], sleeps: []).status, .fail)
 equal("HR inside", Calibration.heartRateCheck(minuteDays: [minuteDraft], sleeps: fixtureSleeps).status, .pass)
+// heart rate coverage: 30 recorded minutes, a heart rate in every 10th, in all of them, in none
+var sparse = MinuteSeries(day: day, tzOffsetMinutes: 180)
+for i in 0 ..< 30 { sparse.steps[i] = 0 }
+for i in stride(from: 0, to: 30, by: 10) { sparse.heartRate[i] = 60 }
+let sparseCheck = Calibration.heartRateCoverageCheck(MinuteDayDraft(series: sparse, sourceFileIDs: []))
+equal("HR every 10th minute", sparseCheck.status, .warn)
+check("HR every 10th minute, detail", sparseCheck.detail == "heart rate in 3 of 30 recorded minutes, about every 10 min")
+var dense = sparse
+for i in 0 ..< 30 { dense.heartRate[i] = 60 }
+equal("HR every minute", Calibration.heartRateCoverageCheck(MinuteDayDraft(series: dense, sourceFileIDs: [])).status, .pass)
+var noHR = sparse
+for i in 0 ..< 30 { noHR.heartRate[i] = nil }
+equal("no HR in recorded minutes", Calibration.heartRateCoverageCheck(MinuteDayDraft(series: noHR, sourceFileIDs: [])).status, .warn)
+equal("no records", Calibration.heartRateCoverageCheck(MinuteDayDraft(series: MinuteSeries(day: day, tzOffsetMinutes: 180), sourceFileIDs: [])).status, .skip)
 if let (r, out) = output("daily details v4"), let id = r.fileID, let records = out.minuteRecords {
     // Fetched `records` minutes and 30 s after the file start: expected = records.
     let fetched = id.ts.addingTimeInterval(TimeInterval(records * 60 + 30))
     equal("records match elapsed", Calibration.recordCountCheck(fileID: id, records: records, fetchedAt: fetched).status, .pass)
     equal("records far short", Calibration.recordCountCheck(fileID: id, records: records, fetchedAt: id.ts.addingTimeInterval(600 * 60)).status, .fail)
+    // A Band 10 Pro closes the file at a fetch and opens the next: the file ends where the next begins,
+    // however much later this copy was fetched (measured 2026-11-15: every fragment failed without this).
+    equal("a fragment ends where the next file starts", Calibration.recordCountCheck(
+        fileID: id, records: records, fetchedAt: id.ts.addingTimeInterval(600 * 60),
+        nextStart: id.ts.addingTimeInterval(TimeInterval(records * 60))).status, .pass)
     // A past day: expected ends at the local day end (1440 minutes after a midnight start).
     let check1440 = Calibration.recordCountCheck(fileID: id, records: 1440, fetchedAt: id.ts.addingTimeInterval(3 * 86_400))
     equal("past day expects the whole day", check1440.status, .pass)
@@ -404,7 +426,7 @@ if let c = cases.first(where: { $0.name.contains("daily details v4") }) {
     let entry = Calibration.fileEntry(broken, output: out, size: bytes.count, fetchedAt: nil)
     check("crc failure recorded", entry.crcOK == false && entry.crcStored != entry.crcComputed && entry.status == "crc")
 }
-check("check kinds", Set(report.checks.map(\.name)).isSuperset(of: ["heart_rate_range", "records_vs_elapsed", "sleep_plausible", "rr_present"]))
+check("check kinds", Set(report.checks.map(\.name)).isSuperset(of: ["heart_rate_range", "heart_rate_coverage", "records_vs_elapsed", "sleep_plausible", "rr_present"]))
 equal("record checks pass", report.checks.filter { $0.name == "records_vs_elapsed" }.map(\.status), Array(repeating: .pass, count: minuteFiles.count))
 let decoded = CalibrationReport.decode(report.json())
 check("JSON round trip", decoded?.files == report.files && decoded?.checks == report.checks)

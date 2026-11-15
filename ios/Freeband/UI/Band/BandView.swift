@@ -55,48 +55,43 @@ private struct BandPage: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(AppModel.stayConnectedKey) private var stayConnected = false
 
-    /// What Stay connected does, and while it's on, whether the session is open right now.
-    private var stayConnectedSubtitle: String {
-        guard stayConnected else {
-            return String(localized: "Lets \(band.shortName) find this phone. Mi Fitness can't connect while it's on.")
-        }
-        switch link.holdState {
-        case .connected where link.bandID == band.id: return String(localized: "Connected. \(band.shortName) can find this phone.")
-        default: return String(localized: "Waiting for \(band.shortName)…")
-        }
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.l) {
                 if bands.count > 1 {
                     switcher
                 }
-                TimelineView(.everyMinute) { timeline in
-                    BandRender(model: BandPresentation.model(band), state: liveState(timeline.date),
-                               height: dynamicTypeSize.isAccessibilitySize ? 150 : 220)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, FBSpace.xs)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(Text(band.shortName))
-                        .accessibilityValue(Text(renderDescription))
-                }
-
-                VStack(alignment: .leading, spacing: FBSpace.xxs) {
-                    Text(band.shortName)
-                        .textStyle(.headline)
-                        .foregroundStyle(.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    StatusLine(name: band.macSuffix.map { String(localized: "ID \($0)") } ?? band.shortName,
-                               battery: BandPresentation.battery(link, band),
-                               state: BandPresentation.statusState(link, band), lastSync: band.lastSyncAt)
-                    if BandPresentation.isSyncing(link, band), let progress = link.fileProgress, progress.total > 0 {
-                        ProgressView(value: Double(progress.done), total: Double(progress.total))
-                            .tint(.textPrimary)
-                            .padding(.top, FBSpace.xxs)
+                Card(padding: FBSpace.m) {
+                    HStack(alignment: .center, spacing: FBSpace.m) {
+                        TimelineView(.everyMinute) { timeline in
+                            BandRender(model: BandPresentation.model(band), state: liveState(timeline.date),
+                                       height: dynamicTypeSize.isAccessibilitySize ? 120 : 168)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text(band.shortName))
+                                .accessibilityValue(Text(renderDescription))
+                        }
+                        VStack(alignment: .leading, spacing: FBSpace.xs) {
+                            Text(band.shortName)
+                                .textStyle(.headline)
+                                .foregroundStyle(.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(BandPresentation.battery(link, band).map { FBFormat.percent(Double($0) / 100) } ?? "–")
+                                    .textStyle(.figureL)
+                                    .foregroundStyle(.textPrimary)
+                                BatteryLabel(bandID: band.id, charging: BandPresentation.isCharging(link, band))
+                            }
+                            .accessibilityElement(children: .combine)
+                            StatusLine(name: band.macSuffix.map { String(localized: "ID \($0)") } ?? band.shortName,
+                                       battery: nil, state: BandPresentation.statusState(link, band), lastSync: band.lastSyncAt)
+                            if BandPresentation.isSyncing(link, band), let progress = link.fileProgress, progress.total > 0 {
+                                ProgressView(value: Double(progress.done), total: Double(progress.total))
+                                    .tint(.textPrimary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-
                 BandContextCard(band: band)
 
                 QuickActionRow {
@@ -115,14 +110,15 @@ private struct BandPage: View {
                 }
 
                 ListCard {
-                    if BandFeatures.controls {
-                        ListRow(title: String(localized: "Alarms"), systemImage: "alarm")
+                    NavigationLink(value: Route.monitoring(band.id)) {
                         ListRow(title: String(localized: "Health monitoring"), systemImage: "heart.text.square")
-                        ListRow(title: String(localized: "Display & Do Not Disturb"), systemImage: "moon")
                     }
-                    ListRow(title: String(localized: "Stay connected"), subtitle: stayConnectedSubtitle,
-                            systemImage: "link",
-                            accessory: .toggle(Binding(get: { stayConnected }, set: { model.setStayConnected($0) })))
+                    .buttonStyle(.fbRow)
+                    NavigationLink(value: Route.bandOptions(band.id)) {
+                        ListRow(title: String(localized: "Connection and data"),
+                                value: stayConnected ? String(localized: "Stays connected") : nil, systemImage: "link")
+                    }
+                    .buttonStyle(.fbRow)
                     NavigationLink(value: Route.aboutBand(band.id)) {
                         ListRow(title: String(localized: "About this band"), value: band.firmware,
                                 systemImage: "info.circle", showsDivider: false)
@@ -310,5 +306,38 @@ struct AboutBandView: View {
             (String(localized: "Last sync"), band.lastSyncAt.map { $0.formatted(date: .abbreviated, time: .shortened) }
                 ?? String(localized: "Not synced yet")),
         ].compactMap { $0 }
+    }
+}
+
+/// "Battery", and how long it will last at the rate it has been going down since the last charge.
+private struct BatteryLabel: View {
+    @Query private var readings: [Sample]
+    private let charging: Bool
+
+    init(bandID: UUID, charging: Bool) {
+        self.charging = charging
+        let start = Date().addingTimeInterval(-30 * 86400)
+        _readings = Query(filter: #Predicate<Sample> { $0.bandID == bandID && $0.kind == "battery" && $0.ts >= start },
+                          sort: \.ts)
+    }
+
+    private var left: String? {
+        guard !charging, let days = BatteryEstimate.daysLeft(readings.map { ($0.ts, $0.level) }) else { return nil }
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        formatter.allowedUnits = days >= 1 ? [.day] : [.hour]
+        return formatter.string(from: days * 86400)
+    }
+
+    var body: some View {
+        Group {
+            if let left {
+                Text("Battery, about \(left) left", comment: "Under the battery percentage; the value is a duration such as '4 days'")
+            } else {
+                Text("Battery")
+            }
+        }
+        .textStyle(.subhead)
+        .foregroundStyle(.textSecondary)
     }
 }

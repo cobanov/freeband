@@ -118,9 +118,9 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 | 7 | Müzik | ↔ | 18/0–2 | statik | oturum, yalnız Apple Music | M | düşük | yok |
 | 8.1 | Kullanıcı bilgisi, günlük hedefler | T→B | 8/0 | statik | kolay | S | düşük | yok |
 | 8.2 | Hedef bildirimi, ikincil hedef, vitality | T→B | 8/21–22, 42–43, 35–36 | runtime | kolay | S | düşük | yok |
-| 9.1 | Nabız aralığı, yüksek/düşük alarm, uyku | T→B | 8/10, 11 | statik + runtime | kolay | S | düşük | yok |
-| 9.2 | SpO2 | T→B | 8/8, 9 | runtime | kolay | S | düşük | yok |
-| 9.3 | Stres | T→B | 8/14, 15 | runtime | kolay | S | düşük | yok |
+| 9.1 | Nabız aralığı, yüksek/düşük alarm, uyku | T→B | 8/10, 11 | statik + runtime | kolay | S | düşük | **var**, cihazda denenmedi |
+| 9.2 | SpO2 | T→B | 8/8, 9 | runtime | kolay | S | düşük | **var**, cihazda denenmedi |
+| 9.3 | Stres | T→B | 8/14, 15 | runtime | kolay | S | düşük | **var**, cihazda denenmedi |
 | 9.4 | Hareketsizlik hatırlatıcısı | T→B | 8/12, 13 | runtime | kolay | S | düşük | yok |
 | 9.6 | Canlı nabız/adım | ↔ | 8/45–47 | statik | kolay | S | düşük | **var** |
 | 9.7 | Takılı / şarjda / uyuyor, pil ayrıntısı | ↔ | 2/78, 2/79, 2/1 | runtime | kolay (itme: oturum) | S | düşük | pil seviyesi var |
@@ -150,7 +150,7 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 | 16.1 | Bantta internet (ağ vekili) | ↔ | 2/92 + kanal 7 | AB | oturum + TCP/IP yığını | L | yüksek | yok |
 | 16.2 | Hızlı uygulamayla mesajlaşma | ↔ | 20/6–9 | AB | oturum + bant uygulaması | L | orta | yok |
 | 16.3 | Kadın sağlığı, rota, tıbbi kimlik, temel veri... | ↔ | 8/7, 20, 37–41, 44, 57–62... | AB | çoğu kolay | S–L | orta | yok |
-| 16.6 | Bilinmeyen 2/110 | B→T | 2/110 | — | loglanmalı | S | düşük | loglanıyor, çözülmüyor |
+| 16.6 | Bilinmeyen 2/110 | B→T | 2/110 | — | loglanmalı | S | düşük | içeriği okundu (alan 71: adlı kaynak listesi), anlamı tahmin |
 
 ## 3. Bildirimler ve aramalar
 
@@ -424,7 +424,11 @@ Yön: `T→B` telefon → bant, `B→T` bant → telefon, `↔` iki yönlü. Bey
 
 ## 9. Sağlık ayarları
 
-Hepsi telefon → bant, GET/SET çifti, arka plan gerektirmez. Gadgetbridge hepsini her bağlantıda GET'liyor [KOD] `X/services/XiaomiHealthService.java:257-275`. Beyanlar statik (`supportsStressMeasurement`, `supportsSpo2`, `supportsHeartRateMeasurement` hepsi `true`) ve runtime (`FEAT_STRESS`, `FEAT_SPO2`, `FEAT_INACTIVITY`) [KOD] `XD/XiaomiCoordinator.java:344-352`, `:481-488`, `:610-619`.
+Hepsi telefon → bant, GET/SET çifti, arka plan gerektirmez. **Freeband'de 9.1–9.3 var** [FB] `FB/Band/MiProtocol.swift` (`MiMonitoring`, `PBFields`), `FB/UI/Band/MonitoringView.swift`: ekran açılınca GET, değişiklikte bandın döndürdüğü baytlar üzerinde yalnız bilinen alan değişip SET, ardından tekrar GET; ekran bandın cevabını gösterir. **Okuma bantta doğrulandı** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13; ekrandaki değerler doğru çıktı:
+  - `8/10` nabız: `08 00 10 00 18 00 20 64 2a 02 08 01 38 01 42 04 08 00 10 32 58 01` = `{disabled 1: 0, interval 2: 0 (akıllı), alarmHighEnabled 3: 0, alarmHighThreshold 4: 100, advancedMonitoring 5{1: 1}, unknown7 7: 1, heartRateAlarmLow 8{1: 0, 2: 50}, sleepRespiratoryRate 11: 1}`. 9 ve 10 hiç gelmiyor.
+  - `8/8` SpO2: `08 01 10 02 18 00 22 04 08 01 10 55` = `{unknown1 1: 1, mode 2: 2 (tüm gün), 3: 0 (belgelerde yok), alarmLow 4{1: 1, 2: 85}}`.
+  - `8/14` stres: `08 01 12 04 08 01 10 50` = `{allDayTracking 1: 1, relaxReminder 2{enabled 1: 1, unknown2 2: 80}}`.
+  - **Yazma da doğrulandı** [ÖLÇÜM, aynı bant, aynı gün]: nabız aralığı akıllıdan 1 dakikaya alındı. Bant `8/11`'e `status 0` döndü, ardından `8/10` cevabında yalnız `interval 2` değişmişti (`08 00 10 01 18 00 …`, geri kalan baytlar aynı); üç dakika sonraki okumada da 1. SpO2 ve stres yazması denenmedi. Gadgetbridge hepsini her bağlantıda GET'liyor [KOD] `X/services/XiaomiHealthService.java:257-275`. Beyanlar statik (`supportsStressMeasurement`, `supportsSpo2`, `supportsHeartRateMeasurement` hepsi `true`) ve runtime (`FEAT_STRESS`, `FEAT_SPO2`, `FEAT_INACTIVITY`) [KOD] `XD/XiaomiCoordinator.java:344-352`, `:481-488`, `:610-619`.
 
 ### 9.1 Sürekli nabız, nabız uyarıları, uyku tespiti
 
@@ -470,6 +474,23 @@ Ayrı bir "uyku tespiti" komutu yok. Uyku davranışını etkileyenler: nabız a
   - Bant → `Command{2,79}` → `system(4).deviceState(49).{chargingState 1 (1 şarjda, 2 değil), wearingState 2 (1 takılı, 2 değil), sleepState 3 (1 uyku, 2 uyanık), warningState 4, activityState 5}`.
   - Pil: `Command{2,1}` → `system(4).power(2).battery(1).{level 1, state 2 (1 şarjda, 2/3 normal), lastCharge 3{state 1, timestampSeconds 2}}` [KOD] `P/xiaomi/wear_system.proto:88-101`, `X/services/XiaomiSystemService.java:370-405`. **Freeband'de seviye var**, `state` ve `lastCharge` okunmuyor.
   - AstroBox'a göre `2,79` itmesinin 4. alanı `waring` (sic): 1 nabız yüksek, 2 nabız düşük, 3 aktifken yüksek, 4 aktifken düşük; şarj alanı 1 başladı, 2 bıraktı, 3 doldu. Yani bant nabız alarmlarını telefona da bildiriyor [AB] `ABP/wear_system.proto:597-639`. Ek itmeler: `2,97` pil durumu (`battery_status(63)`), `2,91` uyarı durumu (`alert_status(58){battery 1, temperature 2, storage 3, ota 4, ..., wear 7}`, GET `2,90`) [AB] `:118-120`, `:691-732`.
+- **Ölçüm, Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13** [ÖLÇÜM]: bant bilekte, şarjda değil, pil %82 iken
+  - `2/78` cevabı `08 02 10 4e 22 0f 82 03 0c 08 01 10 00 18 00 20 00 2a 02 08 00` = `basicDeviceState(48){1: 1, 2: 0, 3: 0, 4: 0, 5{1: 0}}`. Gadgetbridge'in alan adlarıyla (şarjda, pil 0, takılı değil) üçü de yanlış çıkıyor; alanların bu yazılımdaki anlamı bilinmiyor. Freeband bu cevabı okumuyor (önceden okuyup bandı "şarjda" gösteriyordu). Çözmek için bant bilekten çıkarılmışken ve şarjdayken birer cevap gerekli. [TAHMİN: 1 = takılı olabilir]
+  - `2/1` cevabı `battery(1){level 1: 82, state 2: 2, lastCharge 3{state 1: 3, timestampSeconds 2}}`: `state 2` = şarjda değil, belgedekiyle uyumlu. Freeband şarj durumunu buradan alıyor.
+  - Tutulan oturumda bant kendiliğinden `2/79` gönderdi: `08 02 10 4f 22 05 8a 03 02 08 02` = `deviceState(49){1: 2}`, yani yalnız değişen alan geliyor (bantta elle nabız ölçümünden birkaç saniye sonra). Freeband gelmeyen alanları eski değerinde bırakıyor (önceden "takılı değil" sayıyordu). Aynı oturumda anlamı bilinmeyen `4/1` (`08 04 10 01 32 02 20 01`), `23/0` ve `23/17` de geldi.
+  - **Yoklama (Tanılama › Bandı yokla), AstroBox'ın adlandırdığı salt-okunur Health komutları** [ÖLÇÜM, aynı bant] [AB] `ABP/wear_fitness.proto` (`FitnessID`, `Goal`, `BasicData`):
+    - `8/42` GET_GOAL_STATUS → `health(10)` alan 38 `{current_goals: [{type 2}, {type 1}, {type 3}], supported_goals: [1, 2, 3, 4]}`; AstroBox'ta 1 STEP, 2 CALORIE, 3 INTENSITY, 4 STAND. Bandın üç halkası kalori, adım ve "Hareket" (Moving) = INTENSITY.
+    - `8/29` GET_SPORT_STATUS → alan 24 `{1: 0}` (antrenman yok). `8/61` → alan 58 `{1: 0, 2: 0}`, `8/63` → alan 59 `{1: 0}` (uyku düzeni ve uyku bozukluğu ayarları, kapalı).
+    - `8/6` GET_REMAINING_SPORT_DATA → yalnız `status 1`: bantta teslim edilecek antrenman kaydı yok (ya da komut bu durumda geçersiz). `8/44` ve `8/86` cevapsız kaldı.
+    - Canlı özet (`8/47`, AstroBox'ta `BasicData`): alan 3 `distance`, alan 5 `intensity`. Alan 5 bandın Hareket dakikası **değil** [ÖLÇÜM]: bant 49 gösterirken 7 idi. Hareket dakikası dakikalık dosyadan sayılıyor (`docs/ACTIVITY.md` §6.1).
+    - **Mi Fitness'ın kendi kodundan** (Android 9.8.348i, jadx; ayrıntı `docs/MIFITNESS-2026-11-13.md`) [MF]:
+      - `8/41` SYNC_SLEEP_RESULT ve `8/51` SYNC_VITALITY_DATA **telefondan banda yazılıyor**. Ham uyku dosyası (alt tür 8) telefonda yerel bir algoritma kitaplığıyla çözülüyor, özet banda geri yazılıyor; bandın ekranındaki uyku ve halka dökümü bu geri yazımdan geliyor. Geri okuyan komut yok.
+      - Senkron sırası: `8/29` → `8/1` bugün listesi → `8/3` (birden çok kimlik) ya da `8/4` (tek 7 baytlık kimlik) → dosyalar → her dosya için `8/5` onay → bugün bitince `8/2` geçmiş listesi. `8/6` yalnız spor salonu çevrimdışı kayıt listesi.
+      - Eşleşme: `1/17` cevabındaki doğrulama kipi 2 ise sunucusuz "yerel" eşleşme (P-256 ECDH, HKDF bilgisi `miwear-bind`), 1 ise Xiaomi sunucusu üzerinden. Yeniden bağlanma kimlik doğrulaması `1/26`, `1/27`, HKDF bilgisi `miwear-auth`.
+      - `2/78` cevabını Mi Fitness da {1 şarjda, 2 pil, 3 takılı, 4 uyuyor} diye okuyor; bandımızın bilekte ve şarjsızken verdiği {1: 1, 2: 0, 3: 0, 4: 0} bununla da uyuşmuyor. Açıklanamadı.
+    - Açık kaynakların güncel hali (`docs/SOURCES-2026-11-13.md`): `16/3` bandın telefondan konum istemesi (`16/2` ile cevaplanır), `23/0` telefon durumu isteği, `23/17` telefon kullanımı kaydı, `4/1` kadran değişimi; antrenman özet/detay/GPS düzenleri; AstroBox'ın yerel eşleşme akışı.
+  - Bant her senkronda `16/3` (`08 10 10 03 92 01 00`) ve bildirimden sonra `7/16` (uygulama simgesi isteği) gönderiyor; ikisi de cevapsız bırakılıyor.
+  - **`16/3` konum isteği isteğe bağlı cevaplanıyor** [AB] `ABP/wear_gnss.proto` (`Gnss.GnssID`: REQUEST_GPS_INFO 3, SEND_GPS_INFO 2; `GpsInfo{timestamp 1, longitude 2 (double), latitude 3 (double), altitude 4 (double)}`): Bant sekmesindeki "Konumu bantla paylaş" (varsayılan kapalı) açıkken Freeband `Command{16,2}` `gnss(18).gps_info(3)` ile telefonun son konumunu yolluyor; konum yalnız uygulama kullanılırken alınıyor, bellekte duruyor, 6 saatten eskiyse gönderilmiyor. Bandın bu bilgiyle ne yaptığı (GPS'in hızlı kilitlenmesi, gün doğumu, hava) ölçülmedi. [TAHMİN]
 - **Beyan:** runtime (`FEAT_DEVICE_ACTIONS`, bant `2,78`'e cevap verirse) [KOD] `X/services/XiaomiSystemService.java:774-779`.
 - **iOS:** GET kısa oturumla; değişiklik bildirimi (`2,79`) tutulan oturum ister. Freeband'de "bant takılı değil / şarjda / uyuyor" göstermek ve Freeband'in 24 saat kadranındaki boş saatleri açıklamak için kullanışlı.
 - **Efor / risk:** S / düşük.
@@ -805,6 +826,7 @@ Uyumsuzluklar (bantta doğrulanmalı):
 - Gadgetbridge'de `System` için 110 yok (en büyük 79) [KOD] `X/services/XiaomiSystemService.java:76-103`. AstroBox'ın `SystemID` listesi 98'de bitiyor, 110 yok; ABP ve ABC'deki tek "110" `SportType DRIVING` [AB] `ABP/wear_system.proto:41-131`, `ABP/wear_common.proto:73`. `System` yük alanları 64'e kadar (`ABP/wear_system.proto:133-197`).
 - Benzer bant-kendiliğinden mesajlar: `REPORT_BASIC_STATUS 79`, `REPORT_BATTERY_STATUS 97`, `REPORT_ALERT_STATUS 91`, `REPORT_SYSTEM_SETTING 42` [AB] `ABP/wear_system.proto:101`, `:116-120`. 110 büyük olasılıkla yeni yazılımda eklenmiş bir durum raporu ya da bantın telefondan bir şey istemesi [TAHMİN].
 - AstroBox auth sonrası yalnız `Command{2,92}` (ağ durumu) yolluyor [AB] `ABC/device.rs:290-300`. Freeband bunu göndermediği için 110'un "ağ yok" ya da eşlikçi durumu sorusu olması mümkün [TAHMİN].
+- **İçerik okundu** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13, auth'tan hemen sonra, 60 bayt: `08 02 10 6e 22 36 ba 04 33 …` = `system(4)` içinde **alan 71**, onun içinde tekrarlanan alan 1: `{1: 1, 2: "watch_manual", 3: 0, 4: 0, 5: 0}` ve `{1: 0, 2: "watch_snap_rule", 3: 0, 4: 0, 5: 0}`. Yani adlı iki kaynağın (bandın kullanım kılavuzu ve bir "snap" kuralı) durum ya da sürüm listesi; telefondan bunları güncellemesini istiyor olabilir. [TAHMİN: anlamı; alan 1'in 1/0 değeri "var/yok" ya da "güncel/değil" olabilir] Freeband cevap vermiyor ve senkron bundan etkilenmiyor.
 - **Yapılacak:** Freeband çözülmüş gövdeyi hex olarak loglasın ve genel protobuf çözücüyle alan ağacını yazsın. Gövde `08 02 10 6e 22 <uzunluk>` ile başlamalı; ardından gelen varint `system(4)` içindeki alanı verir (alan = etiket >> 3). 64 ve altıysa bilinen bir yük: ör. `8a 03` = 49 `report_basic_status`, `fa 03` = 63 `battery_status`, `ba 03` = 55 `ota_progress`. 64'ün üstündeyse yeni bir yük. `system` yerine `a0 06` (alan 100, `status`/`error_code`) da gelebilir [AB] `ABP/wear.proto:77`. Cevap vermemek şimdilik zararsız görünüyor: pil cevabı ve canlı akış normal geldi [ÖLÇÜM].
 - **Efor / risk:** S (loglama) / düşük.
 

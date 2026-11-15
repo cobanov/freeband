@@ -50,9 +50,6 @@ struct SettingsView: View {
 
                 section(String(localized: "Integrations")) {
                     ListCard {
-                        link(.webAccess, String(localized: "Web access"),
-                             value: model.hubEnabled ? String(localized: "On · \(model.hubURL.host ?? "")") : String(localized: "Off"),
-                             icon: "globe")
                         link(.webhooks, String(localized: "Webhooks"), value: webhookSummary, icon: "arrow.up.forward.app")
                         link(.shortcuts, String(localized: "Shortcuts & Siri"), icon: "square.2.layers.3d", last: true)
                     }

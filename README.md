@@ -29,10 +29,16 @@ Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1
 | Mi Band 8, on BLE V1 | expected to work: Gadgetbridge puts it on the same channel as the Watch S1 Active. Not tested on a band yet ([#4](https://github.com/cobanov/freeband/issues/4)) |
 | Parsing them: per-minute data, daily summary, sleep and sleep stages, manual readings | implemented and tested against fixtures; not yet checked with real files from a Band 10 |
 | Sleep, Recovery and Strain scores with contributors and confidence | implemented (algorithm v1) |
+| Worth noticing: what stands out today against your own normal (resting heart rate, HRV, sleep debt, sleep timing, hard days on low recovery) | implemented and tested (v1 thresholds, not validated on real weeks yet) |
 | English and Turkish, light and dark themes | done |
-| Optional web hub: REST API, web panel, webhooks, CSV/JSON export | live at freeband.cobanov.dev |
-| Alarms, health monitoring settings, Do Not Disturb, weather, watch faces | not built yet |
-| Replacing Mi Fitness entirely (background connection, file acknowledgement) | not built yet |
+| Webhooks (sent from the phone to your own address, signed) and CSV/JSON export | done |
+| The account server (REST API, web panel, invites) | removed on 2026-11-14: nobody used it. The website stays |
+| Health monitoring settings on the band: heart rate interval, heart rate during sleep, blood oxygen, all-day stress (Band tab) | reading verified on a Band 10 Pro (firmware 3.201.026), and writing the heart rate interval; the other writes not tried yet |
+| Alarms, Do Not Disturb, weather, watch faces | not built yet |
+| Background sync: a sync finishes after you leave the app, iOS's background refresh runs one, and with Stay connected on the band coming back in range or changing state starts one ([docs/STAY-CONNECTED.md](docs/STAY-CONNECTED.md) section 4.1) | implemented; not tried on a band yet |
+| Clear the band after sync (off by default): finished minute files and past files that Freeband has stored and fully parsed are acknowledged at the next sync, and the band deletes them | implemented; not tried on a band yet |
+| A morning summary notification, the first time a background sync brings the day's scores | implemented; not tried on a band yet |
+| Pairing a band without Mi Fitness | not built yet |
 
 <img src="docs/img/redmi-watch-5-active.png" width="200" alt="Band: a Redmi Watch 5 Active with battery, sync and quick actions">
 
@@ -66,9 +72,9 @@ The docs are in Turkish, except `docs/BLE-V1.md` and `docs/STAY-CONNECTED.md`.
 | Path | What |
 |---|---|
 | `ios/` | the SwiftUI app (iOS 17+). Generate the project with [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`cd ios && xcodegen generate`). |
-| `ios/tests/` | standalone test harnesses: protocol vectors, key reader, activity parsers, analytics, ingest, and an app↔hub contract test |
-| `hub/` | the optional Cloudflare Worker + D1 hub (Hono, vitest) |
-| `design/`, `scripts/` | design tokens shared by the app and the hub, plus their generator |
+| `ios/tests/` | standalone test harnesses: protocol vectors, key reader, activity parsers, analytics, ingest |
+| `hub/` | the website, freeband.cobanov.dev (a Cloudflare Worker with Hono; vitest) |
+| `design/`, `scripts/` | design tokens shared by the app and the website, plus their generator |
 | `docs/` | findings, plan, design spec, story |
 
 Running the tests:
@@ -81,7 +87,7 @@ cd ios/tests/activity && python3 activity_ref.py --selftest
 # analytics
 cd ios/tests/analytics && swiftc ../../Freeband/Analytics/*.swift main.swift -o /tmp/an && /tmp/an
 
-# hub
+# website
 cd hub && npm install && npx tsc --noEmit && npx vitest run
 ```
 

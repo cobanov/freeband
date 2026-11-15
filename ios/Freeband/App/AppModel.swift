@@ -1,61 +1,42 @@
+import BackgroundTasks
 import Combine
 import Foundation
 import SwiftData
 import SwiftUI
 import UIKit
+import UserNotifications
 
 /// Ties the band session to storage and integrations: every observation is stored as it
 /// arrives; every activity file is stored, then parsed into the derived models; when a session
 /// ends the touched days are scored again, webhooks get the session's samples and health records
-/// and, if web access is on, unsent samples go to the hub.
+/// (the account server and web access were removed on 2026-11-14: nobody used them).
 @MainActor
 final class AppModel: ObservableObject {
     let link: BandLink
     let context: ModelContext
     let ingest: ActivityIngest
 
-    /// The hub stores minute/sleep/score records since migration 0002 (deployed 2026-10-14).
-    static let hubAcceptsHealthTypes = true
-
-    @Published var hubStatus: String?
-    @Published var hubBusy = false
-    @Published var hubEnabled = Vault.hubToken != nil
-    /// An invite opened from a QR code or the hub's /join page, waiting for the user to confirm.
-    @Published var pendingInvite: Invite?
     /// Local midnight of the current day; changes at midnight and on clock/time-zone changes.
     @Published private(set) var today = Calendar.current.startOfDay(for: Date())
     /// The newest calibration report (plan section 4, phase 0).
-    @Published private(set) var calibration: CalibrationReport?
+    @Published var calibration: CalibrationReport?
     /// Parsing or scoring is running (reparse all, launch).
     @Published private(set) var ingestBusy = false
 
     /// Fires with the new day's midnight when the day changes while the app runs.
     let dayChanged = PassthroughSubject<Date, Never>()
 
-    struct Invite: Identifiable, Equatable {
-        let code: String
-        let hub: URL
-        var id: String { code + hub.absoluteString }
-        var isDefaultHub: Bool { hub.host == HubClient.defaultURL.host }
-    }
-
     private var sessionDrafts: [SampleDraft] = []
     /// What the ingests of the running session parsed, for its report and webhooks.
     private var sessionIngest = IngestSummary()
     /// Earliest day per band whose scores must be recomputed once no session is running.
-    private var pendingRollup: [UUID: DayKey] = [:]
+    var pendingRollup: [UUID: DayKey] = [:]
     private var ingestTask: Task<Void, Never>?
     private var ingestAgain = false
-    /// Health records waiting for the hub (only while hubAcceptsHealthTypes).
-    private var pendingHubRecords: [UUID: [[String: Any]]] = [:]
     private var dayObservers: [NSObjectProtocol] = []
 
-    var hubURL: URL {
-        get { UserDefaults.standard.string(forKey: "hubURL").flatMap(URL.init(string:)) ?? HubClient.defaultURL }
-        set { UserDefaults.standard.set(newValue.absoluteString, forKey: "hubURL") }
-    }
-
-    var hub: HubClient { HubClient(baseURL: hubURL, token: Vault.hubToken) }
+    /// The project's site (privacy page, guide).
+    static let siteURL = URL(string: "https://freeband.cobanov.dev")!
 
     /// The one model, for App Intents (Siri, Shortcuts).
     static weak var shared: AppModel?
@@ -63,6 +44,17 @@ final class AppModel: ObservableObject {
     /// Demo mode (DemoMode.swift): an in-memory store with demo data. Band sessions can't start
     /// (the demo band has no key) and nothing reaches the hub or webhooks.
     let isDemo: Bool
+
+    // Background sync state (methods in AppModel+Background.swift).
+    var lastBackgroundSync = Date.distantPast
+    var syncBackgroundTask = UIBackgroundTaskIdentifier.invalid
+    var watchers: Set<AnyCancellable> = []
+    /// Show sleep on the band (docs/SLEEP-WRITEBACK.md): once per night, after the sync that
+    /// brought it, the night's summary goes to the band (Command{8,41}), which is what fills the
+    /// band's own sleep screen when Mi Fitness is around. Off by default.
+    /// The write-back that is on its way: marked as done only when its session completed, so a
+    /// band that was out of reach gets it at the next sync.
+    var sleepWriteBack: (bandID: UUID, wake: TimeInterval)?
 
     init(context: ModelContext, isDemo: Bool = false) {
         self.context = context
@@ -74,7 +66,9 @@ final class AppModel: ObservableObject {
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
-        link.hasActivityFile = { [weak self] id, hex in self?.hasActivityFile(id, hex) ?? false }
+        link.storedActivityFile = { [weak self] id, hex in
+            self?.blob(id, hex)?.fetchedAt
+        }
         link.onDeviceInfo = { [weak self] id, info in
             guard let self, let band = self.band(id) else { return }
             band.firmware = info.firmware.isEmpty ? band.firmware : info.firmware
@@ -83,6 +77,18 @@ final class AppModel: ObservableObject {
         }
         link.onActivityFile = { [weak self] id, file, data, today in self?.storeActivityFile(id, file, data, today: today) }
         link.onFindPhone = { [weak self] id, ring in self?.findPhone(id, ring) }
+        link.phoneLocation = { [weak self] in
+            // A fix older than six hours says little about where the phone is now.
+            guard let self, UserDefaults.standard.bool(forKey: Self.shareLocationKey), let l = self.phoneLocation.last,
+                  Date().timeIntervalSince(l.timestamp) < 6 * 3600 else { return nil }
+            return (l.timestamp, l.coordinate.latitude, l.coordinate.longitude, l.verticalAccuracy >= 0 ? l.altitude : nil)
+        }
+        link.canAcknowledge = { [weak self] id, hex in
+            UserDefaults.standard.bool(forKey: Self.clearBandKey) && self?.blob(id, hex)?.parseStatus == ParseStatus.parsed.rawValue
+        }
+        link.onMonitoring = { [weak self] id, setting, body in
+            self?.monitoring["\(id.uuidString).\(setting.rawValue)"] = body
+        }
         findPhoneAlert?.onStop = { [weak self] in self?.stopFindPhone() }
         calibration = Self.loadCalibration()
         mergeDuplicateBands()
@@ -93,6 +99,7 @@ final class AppModel: ObservableObject {
             // The log line marks a new process: what came before it in the log is gone.
             link.note("— app started")
             updateHold()
+            watchHeldSession()
             Task { await self.launchMaintenance() }
         }
     }
@@ -129,9 +136,74 @@ final class AppModel: ObservableObject {
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
     }
 
+    // MARK: health monitoring settings (docs/CAPABILITIES.md §9)
+
+    /// Each setting as the band last returned it, keyed "<band id>.<GET subtype>". A change is
+    /// built from these bytes, and the screen shows what the band answers afterwards.
+    @Published var monitoring = (UserDefaults.standard.dictionary(forKey: "monitoring") as? [String: Data]) ?? [:] {
+        didSet { if !isDemo { UserDefaults.standard.set(monitoring, forKey: "monitoring") } }
+    }
+
+    func monitoring(_ band: Band, _ setting: MiMonitoring.Setting) -> Data? {
+        monitoring["\(band.id.uuidString).\(setting.rawValue)"]
+    }
+
+    func readMonitoring(_ band: Band) {
+        start(band, .send(MiMonitoring.Setting.allCases.map(MiMonitoring.get)))
+    }
+
+    /// Writes the setting, then reads it back.
+    func writeMonitoring(_ band: Band, _ setting: MiMonitoring.Setting, _ body: Data?) {
+        guard let body else { return }
+        start(band, .send([MiMonitoring.set(setting, body), MiMonitoring.get(setting)]))
+    }
+
+    /// Diagnostics › Probe the band: asks the read-only Health commands AstroBox names and
+    /// Gadgetbridge doesn't use (6 remaining sport data, 7 user profile, 29 sport status, 42 goals, 44 basic
+    /// data, 61 sleep regularity, 63 sleep disorder, 86 training status). The replies go to the
+    /// log whole. (Whether an acknowledged file comes back when asked for by id was probed once
+    /// and answered: it does not, docs/ACTIVITY.md section 2.6.)
+    /// Diagnostics › Ask the band how it pairs (docs/BIND.md): one question, no pairing.
+    func probeBindSelectedBand() {
+        if let band = selectedBand() { start(band, .bindProbe) }
+    }
+
+    func probeSelectedBand() {
+        if let band = selectedBand() { probe(band) }
+    }
+
+    func probe(_ band: Band) {
+        let gets: [UInt64] = [6, 7, 29, 42, 44, 61, 63, 86]
+        Task {
+            link.note("probe: asking 8/" + gets.map(String.init).joined(separator: ", 8/"))
+            start(band, .send(gets.map(MiAuth.healthGet)))
+            try? await Task.sleep(for: .milliseconds(300))
+            while link.phase.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
+            link.note("probe: done")
+        }
+    }
+
     // MARK: Stay connected and Find Phone (docs/STAY-CONNECTED.md)
 
     static let stayConnectedKey = "stayConnected"
+    /// Clear the band after sync: files stored and parsed here are acknowledged at the next sync.
+    static let clearBandKey = "clearBandAfterSync"
+    /// Share location with the band: answer its location request at each sync.
+    static let shareLocationKey = "shareLocation"
+    /// Show sleep on the band: write the night's summary back, as Mi Fitness does.
+    static let sleepToBandKey = "sleepToBand"
+    private let phoneLocation = PhoneLocation()
+
+    /// The switch; turning it on asks iOS for the location permission and a first fix.
+    func setShareLocation(_ on: Bool) {
+        UserDefaults.standard.set(on, forKey: Self.shareLocationKey)
+        if on { phoneLocation.refresh() }
+    }
+
+    /// When the app comes to the front: a fresh fix for the next time the band asks.
+    func refreshSharedLocation() {
+        if !isDemo, UserDefaults.standard.bool(forKey: Self.shareLocationKey) { phoneLocation.refresh() }
+    }
     /// Ringing stops by itself after this long.
     static let ringLimit: TimeInterval = 120
 
@@ -169,7 +241,13 @@ final class AppModel: ObservableObject {
     /// don't run in a suspended app. Once it is open, Bluetooth events wake the app
     /// (docs/STAY-CONNECTED.md section 3).
     func enterBackground() {
-        stop()
+        scheduleBackgroundRefresh()
+        // A sync, a check or a command finishes in the background; only Live is cut short.
+        if link.phase.isBusy, link.phase != .live {
+            Task { await self.finishInBackground() }
+        } else {
+            stop()
+        }
         guard !isDemo, UserDefaults.standard.bool(forKey: Self.stayConnectedKey) else { return }
         endBackgroundTask()
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Stay connected") { [weak self] in
@@ -196,7 +274,7 @@ final class AppModel: ObservableObject {
     }
 
     /// The band on the Band tab: the one picked there, else the first added.
-    private func selectedBand() -> Band? {
+    func selectedBand() -> Band? {
         let bands = (try? context.fetch(FetchDescriptor<Band>(sortBy: [SortDescriptor(\.addedAt)]))) ?? []
         let selected = UserDefaults.standard.string(forKey: "selectedBand") ?? ""
         return bands.first { $0.id.uuidString == selected } ?? bands.first
@@ -264,10 +342,16 @@ final class AppModel: ObservableObject {
     /// `lastSyncAt` moves only on a complete session. Files that arrived are parsed whatever the
     /// outcome; webhooks get `sync.completed` or `sync.partial`, nothing on failure.
     private func sessionEnded(_ id: UUID, _ outcome: BandLink.Outcome) {
+        if let sent = sleepWriteBack, sent.bandID == id {
+            sleepWriteBack = nil
+            if outcome == .complete { UserDefaults.standard.set(sent.wake, forKey: "sleepToBandWake.\(id.uuidString)") }
+            return  // a single command, not a sync: nothing to parse, score or report
+        }
         let drafts = sessionDrafts
         sessionDrafts = []
         guard let band = band(id) else { return }
-        if outcome == .complete {
+        // Only a sync is a sync: a notification, Find or a settings read ends "complete" too.
+        if outcome == .complete, link.purpose == .sync {
             band.lastSyncAt = Date()
             try? context.save()
         }
@@ -277,16 +361,16 @@ final class AppModel: ObservableObject {
             let parsed = sessionIngest
             sessionIngest = IngestSummary()
             runPendingRollups()
+            notifyMorningSummary(id)
+            writeBackSleep(id)
             if !parsed.isEmpty {
                 setCalibration(makeReport(parsed, bandID: id, outcome: outcome.label))
             }
             if case .failed = outcome { return }
             let records = healthRecords(bandID: id, parsed)
             guard !drafts.isEmpty || !records.isEmpty else { return }
-            if Self.hubAcceptsHealthTypes, !records.isEmpty { pendingHubRecords[id, default: []] += records }
             await deliverWebhooks(event: outcome == .complete ? "sync.completed" : "sync.partial", device: device,
                                   drafts: drafts, records: records)
-            await pushToHub()
         }
     }
 
@@ -349,6 +433,8 @@ final class AppModel: ObservableObject {
         for r in (try? context.fetch(FetchDescriptor<SleepRR>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
         for r in (try? context.fetch(FetchDescriptor<ManualReading>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
         for r in (try? context.fetch(FetchDescriptor<DailyScore>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
+        // Workouts are rebuilt for the keeper from the moved files; the old band's rows would be orphans.
+        try? context.delete(model: Workout.self, where: #Predicate { $0.bandID == from })
         try? context.save()
         guard !moved.isEmpty else { return }
 
@@ -379,10 +465,6 @@ final class AppModel: ObservableObject {
     /// it was last fetched from the "today" list. Such a file kept growing after that fetch (the
     /// rest of its day), so it is fetched once more now that its day is over; the copy fetched
     /// from the past list is final.
-    private func hasActivityFile(_ bandID: UUID, _ hex: String) -> Bool {
-        guard let blob = blob(bandID, hex) else { return false }
-        return !blob.fetchedFromToday
-    }
 
     /// Stores (or replaces: today's files grow during the day) a raw file, then parses it.
     private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data, today: Bool) {
@@ -546,290 +628,4 @@ final class AppModel: ObservableObject {
         dayChanged.send(start)
     }
 
-    // MARK: keys
-
-    /// Adds one band per MAC for the chosen keys, or adds the keys to a band already added.
-    /// Keys that worked before stay first; new ones are tried after them.
-    @discardableResult
-    func add(keys: [BandKey]) -> [Band] {
-        guard !isDemo else { return [] }
-        var bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
-        var result: [Band] = []
-        for group in BandKey.groupedByBand(keys) {
-            let lead = group[0]
-            let match = bands.first { band in
-                if let a = band.macSuffix, let b = lead.macSuffix { return a == b }
-                return band.name == lead.name.trimmingCharacters(in: .whitespaces)
-            }
-            let band = match ?? Band(name: BandKey.bestName(group), mac: lead.mac)
-            if match == nil {
-                context.insert(band)
-                bands.append(band)
-            } else if BandKey.bestName(group).localizedCaseInsensitiveContains("pro"), !band.name.localizedCaseInsensitiveContains("pro") {
-                band.name = BandKey.bestName(group)
-                band.model = Band.modelCode(for: band.name)
-            }
-            Vault.setBandKeys(Vault.bandKeys(band.id) + group.map(\.hex), for: band.id)
-            if !result.contains(where: { $0.id == band.id }) { result.append(band) }
-        }
-        try? context.save()
-        return result
-    }
-
-    /// Removes the band with everything stored for it: samples, raw files, derived rows, scores.
-    func remove(_ band: Band) {
-        let id = band.id
-        Vault.removeBandKey(id)
-        try? context.delete(model: Sample.self, where: #Predicate { $0.bandID == id })
-        try? context.delete(model: ActivityBlob.self, where: #Predicate { $0.bandID == id })
-        ActivityIngest.deleteDerived(context: context, bandID: id, includingScores: true)
-        pendingRollup[id] = nil
-        pendingHubRecords[id] = nil
-        context.delete(band)
-        try? context.save()
-        updateHold()
-    }
-
-    /// Deletes every observation, raw file, derived row and score; bands, keys and webhooks stay.
-    func deleteAllData() {
-        try? context.delete(model: Sample.self)
-        try? context.delete(model: ActivityBlob.self)
-        ActivityIngest.deleteDerived(context: context, bandID: nil, includingScores: true)
-        pendingRollup = [:]
-        pendingHubRecords = [:]
-        try? context.save()
-        setCalibration(nil)
-    }
-
-    // MARK: calibration
-
-    private func makeReport(_ summary: IngestSummary, bandID: UUID?, outcome: String?) -> CalibrationReport {
-        var minuteDays = summary.minuteDays.values.flatMap { $0 }
-        // Summaries whose day was not rebuilt in this pass: compare with the stored minute day.
-        let known = Set(minuteDays.map(\.day))
-        let bandIDs = Set(summary.touchedDays.keys)
-        for s in summary.summaries where !known.contains(s.day) {
-            let index = s.day.index
-            for band in bandIDs {
-                if let row = try? context.fetch(FetchDescriptor<MinuteDay>(
-                    predicate: #Predicate { $0.bandID == band && $0.dayIndex == index })).first {
-                    minuteDays.append(row.draft)
-                }
-            }
-        }
-        return Calibration.build(files: summary.files, minuteFiles: summary.minuteFiles, minuteDays: minuteDays,
-                                 summaries: summary.summaries, sleeps: summary.sleeps, fetchedAt: summary.fetchedAt,
-                                 bandID: bandID?.uuidString, outcome: outcome, parserVersion: ActivityIngest.parserVersion,
-                                 algoVersion: ScoreEngine.algoVersion)
-    }
-
-    private static var calibrationURL: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("calibration-latest.json")
-    }
-
-    private static func loadCalibration() -> CalibrationReport? {
-        guard let url = calibrationURL, let data = try? Data(contentsOf: url) else { return nil }
-        return CalibrationReport.decode(data)
-    }
-
-    private func setCalibration(_ report: CalibrationReport?) {
-        calibration = report
-        guard let url = Self.calibrationURL else { return }
-        if let report {
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? report.json().write(to: url, options: [.atomic, .completeFileProtection])
-        } else {
-            try? FileManager.default.removeItem(at: url)
-        }
-    }
-
-    /// The latest report as a JSON file to share.
-    func exportCalibration() throws -> URL? {
-        guard let calibration else { return nil }
-        let stamp = Payload.iso.string(from: calibration.generatedAt).replacingOccurrences(of: ":", with: "")
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("freeband-calibration-\(stamp).json")
-        try calibration.json().write(to: url, options: .completeFileProtection)
-        return url
-    }
-
-    // MARK: webhooks
-
-    /// Minute, sleep and score records of what this session parsed (plan section 6).
-    private func healthRecords(bandID: UUID, _ summary: IngestSummary) -> [[String: Any]] {
-        var records: [[String: Any]] = []
-        for draft in (summary.minuteDays[bandID] ?? []).sorted(by: { $0.day < $1.day }) {
-            records += Payload.minuteRecords(draft.series)
-        }
-        let sleepIDs = Set(summary.sleeps.map(\.sourceFileID))
-        if !sleepIDs.isEmpty {
-            let rows = (try? context.fetch(FetchDescriptor<SleepRecord>(
-                predicate: #Predicate { $0.bandID == bandID && $0.isPrimary }, sortBy: [SortDescriptor(\.bedTime)]))) ?? []
-            records += rows.filter { sleepIDs.contains($0.sourceFileID) }.compactMap { Payload.sleepRecord($0.draft()) }
-        }
-        let days = summary.touchedDays[bandID] ?? []
-        if let lo = days.min()?.index {
-            let offset = TimeZone.current.secondsFromGMT() / 60
-            let rows = (try? context.fetch(FetchDescriptor<DailyScore>(
-                predicate: #Predicate { $0.bandID == bandID && $0.dayIndex >= lo }, sortBy: [SortDescriptor(\.dayIndex)]))) ?? []
-            records += rows.map { Payload.scoreRecord($0, tzOffsetMinutes: offset) }
-        }
-        return records
-    }
-
-    private func deliverWebhooks(event: String, device: Payload.Device, drafts: [SampleDraft], records: [[String: Any]]) async {
-        guard !isDemo else { return }
-        let hooks = ((try? context.fetch(FetchDescriptor<Webhook>())) ?? []).filter(\.enabled)
-        guard !hooks.isEmpty else { return }
-        let bodies = Payload.bodies(event: event, device: device, samples: drafts, records: records)
-        for hook in hooks {
-            guard let url = URL(string: hook.url) else { continue }
-            for body in bodies {
-                hook.lastStatus = await WebhookSender.deliver(body, event: event, to: url, secret: hook.secret)
-            }
-            hook.lastAt = Date()
-        }
-        try? context.save()
-    }
-
-    func ping(_ hook: Webhook) async {
-        guard let url = URL(string: hook.url) else { return }
-        let bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
-        let device = bands.first.map { Payload.Device($0) } ?? Payload.Device(id: UUID(), name: "Freeband", model: "band10")
-        let body = Payload.body(event: "ping", device: device, samples: [])
-        hook.lastStatus = await WebhookSender.deliver(body, event: "ping", to: url, secret: hook.secret)
-        hook.lastAt = Date()
-        try? context.save()
-    }
-
-    // MARK: invites
-
-    /// `freeband://join?invite=OB-XXXX-XXXX&hub=https://…`; only https hubs are accepted.
-    func handle(_ url: URL) {
-        guard url.scheme == "freeband", url.host == "join",
-              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return }
-        let code = (items.first { $0.name == "invite" }?.value ?? "").trimmingCharacters(in: .whitespaces)
-        guard !code.isEmpty, code.count <= 64 else { return }
-        let hub = items.first { $0.name == "hub" }?.value
-            .flatMap(URL.init(string:))
-            .flatMap { $0.scheme == "https" && $0.host != nil ? $0 : nil } ?? HubClient.defaultURL
-        pendingInvite = Invite(code: code, hub: hub)
-    }
-
-    func accept(_ invite: Invite) async {
-        hubURL = invite.hub
-        await enableWebAccess(invite: invite.code)
-    }
-
-    // MARK: hub (web access)
-
-    func enableWebAccess(invite: String) async {
-        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
-        hubBusy = true
-        defer { hubBusy = false }
-        let name = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).first?.name ?? "Freeband"
-        do {
-            let account = try await HubClient(baseURL: hubURL).createAccount(deviceName: name, invite: invite)
-            Vault.hubToken = account.token
-            hubEnabled = true
-            hubStatus = String(localized: "Web access is on.")
-            await pushToHub()
-        } catch {
-            hubStatus = error.localizedDescription
-        }
-    }
-
-    func disableWebAccess() async {
-        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
-        hubBusy = true
-        defer { hubBusy = false }
-        do {
-            try await hub.deleteAccount()
-        } catch HubClient.Failure.status(401, _) {
-            // already gone on the server
-        } catch {
-            hubStatus = error.localizedDescription
-            return
-        }
-        Vault.hubToken = nil
-        hubEnabled = false
-        let all = (try? context.fetch(FetchDescriptor<Sample>())) ?? []
-        all.forEach { $0.pushedToHub = false }
-        try? context.save()
-        hubStatus = String(localized: "Web access is off and your data on the server is deleted.")
-    }
-
-    /// Uses a key the user already has (rotated on the web panel, or from another phone): the
-    /// key is kept only once the hub accepts it.
-    func enterAPIKey(_ key: String) async {
-        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
-        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else { return }
-        hubBusy = true
-        defer { hubBusy = false }
-        do {
-            try await HubClient(baseURL: hubURL, token: key).verify()
-            Vault.hubToken = key
-            hubEnabled = true
-            hubStatus = String(localized: "API key saved.")
-            await pushToHub()
-        } catch HubClient.Failure.status(401, _) {
-            hubStatus = String(localized: "The server didn't recognise this key. Make sure you copied the latest key from the web panel.")
-        } catch {
-            hubStatus = error.localizedDescription
-        }
-    }
-
-    func rotateToken() async {
-        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
-        hubBusy = true
-        defer { hubBusy = false }
-        do {
-            Vault.hubToken = try await hub.rotate()
-            hubStatus = String(localized: "New API key created. The old one no longer works.")
-        } catch {
-            hubStatus = error.localizedDescription
-        }
-    }
-
-    /// Sends every sample not yet on the hub, one request per band, up to 4000 at a time. Health
-    /// records follow only once the hub accepts them (hubAcceptsHealthTypes).
-    func pushToHub() async {
-        guard !isDemo else { return }
-        guard Vault.hubToken != nil else { return }
-        let bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
-        var sent = 0
-        for band in bands {
-            let id = band.id
-            var descriptor = FetchDescriptor<Sample>(predicate: #Predicate { $0.bandID == id && !$0.pushedToHub },
-                                                     sortBy: [SortDescriptor(\.ts)])
-            descriptor.fetchLimit = 4000  // 5000 compact live samples exceed the hub's 512 KB body cap
-            if let pending = try? context.fetch(descriptor), !pending.isEmpty {
-                let body = Payload.body(event: "sync.completed", device: Payload.Device(band),
-                                        samples: pending.map(SampleDraft.init(sample:)))
-                do {
-                    _ = try await hub.ingest(body)
-                    pending.forEach { $0.pushedToHub = true }
-                    sent += pending.count
-                } catch {
-                    hubStatus = error.localizedDescription
-                    return
-                }
-            }
-            if Self.hubAcceptsHealthTypes, let records = pendingHubRecords[id], !records.isEmpty {
-                do {
-                    for body in Payload.bodies(event: "sync.completed", device: Payload.Device(band), samples: [], records: records) {
-                        _ = try await hub.ingest(body)
-                    }
-                    pendingHubRecords[id] = nil
-                    sent += records.count
-                } catch {
-                    hubStatus = error.localizedDescription
-                    return
-                }
-            }
-        }
-        try? context.save()
-        if sent > 0 { hubStatus = String(localized: "Sent \(sent) records to the server.") }
-    }
 }

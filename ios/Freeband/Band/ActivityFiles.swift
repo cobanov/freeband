@@ -272,6 +272,17 @@ struct ActivityFileID: Hashable, Comparable, Sendable, CustomStringConvertible {
         self.init(bytes: [UInt8](bytes))
     }
 
+    /// The daily details files of a list that a later daily details file of the same list
+    /// follows. A Band 10 Pro closes the minute file each time it is fetched and opens a new one
+    /// (docs/ACTIVITY.md section 2.6), so a file with a successor is finished: it will not change
+    /// again. On a band that keeps one growing file a day, that file has no successor and is
+    /// never in the result.
+    static func finishedDetails(in list: [ActivityFileID]) -> Set<ActivityFileID> {
+        let details = list.filter { $0.kind == .dailyDetails }
+        guard let newest = details.map(\.ts).max() else { return [] }
+        return Set(details.filter { $0.ts < newest })
+    }
+
     init?<Bytes: Collection>(bytes: Bytes) where Bytes.Element == UInt8 {
         guard bytes.count == 7 else { return nil }
         let b = Array(bytes)
@@ -630,6 +641,10 @@ struct DailyDetails: Equatable, Sendable {
         var steps: Int?
         /// Raw value; [spec: probably kcal].
         var activeCalories: Int?
+        /// How hard the minute was, by the band: 0 quiet, 1 light, 2 low, 3 middle, 4 high,
+        /// 5 severe; a still wrist reports 7. Minutes at 3...5 are the band's "Moving" minutes
+        /// (docs/ACTIVITY.md section 6.1).
+        var activityLevel: Int?
         var distanceMeters: Int?
         /// Raw bpm; 0 likely means not measured (the app should keep 10...250).
         var heartRate: Int?
@@ -694,7 +709,7 @@ struct DailyDetails: Equatable, Sendable {
             if x.valid(2) { rec.steps = x.bits(2, 14) }
         }
         if let x = try g.next(8, &r), x.valid(1) { rec.activeCalories = x.bits(2, 6) }  // g1
-        _ = try g.next(8, &r)  // g2: unknown
+        if let x = try g.next(8, &r), x.valid(0) { rec.activityLevel = x.bits(0, 3) }  // g2: [7..5] level | [4..0] sport type
         if let x = try g.next(16, &r), x.valid(0) { rec.distanceMeters = Int(x.raw) }  // g3
         if let x = try g.next(8, &r), x.valid(0) { rec.heartRate = Int(x.raw) }  // g4
         if let x = try g.next(8, &r), x.valid(0) { rec.energy = Int(x.raw) }  // g5
@@ -868,6 +883,13 @@ struct SleepRRPacket: Equatable, Sendable {
     let intervalsMs: [Int]
 }
 
+/// One breathing-rate reading from a type-10 packet (spec section 6.3.2). The packet carries no
+/// time per record; `ts` spreads a packet's records evenly over the 10 minutes ending at its ts.
+struct SleepBreathSample: Equatable, Sendable {
+    let ts: Date
+    let breathsPerMinute: Int
+}
+
 /// ACTIVITY / SLEEP / any detail type.
 struct SleepDetails: Equatable, Sendable {
     static let bitmapLengths: [UInt8: Int] = [1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 6: 3]
@@ -876,6 +898,11 @@ struct SleepDetails: Equatable, Sendable {
     static let packetMagic: [UInt8] = [0xFB, 0xFA, 0xFC, 0xFF]
     static let packetHeaderLength = 17
     static let payloadlessPacketTypes: Set<UInt8> = [2, 3, 9, 12, 13, 14, 15, 18, 19]
+    /// Type 10: 4 bytes per record, breaths per minute in byte 1; a packet covers 10 minutes.
+    static let breathRecordLength = 4
+    static let breathWindowSeconds: Int64 = 600
+    /// Outside this a reading is "none" (0) or implausible; Gadgetbridge drops those too.
+    static let breathRange = 1 ... 40
 
     let version: UInt8
     let bitmap: [UInt8]
@@ -906,6 +933,9 @@ struct SleepDetails: Equatable, Sendable {
     let nightStages: [SleepStageSample]
     let summaries: [SleepSummaryPacket]
     let rrIntervals: [SleepRRPacket]
+    /// From type-10 packets, in stream order. Read in a source for v5 files only; v2 and v6 files
+    /// carry the packet too, but nobody has checked what their bytes mean.
+    let respiratoryRate: [SleepBreathSample]
     /// Fell-asleep (type 2) and woke-up (type 3) events paired into spans of sleep, in time order.
     let sleepSpans: [DateInterval]
     /// Bytes skipped while looking for the packet magic.
@@ -1029,7 +1059,7 @@ struct SleepDetails: Equatable, Sendable {
             heartRate: hr, spo2: spo2, snore: snore, blocksError: blocksError,
             packets: stream.packets, stages: stream.stages,
             nightStages: stream.lastStagesByTs.keys.sorted().flatMap { stream.lastStagesByTs[$0] ?? [] },
-            summaries: stream.summaries, rrIntervals: stream.rr, sleepSpans: sleepSpans(stream.packets),
+            summaries: stream.summaries, rrIntervals: stream.rr, respiratoryRate: stream.breaths, sleepSpans: sleepSpans(stream.packets),
             skippedBytes: stream.skipped, trailingBytes: stream.trailing, streamError: stream.error
         )
     }
@@ -1071,6 +1101,7 @@ struct SleepDetails: Equatable, Sendable {
         var lastStagesByTs: [Int64: [SleepStageSample]] = [:]
         var summaries: [SleepSummaryPacket] = []
         var rr: [SleepRRPacket] = []
+        var breaths: [SleepBreathSample] = []
         var skipped = 0
         var trailing = 0
         var error: String?
@@ -1146,6 +1177,15 @@ struct SleepDetails: Equatable, Sendable {
                     ))
                 case 1:  // RR intervals, 10 ms per unit
                     s.rr.append(SleepRRPacket(tsRaw: ts, intervalsMs: payload.map { Int($0) * 10 }))
+                case 10:  // breathing rate: 4-byte records, breaths per minute in byte 1
+                    let count = length / breathRecordLength
+                    let start = packetSeconds(ts) - breathWindowSeconds
+                    for i in 0 ..< count {
+                        let rate = Int(payload[i * breathRecordLength + 1])
+                        guard breathRange.contains(rate) else { continue }
+                        let offset = Int64(i + 1) * breathWindowSeconds / Int64(count + 1)
+                        s.breaths.append(SleepBreathSample(ts: unixDate(start + offset), breathsPerMinute: rate))
+                    }
                 default:
                     break
                 }
@@ -1335,10 +1375,127 @@ struct ManualSamples: Equatable, Sendable {
     }
 }
 
+// MARK: - Workout summary (spec section 6.6)
+
+/// SPORTS / * / SUMMARY. Values are raw: the validity header is not applied, so the band's 0 for
+/// "not measured" is kept; a key is missing only when the layout has no such field.
+struct WorkoutSummary: Equatable, Sendable {
+    /// From the workout type code when the layout has a known one, else from the file's subtype.
+    let sport: String
+    /// Decoded fields by the names of docs/ACTIVITY.md 6.6 (`start`, `active_s`, `distance_m`, ...).
+    let values: [String: Double]
+
+    func int(_ key: String) -> Int? { values[key].map { Int($0) } }
+    var start: Date { unixDate(Int64(values["start"] ?? 0)) }
+    var end: Date { unixDate(Int64(values["end"] ?? 0)) }
+
+    static let workoutTypes: [Int: String] = [
+        1: "outdoor_running", 2: "walking", 3: "hiking", 4: "trekking", 5: "trail_running", 6: "outdoor_cycling",
+        7: "indoor_cycling", 8: "freestyle", 15: "outdoor_walking", 16: "hiit", 333: "indoor_walking", 399: "indoor_fitness",
+    ]
+
+    /// Sport name and validity header length by version, for the subtypes that have a table.
+    static func headers(_ subtype: UInt8) -> (sport: String, sizes: [UInt8: Int])? {
+        switch subtype {
+        // 0x01 and 0x02 (the legacy outdoor run and walk, v4) are documented in docs/ACTIVITY.md
+        // 6.6 but no real file has been seen, so they stay raw until one is.
+        case 0x03: return ("treadmill", [5: 4, 9: 6, 10: 8, 11: 9])
+        case 0x07: return ("indoor_cycling", [8: 7, 9: 8])
+        case 0x08: return ("freestyle", [5: 3, 7: 5, 8: 6, 9: 6, 10: 6])
+        case 0x0B: return ("elliptical", [3: 4, 4: 4, 5: 4, 6: 4])
+        case 0x0D: return ("rowing", [4: 4, 6: 5, 7: 5, 8: 6])
+        case 0x16: return ("workout", [1: 5, 2: 6, 4: 7, 5: 9, 6: 9, 9: 13])
+        case 0x17: return ("outdoor_cycling", [4: 6, 5: 6, 6: 7, 8: 8])
+        default: return nil
+        }
+    }
+
+    /// Fields in file order: `name:1|2|4` unsigned, `name:f` f32, `_:n` skipped, `route` the route byte.
+    static func fields(subtype: UInt8, version v: UInt8) -> String {
+        let times = "start:4 end:4 active_s:4"
+        let hr = "hr_avg:1 hr_max:1 hr_min:1"
+        let zones = "zone_extreme_s:4 zone_anaerobic_s:4 zone_aerobic_s:4 zone_fat_burn_s:4 zone_warm_up_s:4"
+        let loadVitality = "load:2 _:15 vitality:1"
+        switch subtype {
+        case 0x01, 0x02:
+            return "\(times) distance_m:4 calories:4 _:12 steps:4 _:2 \(hr)"
+        case 0x16:
+            var s = "workout_type:2 \(times) _:4 distance_m:4 total_calories:2 calories:2"
+            s += (v >= 5 ? " pace_avg:4" : "") + " pace_max:4 pace_min:4" + (v >= 5 ? " speed_avg:f" : "")
+            s += " speed_max:f steps:4" + (v >= 5 ? " step_length_cm:2 cadence_avg:2" : "")
+            s += " cadence_max:2 \(hr) _:20 te_aerobic:f"
+            s += v == 1 ? " _:9" : " _:1 te_anaerobic:f _:\(v >= 9 ? 6 : 1) vo2max:1 _:2 recovery_h:2 _:1"
+            s += " \(zones)"
+            if v == 6 { s += " _:21 \(loadVitality)" }
+            if v == 9 { s += " _:46 \(loadVitality)" }
+            return s
+        case 0x03:
+            var s = "\(times) distance_m:4 calories:2" + (v >= 10 ? " pace_avg:4" : "") + " pace_max:4 pace_min:4 steps:4"
+            s += (v >= 10 ? " step_length_cm:2 cadence_avg:2" : "") + " cadence_max:2 \(hr) te_aerobic:f"
+            s += v == 9 ? " _:4" : v == 5 ? " vo2max:1 _:1" : " _:1 vo2max:1 _:2"
+            s += " recovery_h:2 \(zones)"
+            if v == 9 { s += " _:39 load:2 _:7 vitality:1" }
+            if v == 11 { s += " total_calories:2 _:4 te_anaerobic:f _:25 distance_calibrated_m:4 \(loadVitality)" }
+            return s
+        case 0x08:
+            var s = "\(times) calories:2 \(hr)" + (v > 5 ? " _:6" : "") + " te_aerobic:f _:\(v > 6 ? 2 : 1) recovery_h:2 \(zones)"
+            if v == 5 {
+                s += " _:10 workout_type:2"
+            } else {
+                s += " total_calories:2 _:4 te_anaerobic:f _:1 workout_type:2 _:8 load:2 _:1" + (v > 7 ? " vitality:1" : "")
+            }
+            return s
+        case 0x07:
+            return "\(times) _:4 calories:2 _:4 \(hr) te_aerobic:f _:2 recovery_h:2 \(zones) _:6 te_anaerobic:f _:39 load:2"
+        case 0x17:
+            var s = "workout_type:2 \(times) _:4 distance_m:4 total_calories:2 calories:2 pace_max:4 pace_min:4"
+            s += (v >= 5 ? " speed_avg:f" : "") + " speed_max:f \(hr) _:20 te_aerobic:f _:1 te_anaerobic:f"
+            s += " _:\(v >= 7 ? 6 : 1) vo2max:1 _:2 recovery_h:2 _:1 \(zones)"
+            if v >= 6 { s += " _:\(v >= 7 ? 19 : 14) route \(loadVitality)" }
+            return s
+        case 0x0B:
+            var s = "\(times) calories:2 steps:4" + (v >= 6 ? " cadence_avg:2" : "") + " cadence_max:2 \(hr) te_aerobic:f"
+            s += " _:\(v >= 4 ? 2 : 1) recovery_h:2 \(zones)"
+            if v >= 6 { s += " total_calories:2 _:4 te_anaerobic:f _:1 route _:9 load:2 _:1 vitality:1" }
+            return s
+        case 0x0D:
+            var s = "\(times) calories:2 \(hr)" + (v >= 7 ? " te_aerobic:f _:2 recovery_h:2" : " _:\(v > 4 ? 8 : 7)")
+            s += " \(zones)" + (v >= 8 ? " _:5" : "") + (v >= 7 ? " total_calories:2" : " _:2") + " strokes:4 stroke_rate_avg:4"
+            if v >= 7 { s += " stroke_rate_max:4 _:17 te_anaerobic:f _:\(v >= 8 ? 6 : 1) _:10 load:2 _:1 vitality:1" }
+            return s
+        default:
+            return ""
+        }
+    }
+
+    /// Nil when the subtype or version has no table (the caller reports which).
+    static func parse(body: [UInt8], fileID: ActivityFileID) throws -> WorkoutSummary? {
+        guard let table = headers(fileID.subtype), let header = table.sizes[fileID.version] else { return nil }
+        var r = ActivityByteReader(body)
+        try r.skip(header)  // validity bitmap, not applied
+        var values: [String: Double] = [:]
+        for field in fields(subtype: fileID.subtype, version: fileID.version).split(separator: " ") {
+            let parts = field.split(separator: ":")
+            let name = String(parts[0])
+            if name == "route" {
+                if [0xFC, 0xFD, 0xFF].contains(try r.u8()) { try r.skip(8) }
+            } else if name == "_" {
+                try r.skip(Int(parts[1]) ?? 0)
+            } else if parts[1] == "f" {
+                values[name] = Double(try r.f32())
+            } else {
+                values[name] = Double(try r.uintLE(Int(parts[1]) ?? 1))
+            }
+        }
+        let sport = values["workout_type"].flatMap { workoutTypes[Int($0)] } ?? table.sport
+        return WorkoutSummary(sport: sport, values: values)
+    }
+}
+
 // MARK: - Dispatch
 
 enum ActivityUnsupported: Equatable, Sendable, CustomStringConvertible {
-    /// Workouts and unknown kinds: keep the raw file.
+    /// Workout details, GPS, sports without a summary table and unknown kinds: keep the raw file.
     case kind(ActivityFileKind)
     /// A known kind in a version this module does not know.
     case version(ActivityFileKind, UInt8)
@@ -1357,6 +1514,7 @@ enum ActivityPayload: Equatable, Sendable {
     case sleepDetails(SleepDetails)
     case sleepStages(SleepStages)
     case manualSamples(ManualSamples)
+    case workoutSummary(WorkoutSummary)
     /// Nothing between the pad and a matching CRC: the band has no records of this kind.
     case empty
     case unsupported(ActivityUnsupported)
@@ -1403,6 +1561,7 @@ struct ActivityParseResult: Sendable, CustomStringConvertible {
         case let .sleepDetails(d): body = "\(d.stages.count) stage(s), \(d.packets.count) packet(s)"
         case let .sleepStages(d): body = d.noData ? "no data" : "\(d.stages.count) phase change(s)"
         case let .manualSamples(d): body = "\(d.samples.count) sample(s)"
+        case let .workoutSummary(w): body = "\(w.sport), \(w.int("active_s") ?? 0) s"
         case .empty: body = "empty"
         case let .unsupported(u): body = u.description
         case let .error(e): body = "error: \(e)"
@@ -1453,6 +1612,21 @@ enum ActivityParser {
         if body.isEmpty, crc?.ok == true {
             // Only a checked CRC tells an empty file from one cut short after the pad.
             payload = .empty
+        } else if kind == .workoutSummary {
+            // Per sport and version (section 6.6), so not in supportedVersions.
+            do {
+                if let summary = try WorkoutSummary.parse(body: body, fileID: id) {
+                    payload = .workoutSummary(summary)
+                } else if WorkoutSummary.headers(id.subtype) != nil {
+                    payload = .unsupported(.version(kind, id.version))
+                } else {
+                    payload = .unsupported(.kind(kind))
+                }
+            } catch let error as ActivityParseError {
+                payload = .error(error)
+            } catch {
+                payload = .error(.malformed(String(describing: error)))
+            }
         } else if kind.supportedVersions.isEmpty {
             payload = .unsupported(.kind(kind))
         } else if !kind.supportedVersions.contains(id.version) {
@@ -1483,5 +1657,44 @@ enum ActivityParser {
             }
         }
         return ActivityParseResult(fileID: id, pad: pad, crc: crc, payloadLength: body.count, payload: payload, warnings: warnings)
+    }
+}
+
+/// What one sync does with the band's two file lists: which files to ask for and which to
+/// acknowledge (the band deletes an acknowledged file, so this is the one place that decides
+/// what leaves the band).
+struct ActivitySyncPlan: Equatable, Sendable {
+    var fetch: [ActivityFileID]
+    var acknowledge: [ActivityFileID]
+
+    /// A night that began yesterday evening can still grow until the morning; nothing older can.
+    static let settledAfter: TimeInterval = 36 * 3600
+
+    /// A file is settled when it can no longer change on the band: a minute file that a later
+    /// one follows (`finishedDetails`, over both lists), or any file whose time is more than 36
+    /// hours before `now`. A stored copy is final when it was fetched from a file that could no
+    /// longer change: a finished minute file (the band closes it at the fetch), or a copy fetched
+    /// after the file's 36 hours. A summary fetched in the evening is a copy of an unfinished
+    /// day, however old the file is now.
+    ///
+    /// Which of the band's two lists a file is on decides nothing: a Band 10 Pro was seen to
+    /// hand over the current day's summary and that afternoon's nap on its "past" list.
+    ///
+    /// - A file is fetched unless it is settled and its stored copy is final.
+    /// - A file is acknowledged only when it is settled, its stored copy is final, and
+    ///   `mayAcknowledge` says so (clearing is on and the copy parsed fully). So the band never
+    ///   deletes a file of which the phone holds only an earlier, shorter copy.
+    ///
+    /// `storedAt`: when the copy on the phone was fetched; nil when there is none.
+    static func make(today: [ActivityFileID], past: [ActivityFileID], now: Date,
+                     storedAt: (ActivityFileID) -> Date?, mayAcknowledge: (ActivityFileID) -> Bool) -> ActivitySyncPlan {
+        let all = Set(today).union(past)
+        let finished = ActivityFileID.finishedDetails(in: Array(all))
+        let done = all.filter { file in
+            guard let fetched = storedAt(file) else { return false }
+            if finished.contains(file) { return true }
+            return now.timeIntervalSince(file.ts) > settledAfter && fetched.timeIntervalSince(file.ts) > settledAfter
+        }
+        return ActivitySyncPlan(fetch: all.subtracting(done).sorted(), acknowledge: done.filter(mayAcknowledge).sorted())
     }
 }

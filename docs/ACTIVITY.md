@@ -120,6 +120,12 @@ Freeband için [ÖNERİ]:
 - "Bugün" listesindeki günlük detay dosyası gün içinde büyüyor olabilir: id aynı kalıp içerik uzayabilir. Bugünün listesindeki dosyalar her senkronda yeniden çekilmeli ve eski kopyanın yerine yazılmalı. [TAHMİN; Gadgetbridge her seferinde ACK'leyip sildiği için bu durumu hiç görmüyor]
 - Mi Fitness aynı dosyaları ACK'leyip silebilir; Freeband'in listesi ile isteği arasında dosya kaybolursa istek zaman aşımına düşer. Bu normal akış sayılmalı. [TAHMİN]
 - Bileklik dolarsa senkron bozulabilir (Gadgetbridge uyarısı). Mi Fitness'ın periyodik çalışması bu riski azaltır. [KOD] `strings.xml:1277`, [TAHMİN]
+- **ACK'lenmiş dosya kimliğiyle istenince de gelmiyor** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: bugünün günlük özet ve manuel ölçüm dosyalarının kimlikleri bir gün geri alınıp subtype 3 ile istendi (deneme kodu sonradan silindi); bant ikisine de cevap vermedi (5 sn, bir tekrar, yine yok). O günün dosyalarını Mi Fitness almıştı. Yani başka bir uygulamanın onayladığı kayıt bu yoldan geri alınamıyor.
+- **Mi Fitness, Freeband çalışmadığı her an dosyaları alıyor** [ÖLÇÜM, aynı gün]: Freeband'in tuttuğu oturum uygulama yeniden kurulurken birkaç dakika kapalı kaldı; sonraki listede o ana kadarki dakikalık parçaların hiçbiri yoktu (Freeband hiç ACK göndermedi). Verinin Freeband'e kalması için Mi Fitness'ın bağlanamaması gerekiyor.
+- **Bant, dakikalık dosyayı her alımda kapatıp yenisini açıyor** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: bir akşamda 14 parça oluştu; alınmış bir parçanın boyu sonraki senkronlarda hiç değişmedi (66, 82, 114 bayt). Geçmiş listesi hep boştu: onaylanmamış her şey "bugün" listesinde kalıyor. Bu yüzden:
+  - **Yerleşmiş ve kopyası kesin olan dosya yeniden çekilmiyor** (`ActivitySyncPlan`, `FB/Band/ActivityFiles.swift`; testi `ios/tests/activity/swift`). Bir dosya artık bantta değişemeyecekse "yerleşmiş" sayılır: listede kendisinden sonra başlamış bir dakikalık dosya bulunan dakikalık dosya (`finishedDetails`), ya da zamanı 36 saatten eski her dosya (dün akşam başlayan bir gece sabaha kadar büyüyebilir; daha eskisi büyüyemez). Telefondaki kopya ise ancak dosya artık değişemezken alınmışsa "kesin"tir: bitmiş bir dakikalık dosyaysa (bant onu alımda kapatıyor), ya da dosyanın 36 saati dolduktan sonra alınmışsa. Dosyanın hangi listede geldiği hiçbir şeyi belirlemez (aşağıdaki ölçüm). Akşam alınmış bir günlük özet, dosya şimdi ne kadar eski olursa olsun bitmemiş bir günün kopyasıdır ve bir kez daha çekilir. Yerleşmiş ve kopyası kesin dosya bir daha istenmez; diğer her şey her senkronda çekilir.
+  - **Freeband'in ACK kuralı (isteğe bağlı, varsayılan kapalı):** "Senkrondan sonra bandı temizle" açıksa yalnız yerleşmiş ve telefonda kesin kopyası olan, o kopyası da tümüyle çözülmüş (`parsed`) dosyalar onaylanır. Böylece bant, telefonda yalnız daha eski ve kısa bir kopyası bulunan dosyayı asla silmez. Çözülemeyen dosyalar bantta kalır. Mi Fitness her dosyayı çözdükten hemen sonra onaylıyor [MF]. Onayın kendisi bantta henüz denenmedi.
+- **Liste üyeliği bir işaret değil** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13..15: üç günde saklanan 46 dosyanın 33'ü "geçmiş" listesinden geldi; aralarında o an süren günün özeti ve o günün öğle uykusu da vardı. 13 Kasım akşamı ise geçmiş listesi boştu ve her şey "bugün" listesindeydi. Yani bant bir dosyayı geçmiş listesine koyduğunda dosya bitmiş olmuyor. Plan bu yüzden iki listeyi birleştirir ve yalnız dosyanın yaşına ve kopyanın ne zaman alındığına bakar (`ActivitySyncPlan.make(today:past:now:storedAt:mayAcknowledge:)`).
 - **Redmi Watch 5 Active (firmware 2.2.105):** ACK'lenmemiş dosyaların hepsi "bugün" listesinde geliyor; geçmiş listesi boş. Saat istekleri geç ve sırasız cevaplayabiliyor: bir dosyanın içeriği, sonra istenen başka bir dosya beklenirken geliyor. Saat bazen bir bağlantıda dosya isteklerine hiç cevap vermiyor. [ÖLÇÜM] Bu yüzden dosya, beklenen id'ye göre değil içeriğin ilk 7 baytındaki id'ye göre saklanır; Gadgetbridge de id'yi içerikten okuyor [KOD] `X/activity/XiaomiActivityFileFetcher.java:142`. Cevap gelmeyen dosya bir kez daha istenir, yine gelmezse atlanır ve kalan dosyalar için yeni bağlantı açılır. [ÖNERİ]
 
 ## 3. Dosya kimliği (7 bayt)
@@ -268,18 +274,20 @@ Kayıt (her biri bir dakika) — grupları sırayla, yalnız nibble'ında `0x8` 
 | Grup | Genişlik | Sürüm | İçerik | Geçerlilik | Birim |
 |---|---|---|---|---|---|
 | g0 | 16 | ≥1 | bit 15: bilinmiyor; bit 14: **ek bayt bayrağı**; bit 13–0: **adım** | slot 1 → bayrak, slot 2 → adım | adım/dakika (en fazla 16383) |
-| g1 | 8 | ≥1 | bit 7–6: bilinmiyor ("activity type?"); bit 5–0: **aktif kalori** | slot 1 | [TAHMİN] kcal/dakika |
-| g2 | 8 | ≥1 | bilinmiyor | — | — |
+| g1 | 8 | ≥1 | bit 7–6: **etkinlik türü** (`activityType`, okunmuyor) [MF]; bit 5–0: **aktif kalori** | slot 0 → tür, slot 1 → kalori | kcal/dakika |
+| g2 | 8 | ≥1 | bit 7–5: **etkinlik düzeyi** (`activityHILevel`): 0 sakin, 1 hafif, 2 düşük, 3 orta, 4 yüksek, 5 şiddetli [MF]; bit 4–0: spor türü (`sportType`, okunmuyor) | slot 0 → düzey, slot 1 → spor türü | Mi Fitness düzeyi yalnız sürüm ≥ 3'te kullanıyor |
 | g3 | 16 | ≥1 | **mesafe** (tüm 16 bit) | slot 0 | metre (Gadgetbridge ×100 ile cm saklar, `:122`) |
 | g4 | 8 | ≥1 | **nabız** | slot 0 | bpm |
 | g5 | 8 | ≥1 | **energy** (body energy) | slot 0 | [TAHMİN] 0–100 |
-| g6 | 16 | ≥1 | bilinmiyor | — | — |
+| g6 | 16 | ≥1 | bit 15–10: toplam kalori (`totalCal`); bit 9–8: enerji durumu; bit 7–0: enerji durumu değeri (bit 7 işaret) [MF]; Freeband okumuyor | — | — |
 | g7 | 8 | ≥3 | **SpO2** | slot 0 | % |
 | g8 | 8 | ≥3 | **stres**; `255` = değer yok (`:155`) | slot 0 | 0–100 |
 | ek | 8 | ≥1 | g0'daki bayrak 1 ise **tam bu noktada** 1 bayt; anlamı bilinmiyor (`:162-165`) | — | — |
 | g9 | 16 | ≥4 | "light value" (Gadgetbridge parse etmiyor, `:167-169`) | [TAHMİN] slot 0 | bilinmiyor |
 | g10 | 16 | ≥4 | "body momentum" (Gadgetbridge parse etmiyor, `:171-172`) | [TAHMİN] slot 0 | bilinmiyor |
 
+- **[MF] = Mi Fitness Android 9.8.348i'nin (com.xiaomi.wearable) jadx ile açılmış kodunda okundu**, 2026-11-13: `com.xiaomi.fit.fitness.parser.daily.DailyRecordParser` (grup tablosu `v2DataInfoArray`, alan türleri `DataItemType`) ve `...device.mi.parse.utils.MiParsedDataRecorder.recordDailyRecord`. Kod kopyalanmadı; alan yerleri ve anlamları buraya yazıldı.
+- **Bandın "Hareket" (Moving) dakikası bir dosyada ya da komutta gelmiyor; telefonda sayılıyor** [MF]: Mi Fitness, etkinlik düzeyi 3–5 olan her dakika için bir kayıt üretiyor (`MHStrengthItem`), halka bunların sayısı. Freeband aynı sayımı yapıyor (`MinuteSeries.movingMinutes`). [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: bilek hareketsizken 47 dakikanın hepsinde g2 = `0xE0`, yani düzey **7** (enum'da yok; "hesaplanmadı" gibi) ve bandın Hareket sayısı o sürede değişmedi. Düzey 3–5'in bandın sayısıyla birebir arttığı henüz ölçülmedi.
 - Ek bayt **v1/v2'de g6'dan sonra, v3/v4'te g8'den sonra ve g9'dan önce** gelir. Bayrak yalnız g0 varsa ve slot 1 geçerliyse okunur; yoksa 0 sayılır. (`:97-103`, `:162-165`)
 - Tüm gruplar varken kayıt boyu: v1/v2 10, v3 12, v4 16 bayt; ek bayt varsa +1.
 - Zaman: kayıt `i`'nin zamanı `fileId.ts + 60·i` saniye. (`:84-85`, `:92`, `:177`)
@@ -338,6 +346,8 @@ Düzen: gövde = `bitmap | slot0 | slot1 | …`. **Her slot, bit'i kapalı olsa 
 | 31 | 55 | 2 | ayrılmış | v5 |
 
 \* Gövde ofseti bitmap'ten sonrasına göre. Dosyada mutlak ofset = 8 + bitmap boyu + gövde ofseti. Slot 27 ofseti 49 ve standing ofseti 22, Gadgetbridge testindeki hesapla aynı [TEST] `T/impl/DailySummaryParserTest.java:240`, `:258`.
+
+**Bandın ekranıyla karşılaştırma** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: `steps` 7452 ve `activeCalories` 940, bandın Adım ve Kalori ekranlarındaki sayılarla aynı (kalori hedefi 600 olan ekran), yani slot 1 bandın "Kalori" dediği değer. `calories` (slot 13) aynı anda 1052 idi. "Ayrılmış" slot 2'de 89 vardı; o sırada son nabız ölçümleri 86–89'du, son nabız olabilir [TAHMİN]. Bandın "Hareket" (Moving, 49 dk) değeri özetin hiçbir slotunda yok.
 
 Tüm alanlar işaretsiz. Gadgetbridge `steps` ve zaman damgalarını Java `int` (işaretli) okuyor; Swift `UInt32` kullanmalı. Gadgetbridge bu parser'da CRC'yi gövdeden düşmüyor, sadece sabit sayıda slot okuyor (`:166-184`).
 
@@ -399,12 +409,34 @@ Akış, 17 baytlık başlığı olan paketlerden oluşur. Başlık **sihirli de�
 | 17 | veri | `dataLen` bayt, içeriği **big-endian** (`:227-230`) |
 
 - Tip 2, 3, 9, 12, 13, 14, 15'te veri **yok**; `dataLen` alanı bayrak sayılıyor ve atlanmıyor. (`:221-225`)
-- **Tip 18 ve 19 da verisiz** [GERÇEK, v6]: `dataLen` 1 ama sıradaki paket hemen başlıyor. Bunlar listede olmasa bir sonraki paketin başı atlanır. Gerçek dosyada ayrıca 10, 11 ve 20 (veri uzunluğu `dataLen` kadar) ve 101 (4 bayt) tipleri var; anlamları bilinmiyor. Bu kuralla 231 paketlik dosyada atlanan ve artan bayt sıfır.
+- **Tip 18 ve 19 da verisiz** [GERÇEK, v6]: `dataLen` 1 ama sıradaki paket hemen başlıyor. Bunlar listede olmasa bir sonraki paketin başı atlanır. Gerçek dosyada ayrıca 10, 11 ve 20 (veri uzunluğu `dataLen` kadar) ve 101 (4 bayt) tipleri var. Bu kuralla 231 paketlik dosyada atlanan ve artan bayt sıfır.
+- **Tip 10, 11, 20 ve 101 için kaynaklar ne diyor** (Gadgetbridge master `83b2efe9`, 2026-11-13; satır numaraları o sürümün `SleepDetailsParser.java` dosyasından):
+  - **10 (`0x0A`)**: solunum hızı, aşağıda. [KOD] `:314-350`
+  - **101 (`0x65`)**: "Sentinel/manifest packet", dosyada bir kez; incelenen v5 dosyalarının hepsinde gövde `01 02 07 04`. Gadgetbridge yalnız logluyor, baytların anlamını söylemiyor. [KOD] `:351-355`. Band 10 Pro v6 dosyasında da 4 bayt [ÖLÇÜM]; baytların anlamı bilinmiyor.
+  - **11 ve 20**: hiçbir kaynakta yok. Gadgetbridge'in "Known types" listesinde (`:221-229`) ve dallarında (1, 16, 17, `0x0A`, `0x65`) geçmiyorlar; `dataLen` bayt okunup atılıyor (`:237-240`). AstroBox'ta aktivite dosyası parser'ı yok. Mi Fitness ham uyku baytlarını yerel kütüphaneye (`jni_xiaomi_sleep_algorithm`) veriyor, paket tipleri Java tarafında görünmüyor (`docs/MIFITNESS-2026-11-13.md` Q3). Anlamları bilinmiyor; Freeband gövdelerini ham saklıyor.
+  - Gadgetbridge master verisiz tipler listesine 18'i (`0x12`) eklemiş (`:231`), yukarıdaki ölçümle aynı; 19 hâlâ listesinde yok.
 - **Gece birden çok kez gönderiliyor** [GERÇEK, v6]: aynı `ts` (`bedTime`) ile bir ara tip-16/17 çifti (gece ortasında, o ana kadarki evreler) ve uyanınca son çift geliyor; son tip-17, ilkini önek olarak içeriyor. Evreler birleştirilirse çakışır. Freeband her `ts` için **son** tip-17 paketini kullanıyor (`nightStages`), dakikalar son tip-16'dan.
 - Bilinen tipler: 0 `acc_unk`, 1 `ppg_unk` (RR aralıkları), 2 `fall_asleep`, 3 `wake_up`, 12/13 `switch_ts_unk`, 16 özet, 17 evreler. (`:211-219`)
 - `ts` birimi karışık: "sometimes in seconds and other times in nanoseconds. Message types 16 and 17 are in seconds" (`:204-205`). Tip 1 için Gadgetbridge `ts`'i **milisaniye** gibi kullanıyor (`:235-240`). [TAHMİN: tip 1'in birimi kesin değil]
 - **Xiaomi Watch S1 Active, v2** [ÖLÇÜM, 2026-11-08]: tip 1, 2, 3 ve 101'de `ts` **milisaniye**, tip 0, 9 ve 10'da **nanosaniye**. Freeband birimi büyüklükten çıkarıyor (`SleepDetails.packetSeconds`).
 - **Uykuya dalma / uyanma olayları** [ÖLÇÜM, S1 Active v2]: dosyada tip-16 özet ve tip-17 evre yok; başlık 09:52-12:38 diyor, ama tip 2/3 çiftleri 08:52-09:24, 09:52-11:48, 11:50-12:38. Saat aynı oturumu 08:52-12:38, 3 sa 16 dk uyku olarak gösteriyor: olaylar doğru, başlığın yatış saati sonraki bir dalışa denk geliyor. Gadgetbridge 2/3'ü atlıyor ve başlığı kullanıyor. Freeband özet ve evre olmayan dosyada oturumu olaylardan kuruyor: ilk dalıştan son uyanışa, aralar uyanık dakika (`sessionFromSpans`).
+
+Tip 10 (`0x0A`), uykuda solunum hızı. Gadgetbridge master `83b2efe9` (2026-11-13) `SleepDetailsParser.java:314-350`; ekleyen commit `28cd9c60` (2026-10-22), v5 dosyalarından:
+
+| Ofset | Alan | Tür | Not |
+|---|---|---|---|
+| 0 | hareket şiddeti ya da PPG genliği | u8 | "range 0..254, mean ~116"; kullanılmıyor (`:316`) |
+| 1 | **solunum hızı**, dakikada nefes | u8 | "only slot used" (`:317`) |
+| 2 | gürültülü, PPG'den türetilmiş bir değer | u8 | kullanılmıyor (`:318-320`) |
+| 3 | kalite bayrağı | u8 | "0 dominant, 16 / 32 frequent, 1 / 17 rare"; kullanılmıyor (`:321`) |
+
+- Kayıt 4 bayt, kayıt sayısı `dataLen / 4` (artan bayt sayılmaz). [KOD] `:326`
+- Paket 10 dakikada bir geliyor, `ts` **nanosaniye** ve pencerenin **sonu**. [KOD] `:322-325`. S1 Active v2'de de tip 10 nanosaniye [ÖLÇÜM].
+- Kayıtların kendi zamanı yok. Gadgetbridge `N` kaydı `ts`'ten önceki 10 dakikaya eşit aralıkla yayıyor: kayıt `i` (0'dan) = `ts − 600 sn + (i + 1) · 600 / (N + 1)` (`:329-343`). Eşit yayma Gadgetbridge'in kabulü. [TAHMİN]
+- 1–40 dışındaki değer atılıyor (`:338`); 0 "ölçüm yok" demek olmalı [TAHMİN].
+- Freeband aynı kuralı tam saniyeyle uyguluyor (`SleepDetails.respiratoryRate`): `packetSeconds(ts) − 600 + (i + 1) · 600 / (N + 1)`, tam sayı bölmesi. Baytlar 0, 2 ve 3 yorumlanmıyor; paket gövdesi ham da duruyor.
+- **Yalnız v5 için kaynakta okundu.** S1 Active v2 dosyasındaki tek tip-10 paketi de 4 bayttı (`59 07 92 00`, uykuya dalmadan 17 dk önce) [ÖLÇÜM]; bayt 1'in orada da solunum hızı olduğu doğrulanmadı (7 düşük bir değer). Band 10 Pro v6 dosyasında tip 10 var, içeriği bu düzenle karşılaştırılmadı. Parser sürüme bakmadan okuyor; v2 ve v6 değerleri bantla karşılaştırılmadan gösterilmemeli. [TAHMİN]
+- Bandın ayarı: `HeartRate.sleepRespiratoryRate = 11` (0 desteklenmiyor, 1 açık, 2 kapalı). [KOD] `P/xiaomi/wear_fitness.proto:99-101`
 
 Tip 17, evreler (`:284-299`): `dataLen / 2` tane u16 BE kelime. Her kelime:
 
@@ -480,19 +512,100 @@ Bkz. bölüm 8.
 | değer | `0x11`/`0x12`/`0x13` → u8; `0x44` → u32 (gerçekte iki u16, `:95-98`) |
 
 - Değeri `0` olan kayıt atlanır (`:106-108`).
+- **Dosya kimliği aynı kalır, içerik değişir** [ÖLÇÜM] Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-13: günün manuel ölçüm dosyası (kimliğindeki zaman yerel gece yarısı) üç senkronda 3, 7 ve 21 kayıtla geldi; sonuncusunda öncekilerin hiçbiri yoktu. Bant yalnız son alımdan sonraki ölçümleri veriyor. Freeband bu yüzden manuel ölçümleri dosyaya göre silip yeniden yazmıyor: (zaman, tür) aynı değilse ekliyor, yeniden çözmede de eskileri koruyor.
+- **Süren ölçüm sıfır yazar** [ÖLÇÜM, aynı bant]: bir stres ölçümü boyunca 2 saniye arayla 20 kayıt `değer 0` ile, ardından sonuç (`38`) geldi. Sıfırların atlanması bu yüzden doğru.
 - Bilinmeyen tip → **parse durur**, dosyanın tamamı başarısız sayılır, çünkü kayıt boyu bilinmiyor (`:100-104`). Kan basıncı TODO (`:99`).
 - FIXME: "the type is actually composed of 2 nibbles that define the data length + type" (`:86-88`). Örneklerde üst nibble bayt sayısına uyuyor (`0x1x` → 1 bayt, `0x44` → 4 bayt). [TAHMİN] Bilinmeyen tipte üst nibble kadar bayt atlayıp devam etmek denenebilir, ama doğrulanmadı.
 - Sıcaklık: `(value & 0xFFFF) / 100` °C. [KOD] `XD/XiaomiTemperatureSampleProvider.java:108`. Üst 16 bitin anlamı bilinmiyor.
 - Kaynak yorumundaki örnek kayıtlar (`:72-77`): `8A90A965 12 63` SpO2 99; `9698A965 13 1C` stres 28; `E79CA965 44 5A0E0000` 36,74 °C.
 
-### 6.6 Antrenman özeti (SPORTS / * / SUMMARY) — kapsam dışı
+### 6.6 Antrenman özeti (SPORTS / * / SUMMARY)
 
-Küçük değil: `X/activity/impl/WorkoutSummaryParser.java` 1122 satır, 13 antrenman türünün her biri için ayrı sürüm tablosu ve alan listesi. Bu belgede ve referans parser'da yalnız zarf (id, pad, CRC) ele alınıyor. Özet:
+Kaynak bu bölümde Gadgetbridge master `83b2efe9` (2026-11-13); satır numaraları o commit'e göre. `W` = `X/activity/impl/WorkoutSummaryParser.java`, `S` = `X/activity/impl/XiaomiSimpleActivityParser.java`. Swift karşılığı `WorkoutSummary` (`ActivityFiles.swift`), referansı `activity_ref.py` `parse_workout_summary`.
 
-- Gövde = `bitmap (türe ve sürüme göre 3–13 bayt) | alanlar`; alan listesi `XiaomiSimpleActivityParser.Builder` ile kuruluyor. [KOD] `X/activity/impl/WorkoutSummaryParser.java:204-279`, `X/activity/impl/XiaomiSimpleActivityParser.java:228-285`
-- Gadgetbridge burada bitmap'i **uygulamıyor**; her alan koşulsuz okunuyor (FIXME). [KOD] `X/activity/impl/XiaomiSimpleActivityParser.java:94-101`
-- Çoğu tür `TIME_START` u32, `TIME_END` u32, `ACTIVE_SECONDS` u32 ile başlıyor; açık hava yürüyüş v2 ve açık hava bisiklet önce u16 `XIAOMI_WORKOUT_TYPE` taşıyor. [KOD] `:303-306`, `:498-502`, `:614-618`
-- Gerçek dosyalar fikstürde duruyor (bölüm 11), ileride Swift'te yazılırsa hazır.
+**Ortak yapı.** Gövde = `geçerlilik başlığı (N bayt) | sabit sıralı little-endian alanlar`; dosyanın sonunda CRC32. [KOD] `W:203-277`, `S:72-97`
+
+- **Geçerlilik.** Başlığın i. biti (MSB önce) i. alanın geçerli olduğunu söyler, ama Gadgetbridge başlığı **uygulamıyor**: uzunluğu bilinmeyen boşluklar yüzünden alan sırası ile bit sırası tutmuyor, her alan koşulsuz okunuyor. [KOD] `S:96-103` Freeband de aynısını yapar: başlığı atlar, bütün alanları okur. Sonuç: bileklik ölçmediği değeri 0 yazar. [ÖNERİ] Parser ham değeri verir; kayda çevirirken (`IngestMapper.workoutDraft`) 0 olan nabız, mesafe, adım, tempo, hız, kadans, kalori, VO2max, toparlanma, yük ve antrenman etkisi "yok" sayılır. Koşu bandında kalibre mesafe 0 değilse ölçülen mesafenin yerine o saklanır (Gadgetbridge de gösterimde onu öne alıyor, [KOD] `W:1038-1041`). Kayıt `Workout` satırıdır: dosya başına bir satır, dosya yeniden gelirse satır yenilenir; gün, antrenmanın başladığı yerel gündür.
+- **Spor.** Dosya kimliğinin alt tipi sporu verir (bölüm 3.1). 0x16 tek başına spor söylemez (koşu da yürüyüş de onunla yazılıyor); kodu bilinmiyorsa spor adı `workout` kalır. 0x16, 0x17 ve 0x08 gövdesinde ayrıca u16 "antrenman tipi" kodu var; bilinen bir kodsa sporu o belirler: 1 açık hava koşu, 2 yürüyüş, 3 doğa yürüyüşü, 4 trekking, 5 patika koşusu, 6 açık hava bisiklet, 7 kapalı bisiklet, 8 serbest, 15 açık hava yürüyüş, 16 HIIT, 333 kapalı yürüyüş, 399 kapalı fitness. [KOD] `XD/XiaomiWorkoutType.java:52-83,200-203`, `W:244-246,500`
+- **Birimler.** Zaman = Unix saniyesi (u32), süre = saniye, mesafe = metre, kalori = kcal, tempo = saniye/km (`pace_max` en hızlı, `pace_min` en yavaş), hız = km/sa (f32), kadans = adım/dk, nabız = bpm, toparlanma = saat, bölge süreleri = saniye. 16 bitlik alanlar işaretsiz.
+- **Kapsam.** Aşağıdaki tür/sürüm çiftleri çözülür. Listede olmayan bir sürüm `unsupported(.version)`, tablosu olmayan bir alt tip (havuz 0x09, ip atlama 0x0E, HIIT 0x10, bisiklet v2 0x06) `unsupported(.kind)` olarak ham saklanır. Gövde tablodan kısa ise `truncated`. Çözülen son alandan sonraki baytlara bakılmaz.
+
+Tablolarda `—n—` = n bayt atlanır (bilinmiyor ya da çözülmüyor; parantezdeki ad Gadgetbridge'in verdiği ad). "Bölgeler" = u32 × 5: aşırı, anaerobik, aerobik, yağ yakımı, ısınma. `Y`/`C` = toplam yük (u16) / canlılık kazancı (u8).
+
+**Açık hava koşu / yürüyüş, alt tip 0x16.** Başlık: v1 5, v2 6, v4 7, v5 ve v6 9, v9 13 bayt; 3, 7, 8 reddedilir. [KOD] `W:474-592` [TEST] `T/impl/WorkoutSummaryParserTest.java` (v5 koşu, v6 ve v9 yürüyüş)
+
+| Sıra | Alan | Boy | Sürüm |
+|---|---|---|---|
+| 1 | antrenman tipi | u16 | hepsi |
+| 2-4 | başlangıç, bitiş, aktif süre | u32 × 3 | hepsi |
+| 5 | —4— (geçerli süre; v6'da aktif süreye eşit) | 4 | hepsi |
+| 6 | mesafe | u32 | hepsi |
+| 7-8 | toplam kalori, aktif kalori | u16 × 2 | hepsi |
+| 9 | ortalama tempo | u32 | ≥5 |
+| 10-11 | en hızlı tempo, en yavaş tempo | u32 × 2 | hepsi |
+| 12 | ortalama hız | f32 | ≥5 |
+| 13 | en yüksek hız | f32 | hepsi |
+| 14 | adım | u32 | hepsi |
+| 15-16 | ortalama adım boyu (cm), ortalama kadans | u16 × 2 | ≥5 |
+| 17 | en yüksek kadans | u16 | hepsi |
+| 18-20 | nabız ortalama, en yüksek, en düşük | u8 × 3 | hepsi |
+| 21 | —20— | 20 | hepsi |
+| 22 | aerobik antrenman etkisi | f32 | hepsi |
+| 23 | v1: —9—. Diğerleri: —1—, anaerobik etki f32, —6— (v9) ya da —1—, VO2max u8, —2—, toparlanma u16, —1— | | |
+| 24-28 | bölgeler | u32 × 5 | hepsi |
+| kuyruk v6 | —21— (süre, kalori, mesafe, tempo, hız, kadans hedefleri), Y, —15— (tahmini 5 km/10 km/maraton/yarı maraton süreleri dahil), C, —29— (yer temas süreleri dahil) | 68 | 6 |
+| kuyruk v9 | —46—, Y, —15—, C, sonrası çözülmüyor (yer teması, dikey oran ve salınım) | | 9 |
+
+v5'in 68 baytlık kuyruğu çözülmemiş. [KOD] `W:574`
+
+**Eski açık hava koşu 0x01 ve yürüyüş 0x02, v4.** Başlık 4 bayt. başlangıç, bitiş, aktif süre, mesafe, kalori (hepsi u32), —12— (iki tempo alanı dahil; Gadgetbridge birimini s/m diye etiketliyor, çözülmüyor), adım u32, —2—, nabız ortalama/en yüksek/en düşük u8 × 3. Sonrası çözülmüyor: Gadgetbridge oradaki alan boylarının belirlenmediğini söylüyor. [KOD] `W:428-470` v3 (Mi Watch Color Sport) ayrı bir düzen, desteklenmiyor. Fikstürü yok: bu düzen gerçek bir dosyayla denenmedi.
+
+**Koşu bandı, alt tip 0x03.** Başlık: v5 4, v9 6, v10 8, v11 9 bayt. [KOD] `W:949-1055` [TEST] v9, v11
+
+| Sıra | Alan | Boy | Sürüm |
+|---|---|---|---|
+| 1-3 | başlangıç, bitiş, aktif süre | u32 × 3 | hepsi |
+| 4 | mesafe | u32 | hepsi |
+| 5 | aktif kalori | u16 | hepsi |
+| 6 | ortalama tempo | u32 | ≥10 |
+| 7-8 | en hızlı tempo, en yavaş tempo | u32 × 2 | hepsi |
+| 9 | adım | u32 | hepsi |
+| 10-11 | ortalama adım boyu (cm), ortalama kadans | u16 × 2 | ≥10 |
+| 12 | en yüksek kadans | u16 | hepsi |
+| 13-15 | nabız ortalama, en yüksek, en düşük | u8 × 3 | hepsi |
+| 16 | aerobik etki | f32 | hepsi |
+| 17 | v9: —4—. v5: VO2max u8, —1—. v10/v11: —1—, VO2max u8, —1— (VO2max seviyesi), —1— | | |
+| 18 | toparlanma | u16 | hepsi |
+| 19-23 | bölgeler | u32 × 5 | hepsi |
+| kuyruk v9 | —39—, Y, —7—, C | | 9 |
+| kuyruk v11 | toplam kalori u16, —4—, anaerobik etki f32, —25— (hedefler), kalibre mesafe u32 (yoksa 0), Y, —15— (tahmini süreler dahil), C, sonrası çözülmüyor | | 11 |
+
+**Serbest antrenman, alt tip 0x08.** Başlık: v5 3, v7 5, v8/v9/v10 6 bayt. [KOD] `W:281-356` [TEST] v10
+
+başlangıç, bitiş, aktif süre (u32 × 3), aktif kalori u16, nabız ortalama/en yüksek/en düşük (u8 × 3), [v>5: —6—], aerobik etki f32, [v>6: —1—], —1—, toparlanma u16, bölgeler. Sonra v5: —10—, antrenman tipi u16. Diğerleri: toplam kalori u16, —4—, anaerobik etki f32, —1—, antrenman tipi u16, —8— (süre ve kalori hedefi dahil), Y, —1—, [v>7: C]. Yumruk (v>7) ve atış (v10) sayaçları çözülmüyor.
+
+**Kapalı bisiklet, alt tip 0x07.** Başlık: v8 7, v9 8 bayt. [KOD] `W:360-425` [TEST] v9
+
+başlangıç, bitiş, aktif süre (u32 × 3), —4—, aktif kalori u16, —4—, nabız × 3, aerobik etki f32, —2—, toparlanma u16, bölgeler, —6—, anaerobik etki f32, —39— (hedefler dahil), Y.
+
+**Açık hava bisiklet, alt tip 0x17.** Başlık: v4/v5 6, v6 7, v8 8 bayt (v8 = Smart Band 10 Pro). [KOD] `W:596-681` [TEST] v6, v8
+
+antrenman tipi u16, başlangıç, bitiş, aktif süre (u32 × 3), —4—, mesafe u32, toplam kalori u16, aktif kalori u16, en hızlı tempo u32, en yavaş tempo u32, [v≥5: ortalama hız f32], en yüksek hız f32, nabız × 3, —20— (tırmanış, iniş, rakım ortalama/en yüksek/en düşük, f32 × 5), aerobik etki f32, —1—, anaerobik etki f32, —1—, [v≥7: —5—], VO2max u8, —2—, toparlanma u16, —1—, bölgeler. v≥6 ise devamı: [v≥7: —5—], —14— (hedefler), **rota baytı**, Y, —15—, C.
+
+Rota baytı: değeri 0xFC, 0xFD ya da 0xFF ise rota izlenmiştir ve ardından 8 bayt daha gelir; değilse hiçbir şey gelmez. [KOD] `W:664-667` [TEST] `outdoorCyclingV8_routeRide_keepsLoadAndVitalityAligned`
+
+**Eliptik, alt tip 0x0B.** Başlık: v3–v6 4 bayt. [KOD] `W:787-849` [TEST] v6
+
+başlangıç, bitiş, aktif süre (u32 × 3), aktif kalori u16, adım u32, [v≥6: ortalama kadans u16], en yüksek kadans u16, nabız × 3, aerobik etki f32, [v≥4: —1—], —1—, toparlanma u16, bölgeler. v6 devamı: toplam kalori u16, —4—, anaerobik etki f32, —1—, rota baytı (yukarıdaki gibi), —9— (hedefler dahil), Y, —1—, C.
+
+**Kürek, alt tip 0x0D.** Başlık: v4 4, v6/v7 5, v8 6 bayt. [KOD] `W:852-946` [TEST] v7 × 2, v8
+
+başlangıç, bitiş, aktif süre (u32 × 3), aktif kalori u16, nabız × 3. v≥7: aerobik etki f32, —2—, toparlanma u16; daha eski: —7— (v6: —8—). Bölgeler. [v8: —5—]. v≥7: toplam kalori u16; eski: —2—. Çekiş sayısı u32, ortalama çekiş hızı u32 (çekiş/dk). v≥7 devamı: en yüksek çekiş hızı u32, —17—, anaerobik etki f32, —1—, [v8: —5—], —10— (hedefler dahil), Y, —1—, C.
+
+**Detay ve GPS dosyaları (çözülmüyor, ham saklanıyor).** [KOD] `X/activity/impl/WorkoutDetailsParser.java`, `WorkoutGpsParser.java:58-181`
+
+- Detay (detay tipi 0): saniyede bir kayıt. Gövde = alan gruplarının nibble bitmap'i (imza) | bir ya da daha çok bölüm (duraklatma yeni bölüm açar). Bölüm başlığında kayıt sayısı ve başlangıç zamanı var; kayıt = var olan grupların art arda dizilmesi (adım, nabız, o saniyenin mesafesi, kadans, tempo). Başlık ve kayıt boyu tür ve sürüme göre değişiyor (0x16 v9: 27 bayt başlık, 25 bayt kayıt, yalnız adım ve nabız tanımlı).
+- GPS (detay tipi 2): 1 başlık baytı, sonra sabit boylu örnekler: v1 12 bayt (zaman u32, boylam f32, enlem f32), v2 18 bayt (+ doğruluk f32, u16: üst 12 bit hız 0,1 m/s, alt 4 bit kaynak), v3 26 bayt (+ rakım f32, hdop f32). 13 baytlık dosya ya da sıfır koordinatlar = konum yok.
 
 ## 7. Zaman damgası ve saat dilimi
 
@@ -546,7 +659,7 @@ Oturum sınırları:
 | SleepDetails | 1–5 | v2 DETAILS, v4/v5 SUMMARY (`SleepDetailsParser.java:53`); Band 9 FW 2.3.93 RR notu (`:101`) | **v6, SUMMARY** [GERÇEK, Band 10 Pro]; Gadgetbridge v6'yı tanımıyor |
 | SleepStages | 2 | yok | belirsiz; hiç gelmeyebilir [TAHMİN] |
 | ManualSamples | 1, 2 | v1 "Mi Band 9 Active" (`ManualSamplesParser.java:130`) | **v2** [GERÇEK, Band 10 Pro] |
-| Antrenman özeti | türe göre 1–11 | açık hava bisiklet v8 "Smart Band 10 Pro" (`WorkoutSummaryParser.java:605`, test `:211`), v6 "Smart Band 10" (test `:248`) | kapsam dışı |
+| Antrenman özeti | türe göre 1–11 | açık hava bisiklet v8 "Smart Band 10 Pro" (`WorkoutSummaryParser.java:605`, test `:211`), v6 "Smart Band 10" (test `:248`) | bölüm 6.6'daki tür/sürümler |
 | Antrenman detayı | türe göre | `SPORTS_OUTDOOR_CYCLING v5 (Smart Band 10 Pro)` (`WorkoutDetailsParser.java:567`) | kapsam dışı |
 
 Not: "Mi Band 9 Active", Band 9 / 10'dan farklı bir platform; v1 manuel ölçüm ve v4 günlük özet o cihaza özgü olabilir. [TAHMİN] Band 10 ve 10 Pro kodlayıcıları deneysel işaretli. [KOD] `XD/watches/MiBand10Coordinator.java:51-54`, `XD/watches/MiBand10ProCoordinator.java:40-43`
@@ -590,10 +703,26 @@ python3 -I activity_ref.py fileid 21F328650403A0  # id ya da id listesi
 | `gb_fileid.json` | [TEST] `T/XiaomiActivityFileIdTest.java` | id çözme, tekrar kodlama, sıfır id |
 | `gb_manual_samples_v1.json` | [TEST] `T/impl/ManualSamplesParserTest.java:34-87` | 3 **gerçek** Band 9 Active paketi (CRC'li) ve 3 ret vakası; mutasyondan sonra CRC yeniden hesaplandı ki ret içerikten gelsin |
 | `gb_daily_summary.json` | [TEST] `T/impl/DailySummaryParserTest.java` | Gadgetbridge'in bellekte kurduğu girdiler bayt bayt yeniden üretildi (CRC'siz); beklenenler testin assert'leri |
-| `gb_workout_summary_blobs.json` | [TEST] `T/impl/WorkoutSummaryParserTest.java` | 13 **gerçek** antrenman özeti dosyası: id, CRC ve yerel tarih kontrolü; içerik parse edilmiyor |
-| `synthetic.json` | **SENTETİK**, `make_fixtures.py` | DailyDetails v2/v3/v4, SleepDetails v2/v5/v6 (v6: gerçek dosyanın biçiminde, değerler uydurma; bir de blokları hizalanmayan v6), 30 slotluk DailySummary v5, SleepStages v2, ManualSamples v2 (kayıtlar kaynak yorumundan), CRC kontrol değeri, gerçek bir dosyanın 3 parçaya bölünüp birleştirilmesi, bozuk parça, sıra dışı parça, id listesi ve getirme sırası |
+| `gb_workout_summary_blobs.json` | [TEST] `T/impl/WorkoutSummaryParserTest.java` | 13 **gerçek** antrenman özeti dosyası: id, CRC, yerel tarih ve Gadgetbridge testinin assert ettiği değerler (`expect.data`) |
+| `synthetic.json` | **SENTETİK**, `make_fixtures.py` | DailyDetails v2/v3/v4, SleepDetails v2/v5/v6 (v5: bir de tip-10 solunum hızı paketleri; v6: gerçek dosyanın biçiminde, değerler uydurma; bir de blokları hizalanmayan v6), 30 slotluk DailySummary v5, SleepStages v2, ManualSamples v2 (kayıtlar kaynak yorumundan), CRC kontrol değeri, gerçek bir dosyanın 3 parçaya bölünüp birleştirilmesi, bozuk parça, sıra dışı parça, id listesi ve getirme sırası |
 
 Gadgetbridge test ağacında **günlük detay, uyku detayı ve uyku evreleri için hiç gerçek veri yok**; bunlar için yalnız sentetik fikstür var. Sentetik dosyalar bu belgedeki düzenle `make_fixtures.py` içinde, parser'dan bağımsız olarak paketlendi; beklenen değerler paketlenen değerler. Yani iki uygulamanın birbirine uyduğunu gösteriyorlar, bilekliğin gerçekten böyle gönderdiğini değil. İlk gerçek Band 10 dosyaları geldiğinde (`activity_ref.py parse` ile) bu bölümler doğrulanmalı.
+
+### 11.0 İlk tam gece ve tam gün (Band 10 Pro `M2552B1`, firmware 3.201.026, 2026-11-14) [ÖLÇÜM]
+
+Mi Fitness devre dışıyken (offload) bir gece ve bir gün boyunca bandın dosyalarını yalnız Freeband aldı. Telefondaki veritabanından okunanlar:
+
+- **Uyku dosyası:** alt tür 8, detay tipi 1, sürüm 6, 41 KB, 263 paket. Hatasız çözüldü: yatış 00:12, kalkış 06:46; derin 59, hafif 195, REM 122, uyanık 18 dk (toplam 394 dk = yatakta geçen sürenin %100'ü). Nabız ve SpO2 blokları 449'ar örnek, 60 sn aralıklı.
+- **RR var:** 36 tip-1 paketi, 25 801 aralık. Gecenin RMSSD'si 39 ms çıktı. HRV yolu bu bantta çalışıyor.
+- **Paket tipleri:** 0 (45), 1 (36), 2 (2), 3 (2), 9 (6), 10 (37), 11 (37), 12, 13, 14 (3), 16 (2), 17 (2), 18, 19, 20 (86), 101.
+- **Tip 10 solunum hızı olarak okunamıyor:** v5 için belgelenen yorumla (her 4 baytlık kaydın 2. baytı) 195 değer çıkıyor: ortanca 8, aralık 2–31. Uykuda beklenen 12–20/dk'ya uymuyor; v6'da bu alan başka bir şey ya da ölçekli. Mi Fitness solunumu yerel algoritma kitaplığında hesaplıyor (`MiSleepAlgorithmNative`, `AlgoBreathQualityState`), Java tarafında düz bir alan yok. Freeband bu değeri göstermiyor.
+- **Dakikalık veri tam günde özetle birebir:** 14 Kasım'da dakikaların adım toplamı 2413, günlük özet 2413.
+- **Nabız 1 dakikaya ayarlıyken:** kayıtlı 1177 dakikanın 791'inde nabız var (denetim "yaklaşık 1 dakikada bir" diyor); gece dakikalarında nabız dakikalık dosyada değil uyku dosyasında.
+- **Etkinlik düzeyi yalnız 3 ve 7 görüldü:** 1260 dakikanın 12'si düzey 3, kalanı 7. Yani 7 "hareket yok", 3 "hareket" gibi; 0–2 ve 4–5 henüz görülmedi. Bandın Moving sayısıyla karşılaştırma bekliyor.
+- **Manuel ölçümler korunuyor:** aynı kimlikli dosya üç kez farklı içerikle geldi; 14 nabız ve 1 stres ölçümünün hepsi telefonda.
+- **Arka plan senkronu:** uygulama açılmadan 20:30, 21:19, 22:00, 23:04 ve 00:16'da senkron oldu (yaklaşık saatte bir); uyku boyunca hiç olmadı; 07:16'da uyanışla birlikte iki kez. Gündüz dışarıdayken 11:57 ile 19:40 arasında hiç senkron olmadı.
+- **Pil:** 26 saatte %83'ten %69'a (nabız 1 dk, oturum tutuluyor, akşam çok sayıda deneme senkronu).
+- **Senkron planındaki hata bu veriyle bulundu:** 13 Kasım'ın özeti ve manuel ölçüm dosyası 45 saatlikken yeniden çekilmişti. "Telefonda var mı" sorusu bugün listesinden gelen dosyalar için hep "yok" diyordu. Düzeltme `ActivitySyncPlan`'da: karar artık saklı kopyanın ne zaman alındığına bakıyor.
 
 ### 11.1 Gerçek Band 10 Pro dosyaları (2026-10-14)
 

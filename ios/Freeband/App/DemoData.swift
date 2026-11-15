@@ -135,6 +135,9 @@ enum DemoData {
                 let series = makeMinutes(day: day, plan: plan, sleeps: sleeps, rng: &rng)
                 context.insert(MinuteDay(bandID: band, draft: MinuteDayDraft(series: series, sourceFileIDs: ["demo-\(day.string)-details"])))
                 context.insert(DaySummary(bandID: band, draft: summary(series, sleeps: sleeps)))
+                if let workout = makeWorkout(day: day, plan: plan, series: series) {
+                    context.insert(Workout(bandID: band, draft: workout))
+                }
                 if day == today { liveSteps = liveReadings(series) }
             }
             for sleep in nights.values.sorted(by: { $0.bedTime < $1.bedTime }) + naps.values.sorted(by: { $0.bedTime < $1.bedTime }) {
@@ -290,6 +293,33 @@ enum DemoData {
                 s.energy[i] = Int(energy)
             }
             return s
+        }
+
+        /// The evening run of makeMinutes (18:30, 45 or 70 minutes) as the summary a band writes,
+        /// counted from the same minutes so the list and the day trace agree.
+        private func makeWorkout(day: DayKey, plan: Plan, series s: MinuteSeries) -> WorkoutDraft? {
+            guard plan.workout > 0 else { return nil }
+            let minutes = (18 * 60 + 30) ..< (18 * 60 + 30 + (plan.workout == 2 ? 70 : 45))
+            let start = day.start(offsetMinutes: offset).addingTimeInterval(Double(minutes.lowerBound) * 60)
+            let end = start.addingTimeInterval(Double(minutes.count) * 60)
+            guard end < now else { return nil }
+            func total(_ values: [Int?]) -> Int { values[minutes].reduce(0) { $0 + ($1 ?? 0) } }
+            let hr = s.heartRate[minutes].compactMap { $0 }
+            let steps = total(s.steps)
+            let meters = total(s.distance)
+            let hard = plan.workout == 2
+            return WorkoutDraft(
+                sourceFileID: "demo-\(day.string)-workout", sport: "outdoor_running", start: start, end: end, day: day,
+                tzOffsetMinutes: offset, activeSeconds: minutes.count * 60, distanceMeters: meters, steps: steps,
+                calories: total(s.kcal), totalCalories: total(s.kcal) + minutes.count * 6 / 5,
+                hrAvg: hr.isEmpty ? nil : hr.reduce(0, +) / hr.count, hrMax: hr.max(), hrMin: hr.min(),
+                paceAvg: meters > 0 ? minutes.count * 60_000 / meters : nil,
+                paceBest: meters > 0 ? minutes.count * 55_000 / meters : nil,
+                speedAvg: Double(meters) / 1000 / (Double(minutes.count) / 60),
+                speedMax: Double(meters) / 1000 / (Double(minutes.count) / 60) * 1.12,
+                cadenceAvg: steps / minutes.count, cadenceMax: s.steps[minutes].compactMap { $0 }.max(),
+                aerobicEffect: hard ? 3.6 : 2.4, anaerobicEffect: hard ? 1.2 : nil, vo2max: 47,
+                recoveryHours: hard ? 30 : 14, load: hard ? 96 : 48, vitality: hard ? 12 : 7)
         }
 
         private func summary(_ s: MinuteSeries, sleeps: [SleepDraft]) -> DaySummaryDraft {

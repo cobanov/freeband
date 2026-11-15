@@ -62,6 +62,18 @@ Mi Fitness can ring the phone because it keeps a session open in the background.
   - Ringing stops on the band's stop, on Stop in the app or the notification, or after 2 minutes. When it stops on the phone, the phone sends the stop in section 1 so the band can close its screen.
 - **The log.** Diagnostics keeps the last 600 lines across sessions instead of only the last session, so what happened on the held session is still there after a sync. While holding, every command from the band is logged as `← held t/s`. The log lives in memory: `— app started` marks a new process, and `restored by iOS` a relaunch for the held session. When Stay connected is on but can't start, the log says why (`stay connected: no band`, `no key`).
 
+## 4.1 Background sync
+
+A sync used to run only with the app in front, and leaving the app stopped it. Now:
+
+- **Leaving the app.** A running sync, check or command finishes in the background: the app asks iOS for more time (a background task, about 30 s) and stops the session only when that runs out. Files that arrived are kept, the rest come with the next sync. Live HR still stops at once.
+- **Background refresh.** The app registers a background refresh task (`dev.cobanov.freeband.sync`, background mode `fetch`). iOS runs it when it chooses, more often for an app that is opened often; it is not a schedule. [iOS]
+- **The held session.** With Stay connected on, two Bluetooth events wake the app and start a sync: the held session opening (the band came back in range) and the band's state changing (`2/78`, `2/79`: put on, woke up, on the charger; [`CAPABILITIES.md`](CAPABILITIES.md) section 9.7). The sync pauses the hold like any other session.
+- **How often.** Only when the last complete sync is over an hour old, and at most one attempt in 15 minutes, so a band that can't be synced (Mi Fitness holds it, out of range) isn't asked on every event.
+- **The log.** `background sync: <reason>`, with the reason `background refresh`, `held session opened` or `band state changed`.
+
+Not checked on a band: whether a Band 10 sends `2/79` on an idle held session [UNVERIFIED], and how much of a sync fits in the time iOS gives [UNVERIFIED].
+
 ## 5. Limits
 
 - The band can only reach the phone while the hold is open. Find Phone doesn't work after the user swipes Freeband away, while Bluetooth is off, or while another session runs. In those cases the hold reopens within a few seconds when Freeband next runs.
@@ -75,7 +87,7 @@ Mi Fitness can ring the phone because it keeps a session open in the background.
 3. The session stays open for hours in the background, or the band drops it after some idle time. A newer Gadgetbridge than the one Freeband's notes started from adds a `wakeLink` that sends a battery request "so an idle link is awake". [CODE] `SYS:933-939` This hints that an idle link can need waking. [UNVERIFIED] Partly checked: after some hours locked and idle, Find Phone still rang (section 7). A whole night is not checked yet.
 4. Ringing from the background, with the screen locked, and with the silent switch on. Checked, section 7.
 5. What else the band sends while the session is idle: the `← held` lines.
-6. On a Band 10 (BLE V2), the same: the held session is the same code on the V2 channel. [UNVERIFIED]
+6. On a Band 10 (BLE V2), the same: the held session is the same code on the V2 channel. Checked in part: on a Band 10 Pro (`M2552B1`, firmware 3.201.026, 2026-11-13) the hold opens after iOS relaunches the app (`restored by iOS`), authenticates, and gives way to a sync and comes back [MEASURED]. Find Phone and a night on the hold are not checked on it.
 
 ## 7. Checked on the watch
 

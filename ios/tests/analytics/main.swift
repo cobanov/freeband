@@ -222,6 +222,10 @@ equal("full score", s1.score, 93)
 check("not estimated", !s1.estimated)
 equal("high confidence", s1.confidence.level, .high)
 near("duration sub", s1.contributors.first { $0.name == .duration }?.subscore, 430.0 / 480 * 100)
+// v2: the same night against a need of 12 h. Duration 430/720 -> 59.72; the other six are as above,
+// so the weighted mean is (35x59.72 + 15x98.611 + 1000 + 1000 + 770 + 1000 + 957.34) / 100 = 82.97,
+// but a score may stand at most 10 above its duration sub-score: 69.72 -> 70.
+equal("a short night can't be rescued by the rest", SleepScore.score(m1, sleepNeedMinutes: 720, previousMidSleeps: [180, 190, 170, 200]).score, 70)
 near("restfulness sub", s1.contributors.first { $0.name == .restfulness }?.subscore, 77)
 near("regularity value", s1.contributors.first { $0.name == .regularity }?.value, 5)
 near("regularity across midnight", SleepScore.regularityDeviation(10, previous: [1430, 1435, 5]), 15)
@@ -512,7 +516,7 @@ var inputs = (0 ..< 10).map { engineDay($0, rr: $0 >= 5) }
 for i in 1 ..< inputs.count { inputs[i].previousMinutes = inputs[i - 1].minutes; inputs[i].previousSleeps = inputs[i - 1].sleeps }
 let run = ScoreEngine.scoreRange(inputs, history: [], profile: athlete)
 equal("ten results", run.count, 10)
-equal("algorithm version", run[0].algoVersion, 1)
+equal("algorithm version", run[0].algoVersion, 2)
 check("day 0: no baseline, no recovery", run[0].recovery.score == nil && run[0].recovery.confidence.level == ConfidenceLevel.none)
 check("day 0: sleep scored", run[0].sleep.score != nil)
 equal("resting HR from sleep", run[0].restingHR?.source, .sleep)
@@ -546,6 +550,102 @@ noNightHR.sleeps[0].heartRate = []
 noNightHR.minutes = nil
 let bandOnly = ScoreEngine.score(noNightHR, history: [], profile: athlete)
 equal("band resting HR fallback", bandOnly.restingHR?.source, .band)
+
+// MARK: - Insights
+
+section("insights")
+/// `today` on day0, and before it `values` (the most recent first) on the days day0-1, day0-2, ...
+func insightDays(_ today: InsightDay, _ values: [Double?], _ set: (inout InsightDay, Double) -> Void) -> [InsightDay] {
+    [today] + values.enumerated().map { i, v in
+        var d = InsightDay(day: day0.adding(days: -(i + 1)))
+        if let v { set(&d, v) }
+        return d
+    }
+}
+func insights(_ history: [InsightDay], need: Double = 480) -> [Insight] {
+    Insights.compute(day: day0, history: history, sleepNeedMinutes: need)
+}
+func rhrCase(_ today: Double, _ before: [Double?]) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, restingHR: today), before) { $0.restingHR = $1 })
+}
+let flat50 = [Double?](repeating: 50, count: 14)
+// Normal 50, MAD 0, so sigma is the floor: max(1.5, 3% of 50) = 1.5.
+// 53.5: z = 3.5 / 1.5 = 2.33, a notice. 55: z = 3.33, a warning. 52: z = 1.33, nothing.
+equal("rhr 2.33 sigma", rhrCase(53.5, flat50), [Insight(kind: .restingHRHigh, tone: .notice, value: 53.5, reference: 50)])
+equal("rhr 3.33 sigma", rhrCase(55, flat50), [Insight(kind: .restingHRHigh, tone: .warning, value: 55, reference: 50)])
+equal("rhr 1.33 sigma", rhrCase(52, flat50), [])
+equal("rhr, 6-day baseline", rhrCase(55, Array(flat50.prefix(6))), [])
+equal("day without data", insights(insightDays(InsightDay(day: day0), flat50) { $0.restingHR = $1 }.filter { $0.day != day0 }), [])
+// Three days of 53.5: each day's own baseline still has median 50 and MAD 0 (two high days
+// among 14 don't move either), so each is 2.33 sigma: 3 days in a row is a warning.
+equal("rhr 3 days in a row", rhrCase(53.5, [53.5, 53.5] + flat50),
+      [Insight(kind: .restingHRHigh, tone: .warning, value: 53.5, reference: 50, days: 3)])
+// A day without a reading ends the run.
+equal("rhr run broken by a gap", rhrCase(53.5, [nil, 53.5] + flat50).first?.days, 1)
+// Normal 51 (seven 50s, seven 52s), MAD 1, sigma = max(1.4826, 1.5, 1.53) = 1.53.
+// 49: z = -1.31 and below every one of the 14 days. 50: not below the lowest.
+let alternating = (0 ..< 14).map { Double?($0 % 2 == 0 ? 50 : 52) }
+equal("rhr lowest in 14 days", rhrCase(49, alternating), [Insight(kind: .restingHRLowest, tone: .good, value: 49, reference: 51)])
+equal("rhr equal to the lowest", rhrCase(50, alternating), [])
+
+func hrvCase(_ today: Double) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, hrv: today), [Double?](repeating: 40, count: 14)) { $0.hrv = $1 })
+}
+// Normal 40, sigma floor max(3, 8% of 40) = 3.2. 33: z = -2.19. 30: z = -3.13. 35: z = -1.56.
+equal("hrv -2.19 sigma", hrvCase(33), [Insight(kind: .hrvLow, tone: .notice, value: 33, reference: 40)])
+equal("hrv -3.13 sigma", hrvCase(30).first?.tone, .warning)
+equal("hrv -1.56 sigma", hrvCase(35), [])
+
+func debtCase(_ minutes: Double, nights: Int) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, sleepMinutes: minutes), [Double?](repeating: minutes, count: nights - 1)) { $0.sleepMinutes = $1 })
+}
+// Need 480. Seven nights of 420: 7 x 60 = 420 min short. Of 390: 630. Of 450: 210.
+equal("sleep debt 7 h", debtCase(420, nights: 7), [Insight(kind: .sleepDebt, tone: .notice, value: 420, days: 7)])
+equal("sleep debt 10.5 h", debtCase(390, nights: 7), [Insight(kind: .sleepDebt, tone: .warning, value: 630, days: 7)])
+equal("sleep debt 3.5 h", debtCase(450, nights: 7), [])
+equal("sleep debt, 4 nights", debtCase(300, nights: 4), [])
+// Only the last 7 nights count: 10 nights of 420 is still 420.
+equal("sleep debt window", debtCase(420, nights: 10).first?.value, 420)
+
+func shiftCase(_ today: Double, _ before: Double, nights: Int = 7) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, midSleepMinute: today), [Double?](repeating: before, count: nights)) { $0.midSleepMinute = $1 })
+}
+// Middle of the night at 03:00 (180) on the nights before; 04:50 (290) is 110 min later.
+equal("sleep 110 min later", shiftCase(290, 180), [Insight(kind: .sleepShifted, tone: .notice, value: 110, days: 7)])
+equal("sleep 100 min earlier", shiftCase(80, 180).first?.value, -100)
+equal("sleep 60 min later", shiftCase(240, 180), [])
+// 23:50 (1430) before, 01:40 (100) now: 110 min later across midnight, not 1330 earlier.
+equal("sleep shift across midnight", shiftCase(100, 1430).first?.value, 110)
+// And the other way round: 01:40 before, 23:50 now is 110 min earlier.
+equal("sleep shift back across midnight", shiftCase(1430, 100).first?.value, -110)
+equal("sleep shift, 3 nights", shiftCase(290, 180, nights: 3), [])
+
+func loadCase(recovery: Double, hardDays: Int) -> [Insight] {
+    let before = [Double?](repeating: 11, count: hardDays) + [Double?](repeating: 8, count: 14)
+    return insights(insightDays(InsightDay(day: day0, recovery: recovery), before) { $0.strain = $1 })
+}
+// Strain normal 8, sigma floor 1.5; 11 is 2 sigma above on each of the three days.
+equal("3 hard days, recovery 30", loadCase(recovery: 30, hardDays: 3),
+      [Insight(kind: .loadWithoutRecovery, tone: .warning, value: 30, reference: 11, days: 3)])
+equal("3 hard days, recovery 40", loadCase(recovery: 40, hardDays: 3), [])
+equal("2 hard days, recovery 30", loadCase(recovery: 30, hardDays: 2), [])
+
+// Warnings come first: sleep debt (warning) before resting HR (notice), though its rule is later.
+var mixed = insightDays(InsightDay(day: day0, restingHR: 53.5, sleepMinutes: 390), flat50) { $0.restingHR = $1 }
+for i in 1 ... 6 { mixed[i].sleepMinutes = 390 }
+equal("warnings first", insights(mixed).map(\.kind), [.sleepDebt, .restingHRHigh])
+
+// MARK: - Battery estimate
+
+section("battery estimate")
+func reading(_ hours: Double, _ level: Int) -> (at: Date, level: Int) { (at(hours), level) }
+// 80% -> 68% in 24 h is 0.5% an hour; 68 / 0.5 = 136 h = 5.67 days.
+near("days left from one day of discharge", BatteryEstimate.daysLeft([reading(0, 80), reading(8, 76), reading(24, 68)]), 68 / 0.5 / 24, 1e-9)
+// A charge in between: only the readings after it count. 100 -> 94 in 12 h = 0.5% an hour; 94 / 0.5 / 24 = 7.83.
+near("only since the last charge", BatteryEstimate.daysLeft([reading(0, 60), reading(10, 40), reading(11, 100), reading(23, 94)]), 94 / 0.5 / 24, 1e-9)
+check("under 12 hours says nothing", BatteryEstimate.daysLeft([reading(0, 80), reading(6, 70)]) == nil)
+check("under 3 points says nothing", BatteryEstimate.daysLeft([reading(0, 80), reading(24, 78)]) == nil)
+check("no readings", BatteryEstimate.daysLeft([]) == nil)
 
 // MARK: - Done
 

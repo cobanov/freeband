@@ -38,6 +38,8 @@ enum SleepScore {
         .duration: 35, .efficiency: 15, .deep: 10, .rem: 10, .restfulness: 10, .regularity: 10, .hrDip: 10,
     ]
     static let estimateBelowWeight = 60.0
+    /// How far the score may stand above the duration sub-score (v2).
+    static let durationLead = 10.0
 
     // Sub-score curves (choices, algorithm v1). Each is a clamped straight line.
     /// Efficiency 60% scores 0, 90% scores 100.
@@ -88,7 +90,13 @@ enum SleepScore {
 
         let available = rows.filter { $0.subscore != nil }
         let weight = available.reduce(0) { $0 + $1.weight }
-        let score = weight > 0 ? available.reduce(0) { $0 + $1.weight * ($1.subscore ?? 0) } / weight : nil
+        var score = weight > 0 ? available.reduce(0) { $0 + $1.weight * ($1.subscore ?? 0) } / weight : nil
+        // v2: the score may not exceed the duration sub-score by more than `durationLead`. A real
+        // 4 h 52 min night scored 76 ("fair, nearly good") because efficiency, restfulness and the
+        // heart rate dip were all near 100; how well a short night went doesn't make it enough.
+        if let s = score, let duration = rows.first(where: { $0.name == .duration })?.subscore {
+            score = min(s, duration + durationLead)
+        }
         let estimated = weight < estimateBelowWeight
 
         var confidence = Confidence(.high)

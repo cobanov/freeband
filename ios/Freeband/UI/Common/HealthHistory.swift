@@ -109,6 +109,19 @@ final class HealthHistory {
         }
     }
 
+    /// What stands out on `day` (Insights). 90 days back: 60 for a baseline, and room for the
+    /// days of a run to have their own.
+    func insights(_ day: DayKey, sleepNeedMinutes: Int) -> [Insight] {
+        let days = (0 ..< 90).map { back -> InsightDay in
+            let d = day.adding(days: -back)
+            // A nap pays back debt: the day's sleep is the night plus its naps.
+            let naps = result(d)?.naps.reduce(0) { $0 + $1.minutes } ?? 0
+            return InsightDay(day: d, restingHR: value(.restingHeartRate, on: d), hrv: score(d)?.hrv, sleepMinutes: sleepMinutes(d).map { $0 + naps },
+                              midSleepMinute: score(d)?.midSleepMinute, strain: score(.strain, d), recovery: score(.recovery, d))
+        }
+        return Insights.compute(day: day, history: days, sleepNeedMinutes: Double(sleepNeedMinutes))
+    }
+
     /// Daily points ending on `end`, oldest first; days without data are nil (they break lines).
     func points(_ metric: TrendMetric, ending end: DayKey, days: Int = 90,
                 override: [DayKey: Double] = [:]) -> [TrendPoint] {

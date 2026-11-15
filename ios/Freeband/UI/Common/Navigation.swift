@@ -1,12 +1,6 @@
 import SwiftData
 import SwiftUI
 
-/// Band control commands (alarms, health monitoring, display and Do Not Disturb) land in a
-/// later phase. Their rows stay hidden until then.
-enum BandFeatures {
-    static let controls = false
-}
-
 enum AppTab: String, Hashable, CaseIterable {
     case today, sleep, trends, band
 }
@@ -17,11 +11,14 @@ enum Route: Hashable {
     case scoreMethod(ScoreKind, day: Int)
     case trend(TrendMetric, day: Int)
     case night(day: Int)
+    /// A workout of the selected band, by its summary file's id.
+    case workout(fileID: String)
     case aboutBand(UUID)
+    case monitoring(UUID)
+    case bandOptions(UUID)
     case settings
     case bands
     case profile
-    case webAccess
     case webhooks
     case shortcuts
     case diagnostics
@@ -111,12 +108,13 @@ private struct RouteView: View {
         case .settings: SettingsView()
         case .bands: BandsView()
         case .profile: ProfileView()
-        case .webAccess: WebAccessView()
         case .webhooks: WebhooksView()
         case .shortcuts: ShortcutsView()
         case .diagnostics: DiagnosticsView()
         case .about: AboutView()
         case .aboutBand(let id): AboutBandView(bandID: id)
+        case .monitoring(let id): MonitoringView(bandID: id)
+        case .bandOptions(let id): BandOptionsView(bandID: id)
         default:
             SelectedBand { band in
                 if let band {
@@ -126,6 +124,7 @@ private struct RouteView: View {
                         case .scoreMethod(let kind, let day): ScoreMethodView(kind: kind, day: DayKey(index: day), history: history)
                         case .trend(let metric, let day): TrendDetailView(metric: metric, day: DayKey(index: day), band: band, history: history)
                         case .night(let day): SleepNightScreen(band: band, history: history, initialDay: DayKey(index: day))
+                        case .workout(let fileID): WorkoutDetailView(bandID: band.id, fileID: fileID)
                         default: EmptyView()
                         }
                     }

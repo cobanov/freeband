@@ -95,7 +95,7 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
   1. Mi Fitness'ın arka plan yenilemesini kapat (ACK atıp dosyaları siliyor).
   2. Bir gece bandı tak.
   3. Sabah önce Freeband'i senkronize et.
-  4. Dosya başına rapor: tür, sürüm, CRC, çözüm durumu ve makullük kontrolleri. Kontroller: dakikalık adım toplamı günlük özetin ±%2'si içinde olmalı, nabız 30–220 arasında olmalı, kayıt sayısı geçen dakikalarla uyuşmalı, yatış ve kalkış saatleri makul olmalı, RR var mı yok mu.
+  4. Dosya başına rapor: tür, sürüm, CRC, çözüm durumu ve makullük kontrolleri. Kontroller: dakikalık adım toplamı günlük özetin ±%2'si içinde olmalı, nabız 30–220 arasında olmalı, nabız kayıtlı dakikaların kaçında var (bandın ölçüm aralığı; 2 dakikada birden seyrekse uyarı), kayıt sayısı geçen dakikalarla uyuşmalı, yatış ve kalkış saatleri makul olmalı, RR var mı yok mu.
   5. İstersen Mi Fitness'taki sayılarla karşılaştırma.
 - **Hatalar:** tipli `LinkError` ve yerelleştirilmiş tek cümle + tek aksiyon:
   - Mi Fitness bandı tutuyor → "Mi Fitness'ı kapatıp tekrar dene".
@@ -113,9 +113,12 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
   2. bandın `hrResting` değeri (orta);
   3. gündüz adımsız dakikaların 10. yüzdeliği (düşük).
 - **HRV:** yalnız RR varsa. RR 300–2000 ms aralığında tutulur, %20'den fazla sıçrayan atım elenir. 5 dakikalık pencerelerde RMSSD hesaplanır; gecenin değeri ikinci yarıdaki pencerelerin medyanıdır (en az 3 pencere). 10 ms çözünürlük nedeniyle "yaklaşık" etiketi taşır.
+  - **SpO2 ölçümünden sonraki bozulma için ayrı kural yok (2026-11-13, algoritma v1 değişmedi).** "Band 10'un RR verisi filtresiz, her SpO2 ölçümünden sonra birkaç saniye bozuk" iddiası incelendi; eldeki kaynakların hiçbirinde yok (`docs/SOURCES-2026-11-13.md`, `docs/MIFITNESS-2026-11-13.md`, Gadgetbridge `SleepDetailsParser.java`; Gadgetbridge Xiaomi için RMSSD hesaplamıyor) ve ölçümle de gösterilmedi. Kural yazmak için ayrıca RR atımlarını SpO2 örneklerinin saatine birkaç saniye hassasiyetle oturtmak gerekir; RR paketinin zaman damgası birkaç saniye kayıyor (Gadgetbridge'in Band 9 notu, `docs/ACTIVITY.md` 6.3.2) ve birimi kesin değil. Bozuk atımlar aralık dışına çıkıyor ya da %20'den fazla sıçrıyorsa mevcut filtre onları zaten eliyor; yarısından azı sağlam kalan pencere sayılmıyor. Gerçek bir gece dosyasında SpO2 saatlerinin çevresinde reddedilen fark oranı ölçülürse kural o veriden yazılır.
 - **Uyku skoru:** mevcut katkıların ağırlıklı ortalaması.
   - Süre 35, verimlilik 15, derin 10, REM 10, huzur 10 (uyanma ve WASO), düzen 10 (7 gecelik uyku ortası sapması), nabız düşüşü 10.
   - Süre yoksa skor yok. Mevcut ağırlık 60'ın altındaysa skor "tahmini" olarak gösterilir.
+  - **v2 (2026-11-16): skor, süre alt skorunun en fazla 10 puan üstünde olabilir.** Ölçülen gece: 4 sa 52 dk uyku (ihtiyaç 8 sa), süre alt skoru 61, öbür katkıların hepsi 100'e yakın, ağırlıklı ortalama 76 çıktı. Kısa ama derli toplu bir gecenin "iyi" görünmesi yanıltıcı; sınırla aynı gece 71 eder. 10 bir seçimdir, doğrulanmış değil. `ScoreEngine.algoVersion` 2 oldu, saklı skorlar yeniden hesaplanır.
+  - Uyku borcu (içgörü) gündüz uykularını da sayar: o günün `naps` dakikaları gece süresine eklenir.
 - **Toparlanma:** f(z) = 60 + 20z (0–100'e sınırlı), yani "senin normalin" 60 eder.
   - RR varsa ağırlıklar: HRV 40, dinlenik nabız 25, uyku 25, dünkü yük 10.
   - RR yoksa: dinlenik nabız 45, uyku 40, yük 15; güven en fazla "orta".
@@ -128,6 +131,17 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
   - **Uygulamada (algoritma v1):** r < 0,3 olan dakikalar TRIMP'e katılmaz. Formül harfiyen uygulanınca hareketsiz bir gün yaklaşık 90 TRIMP, yani 10 civarında yük çıkarıyordu.
 - **Stres ve SpO2:** skora girmez. Stres: zaman ağırlıklı ortalama ve 4 banttaki dakikalar. SpO2: gece ortalaması, minimumu ve %90 altındaki dakikalar. Tıbbi iddia yok.
 - **Güven:** yüksek/orta/düşük/yok, her zaman gerekçe listesiyle ("RR yok", "nabız 30 dakikada bir", "bazalde 5/14 gece").
+
+### 5.1 Dikkat çekenler (içgörüler, v1)
+
+Bugün ekranında, skorların altında, en çok üç satır; önce uyarılar. Her kural kişiyi kendi bazalıyla karşılaştırır, tam bazal (7 gün) ister, yoksa susar. Eşikler seçimdir, bir popülasyonla doğrulanmadı. `Analytics/Insights.swift`.
+
+- **Dinlenik nabız yüksek:** bazaldan 2σ yukarıda. 3σ ya da üst üste 3 gün ise uyarı. Her günün z'si kendi önceki günlerinin bazalına göre.
+- **İki haftanın en düşük dinlenik nabzı:** z ≤ −1 ve önceki 14 geçerli günün hepsinden düşük (olumlu).
+- **HRV düşük:** bazaldan 2σ aşağıda; 3σ ya da üst üste 3 gece ise uyarı.
+- **Uyku açığı:** son 7 gecede (en az 5'i verili) ihtiyaçtan toplam 5 saat eksik; 10 saat ise uyarı.
+- **Uyku saati kaydı:** gecenin ortası, önceki gecelerin (en az 4) medyanından 90 dakika ileri ya da geri; saat gece yarısında sarılır.
+- **Yoğun günler, düşük toparlanma:** önceki 3 günün her birinde yük bazalın 1σ üstünde ve bugünkü toparlanma düşük bantta (34'ün altı).
 
 ## 6. Veri hattı ve hata düzeltmeleri
 
@@ -182,7 +196,7 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 **Bileşenler** (`UI/Design/Components/`): ScoreArc (270° yay, eşik çentikleri), MetricRow (sparkline + fark), ContributorRow, Hypnogram, ZoneBar, TrendChart (7/30/90, seçimde değer), StatusLine ("Band 10 Pro · %82 · 2 dk önce senkron"), QuickActionButton (56 pt daire, ince ikon), ListCard/ListRow, SegmentedPicker, SnapSlider, sayfa stilleri, EmptyState, ContextCard (canlı/şarj/bulma/uyarı), BandRender (düz vektör bant çizimi, ekranında canlı saat ve pil).
 
 **Ekranlar:**
-- Bugün: hüküm başlığı, StatusLine, üç ScoreArc, bağlamsal kart, dört hızlı aksiyon, "Bugün" metrik listesi.
+- Bugün: hüküm başlığı, StatusLine, üç ScoreArc, **günün izi** (`DayTrace`: gece yarısından gece yarısına nabız çizgisi, çeyrek saatlik adım çubukları, evre renkleriyle uyku bandı; bugün için "şimdi" çizgisi; kartsız, sayfanın kendi figürü), dikkat çekenler, bağlamsal kart, "Bugün" metrik listesi. Hızlı aksiyonlar (Senkron, Canlı, Bul) yalnız Bant sekmesinde; Bugün'de aşağı çekince senkron.
 - Skor detayı (üç skor için tek şablon).
 - Uyku (gece kaydırıcı, hipnogram, evre tablosu, nabız, SpO2).
 - Trendler (kartlar → detay).
@@ -196,6 +210,21 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 **Silinecekler:** `DayDial.swift`, `Theme.swift` (yerine Tokens ve Typography gelir), eski Today/History/ConnectionStatus/ToolsSheet görünümleri (mantıkları taşınınca), Light font, hub'da `dial.ts`, `wordmark.ts` ve dither CSS'i.
 
 **Skill'ler (okuma referansı olarak):** `ios-hig-design`, `swiftui-expert-skill`, `swiftui-pro`, `swift-charts`; yerelde `dataviz` ve `checklist-design` (son tasarım denetimi).
+
+### 8.1 Tasarım v4 (2026-11-13): gece gösterge paneli
+
+Kullanıcı "tamamen yeni, çok daha profesyonel, en az WHOOP kalitesinde" bir arayüz istedi. v3'ün ince çizgili, kartsız sadeliği bırakıldı; bileşen adları ve belirteç hattı (`design/tokens.json` → `gen_tokens.py`) aynı kaldı, bu yüzden değişiklik bütün ekranlara birden yansıdı.
+
+- **Zemin:** koyu öncelikli, soğuk mürekkep siyahı: canvas `#07090D`, surface `#11151C`, raised `#1A202A`, hairline `#1F2632`. Açık tema: canvas `#F3F5F8`, beyaz kartlar.
+- **Renk veride:** iyi `#35E0A1`, orta `#FFC043`, düşük `#FF5A5F`; uyku `#8E7BFF`, yük ve adım `#3BA7FF`, nabız `#FF5C93`. Aksiyon rengi artık mavi değil, temanın mürekkebi (koyuda beyaz düğme); açık anahtarlar "iyi" yeşili.
+- **Halka:** 1 pt iz ve 3 pt yay yerine kalın halka (ana 9, kahraman 12, detay 14 pt), yuvarlak uçlu; iz, skorun kendi renginin %20'si; bant eşikleri halkadan kesilmiş çentikler.
+- **Yazı:** Open Sauce Sans kaldı; rakamlar, başlıklar ve düğmeler 600 (önceden en çok 500). Büyük rakam 64 pt.
+- **Şekil:** kart yarıçapı 20, ince kenar çizgili; düğme yarıçapı 14.
+- **Bugün:** kahraman kart (Toparlanma halkası ve yanında dinlenik nabız, HRV, uyku), yan yana Uyku ve Yük kartları, kart içinde günün izi, dikkat çekenler, sayı ızgarası (Adım geniş, diğerleri ikili; her karoda değer, 7 günlük ortalamaya göre değişim ve metriğin renginde çizgi).
+- **Uyku:** gecenin kahraman kartı (Uyku halkası, yanında süre, yatış–kalkış ve verim, derin ve REM), altında evreler ve gece grafikleri.
+- **Trendler:** her kartta metrik adı, büyük ortalama ve aynı uzunluktaki önceki döneme göre değişim (iki yanda en az 3 gün varsa), altında grafik.
+- **Bant:** tek kartta bant çizimi, adı, büyük pil yüzdesi ve durum satırı; altında hızlı aksiyonlar ve ayarlar.
+- Yapılmadı: skor detayının düzeni v3'teki gibi (yalnız yeni renk, halka ve kartları aldı); README ve App Store ekran görüntüleri eski tasarımda; hub'ın CSS belirteçleri üretildi ama site yayınlanmadı.
 
 ## 9. Fazlar ve yürütme (gece, otonom; kullanıcı 2026-10-14'te onay verdi)
 

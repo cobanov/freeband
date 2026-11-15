@@ -12,7 +12,7 @@ enum ParseStatus: String, Codable, Sendable, CaseIterable {
     case parsed
     /// Parsed with warnings (partial record, stream error, ...): what was read is kept.
     case partial
-    /// Workouts, unknown kinds and unknown versions: kept raw only.
+    /// Workout details and GPS, sports without a summary table, unknown kinds and versions: kept raw only.
     case unsupported
     case error
     case crc
@@ -119,6 +119,37 @@ struct ManualReadingDraft: Equatable, Sendable {
     var celsius: Double?
 }
 
+/// One workout, from its summary file (docs/ACTIVITY.md 6.6). Nil = the band has no such field
+/// for this sport or wrote 0 for it. Pace in s/km (`paceBest` the fastest), speed in km/h.
+struct WorkoutDraft: Equatable, Sendable {
+    var sourceFileID: String
+    var sport: String
+    var start: Date
+    var end: Date
+    var day: DayKey
+    var tzOffsetMinutes: Int
+    var activeSeconds: Int
+    var distanceMeters: Int?
+    var steps: Int?
+    var calories: Int?
+    var totalCalories: Int?
+    var hrAvg: Int?
+    var hrMax: Int?
+    var hrMin: Int?
+    var paceAvg: Int?
+    var paceBest: Int?
+    var speedAvg: Double?
+    var speedMax: Double?
+    var cadenceAvg: Int?
+    var cadenceMax: Int?
+    var aerobicEffect: Double?
+    var anaerobicEffect: Double?
+    var vo2max: Int?
+    var recoveryHours: Int?
+    var load: Int?
+    var vitality: Int?
+}
+
 /// Everything one file yields.
 struct IngestOutput: Sendable {
     var fileID: String
@@ -131,6 +162,7 @@ struct IngestOutput: Sendable {
     var summary: DaySummaryDraft?
     var sleeps: [SleepDraft] = []
     var manual: [ManualReadingDraft] = []
+    var workouts: [WorkoutDraft] = []
     /// DailyDetails records in the file (all days).
     var minuteRecords: Int?
 
@@ -180,10 +212,31 @@ enum IngestMapper {
                 ManualReadingDraft(sourceFileID: hex, ts: sample.ts, day: DayKey(date: sample.ts, offsetMinutes: tz),
                                    kind: sample.kind.rawValue, value: sample.value, celsius: sample.celsius)
             }
+        case let .workoutSummary(w):
+            if let draft = workoutDraft(w, tzOffsetMinutes: tz, hex: hex) { out.workouts = [draft] }
         case .empty, .unsupported, .error:
             break
         }
         return out
+    }
+
+    // MARK: workouts
+
+    /// Zero means "not measured" in a workout summary (the validity header is not applied), so
+    /// zeros become nil. A calibrated treadmill distance replaces the measured one.
+    static func workoutDraft(_ w: WorkoutSummary, tzOffsetMinutes tz: Int, hex: String) -> WorkoutDraft? {
+        func int(_ key: String) -> Int? { w.int(key).flatMap { $0 > 0 ? $0 : nil } }
+        func real(_ key: String) -> Double? { w.values[key].flatMap { $0 > 0 ? $0 : nil } }
+        guard int("start") != nil, w.end >= w.start else { return nil }
+        return WorkoutDraft(
+            sourceFileID: hex, sport: w.sport, start: w.start, end: w.end, day: DayKey(date: w.start, offsetMinutes: tz),
+            tzOffsetMinutes: tz, activeSeconds: w.int("active_s") ?? 0,
+            distanceMeters: int("distance_calibrated_m") ?? int("distance_m"), steps: int("steps"), calories: int("calories"),
+            totalCalories: int("total_calories"), hrAvg: int("hr_avg"), hrMax: int("hr_max"), hrMin: int("hr_min"),
+            paceAvg: int("pace_avg"), paceBest: int("pace_max"), speedAvg: real("speed_avg"), speedMax: real("speed_max"),
+            cadenceAvg: int("cadence_avg"), cadenceMax: int("cadence_max"), aerobicEffect: real("te_aerobic"),
+            anaerobicEffect: real("te_anaerobic"), vo2max: int("vo2max"), recoveryHours: int("recovery_h"),
+            load: int("load"), vitality: int("vitality"))
     }
 
     // MARK: minutes
@@ -198,6 +251,7 @@ enum IngestMapper {
             var s = days[day] ?? MinuteSeries(day: day, tzOffsetMinutes: tz)
             s.steps[m] = rec.steps
             s.kcal[m] = rec.activeCalories
+            s.activityLevel[m] = rec.activityLevel
             s.distance[m] = rec.distanceMeters
             s.heartRate[m] = rec.heartRate.flatMap { $0 > 0 && $0 < 255 ? $0 : nil }
             s.energy[m] = rec.energy.flatMap { $0 > 0 && $0 < 255 ? $0 : nil }
@@ -229,6 +283,7 @@ enum IngestMapper {
                 if let v = s.kcal[i] { merged.kcal[i] = v }
                 if let v = s.distance[i] { merged.distance[i] = v }
                 if let v = s.energy[i] { merged.energy[i] = v }
+                if let v = s.activityLevel[i] { merged.activityLevel[i] = v }
             }
             for id in part.sourceFileIDs where !sources.contains(id) { sources.append(id) }
         }

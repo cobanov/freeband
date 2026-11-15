@@ -5,6 +5,8 @@ import SwiftUI
 /// raw files (shareable) and the last session's log.
 struct DiagnosticsView: View {
     @EnvironmentObject private var link: BandLink
+    @State private var askingBind = false
+    @State private var logLines: [String] = []
     @EnvironmentObject private var model: AppModel
     @Query(sort: \ActivityBlob.ts, order: .reverse) private var blobs: [ActivityBlob]
     @State private var share: ShareItem?
@@ -45,10 +47,10 @@ struct DiagnosticsView: View {
             .fbFormRow()
 
             Section {
-                if link.log.isEmpty {
+                if logLines.isEmpty {
                     Text("No session yet.").foregroundStyle(.textSecondary)
                 }
-                ForEach(Array(link.log.enumerated()), id: \.offset) { entry in
+                ForEach(Array(logLines.enumerated()), id: \.offset) { entry in
                     Text(verbatim: entry.element).font(.caption.monospaced()).foregroundStyle(.textBody)
                 }
             } header: {
@@ -58,11 +60,13 @@ struct DiagnosticsView: View {
         }
         .fbFormStyle()
         .navigationTitle(String(localized: "Diagnostics"))
+        .onAppear { logLines = link.log.lines }
+        .onReceive(link.log.$lines) { logLines = $0 }
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $share) { ActivitySheet(items: $0.urls) }
         .toolbar {
-            if !link.log.isEmpty {
-                ShareLink(item: link.log.joined(separator: "\n")) {
+            if !logLines.isEmpty {
+                ShareLink(item: logLines.joined(separator: "\n")) {
                     Label(String(localized: "Share log"), systemImage: "square.and.arrow.up")
                 }
             }
@@ -101,6 +105,16 @@ struct DiagnosticsView: View {
                 Task { await model.reparseAll() }
             }
             .disabled(busy)
+            Button(String(localized: "Probe the band")) { model.probeSelectedBand() }
+                .disabled(link.phase.isBusy)
+            Button(String(localized: "Ask the band how it pairs")) { askingBind = true }
+                .disabled(link.phase.isBusy)
+                .confirmationDialog(String(localized: "Ask the band how it pairs?"), isPresented: $askingBind, titleVisibility: .visible) {
+                    Button(String(localized: "Ask")) { model.probeBindSelectedBand() }
+                    Button(String(localized: "Cancel"), role: .cancel) {}
+                } message: {
+                    Text("Freeband sends the first step of pairing and stops. The answer shows in the log. On a band that is already paired this has not been tried: it should only be refused, but the band may show a pairing screen.")
+                }
         } header: {
             Text("Calibration")
         } footer: {
@@ -142,7 +156,7 @@ struct AboutView: View {
             VStack(alignment: .leading, spacing: FBSpace.l) {
                 ListCard {
                     ListRow(title: String(localized: "Version"), value: Payload.appVersion, accessory: .none)
-                    Button { openURL(model.hubURL.appendingPathComponent("privacy")) } label: {
+                    Button { openURL(AppModel.siteURL.appendingPathComponent("privacy")) } label: {
                         ListRow(title: String(localized: "Privacy"), systemImage: nil)
                     }
                     .buttonStyle(.fbRow)

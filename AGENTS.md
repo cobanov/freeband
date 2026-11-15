@@ -12,7 +12,7 @@ Instructions for coding agents (and people) changing this repository. The README
   - A log the user shares has them in it (the band's name, the login bytes). Read it, don't paste it.
   - Model codes and firmware versions (`M2116W1`, `1.4.174`) are the same on every unit and belong in the notes.
 - **Code never depends on one band's address or ID.** The app finds a band by what is stored for it (`Band.mac`, `macSuffix`, its keys in the Keychain); nothing in the source names a particular device.
-- **Protocol code has no I/O.** `MiProtocol.swift`, `MiProtocolV1.swift` and `ActivityFiles.swift` use Foundation only (no CoreBluetooth, no SwiftUI), take bytes in and return bytes and events, so they build and test on the Mac. `BandLink.swift` does the Bluetooth.
+- **Protocol code has no I/O.** `MiProtocol.swift`, `MiProtocolV1.swift`, `MiBind.swift` and `ActivityFiles.swift` use Foundation and Apple's crypto only (no CoreBluetooth, no SwiftUI), take bytes in and return bytes and events, so they build and test on the Mac. `BandLink.swift` does the Bluetooth.
 
 ## Supporting a new band, or a new part of the protocol
 
@@ -29,8 +29,8 @@ Instructions for coding agents (and people) changing this repository. The README
 ## Tests
 
 ```sh
-# protocol vectors (V2 and V1); needs python3 with `cryptography`. TZ=UTC: notify_cmd's expected time is UTC.
-cd ios/tests/protocol && swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift main.swift -o /tmp/mitest && TZ=UTC /tmp/mitest | python3 check_vectors.py
+# protocol vectors (V2, V1 and the local bind); needs python3 with `cryptography`. TZ=UTC: notify_cmd's expected time is UTC.
+cd ios/tests/protocol && swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift main.swift -o /tmp/mitest && TZ=UTC /tmp/mitest | python3 check_vectors.py
 
 # activity files: Swift against the fixtures and the Python reference, then the reference alone
 cd ios/tests/activity/swift && swiftc ../../../Freeband/Band/ActivityFiles.swift main.swift -o /tmp/act && /tmp/act
@@ -52,7 +52,27 @@ cd ios && sh tools/build-ipa.sh
 
 No iOS simulator runtime installed? Typecheck the whole app with `xcrun --sdk iphonesimulator swiftc -typecheck -target arm64-apple-ios17.0-simulator -swift-version 5 -module-name Freeband $(find ios/Freeband -name "*.swift")`, and render a view to PNG through Mac Catalyst (`swiftc -target arm64-apple-ios17.0-macabi` with the iOSSupport frameworks and `ImageRenderer`) to look at a drawing.
 
-The contract test (`ios/tests/contract`) writes into `hub/test/fixtures`; pass it another folder unless you mean to update those fixtures.
+## On a device
+
+The simulator has no Bluetooth, so anything that talks to a band is tried on the maintainer's iPhone. The loop that worked (first used 2026-11-13):
+
+- **Install straight onto the phone**, without TestFlight: `cd ios && ~/bin/signing-run sh tools/device-install.sh <device name>`. It replaces the installed copy and keeps its data and the band's key. TestFlight (`tools/testflight.sh`) is for other people; its export step sometimes fails once with "No certificate for team ... found" and works when run again.
+- **The log** is in memory on the phone: Band › Freeband settings › Diagnostics › share the log (AirDrop lands on the Mac's Desktop or in Downloads). It has the band's name in it: read it, don't paste it. Replies that are not understood yet are logged whole as hex.
+- **The database**, for what the band really sent: `sh ios/tools/device-pull.sh out/<date>/db <device name>` (development-signed copy only, phone unlocked). Decode a stored file with `ios/tests/activity/activity_ref.py parse`.
+- **Probes** (Diagnostics): "Probe the band" asks read-only Health commands and logs the answers (device names for the scripts: `sh ios/tools/device-find.sh`); "Ask the band how it pairs" sends the first step of a local bind and stops (`docs/BIND.md`).
+- **Mi Fitness takes the band's files whenever Freeband is not holding the connection**, and a file one app acknowledged is gone for the other (`docs/ACTIVITY.md` section 2.6). For a test that needs the band's files, offload Mi Fitness (iPhone Storage › Mi Fitness › Offload App; its folder and the key stay) and keep Stay connected on.
+
+Where the facts come from, so they need not be looked up again:
+
+- `vendor/` (ignored; clone again if missing): `Gadgetbridge` (codeberg.org/Freeyourgadget/Gadgetbridge), `astrobox-Core` and `astrobox-Pb` (github.com/AstralSightStudios/AstroBox-NG-Module-Core and -Pb), and `mifitness/`: Mi Fitness for Android (`com.xiaomi.wearable`, fetched with `apkeep -a com.xiaomi.wearable -d apk-pure`) with its jadx output in `mifitness/out/sources`. The band-side parsers are under `com/xiaomi/fit/fitness/parser/` and `.../device/mi/`; class names are obfuscated elsewhere, so search for strings and enum names.
+- Notes with citations: `docs/MIFITNESS-2026-11-13.md` (what the vendor app sends, parses and computes), `docs/SOURCES-2026-11-13.md` (today's Gadgetbridge and AstroBox), `docs/BIND.md`, `docs/SLEEP-WRITEBACK.md`, and the measured sections of `docs/ACTIVITY.md` and `docs/CAPABILITIES.md`.
+- `out/` (ignored): logs, calibration reports and database copies from the maintainer's band. Health data; never committed.
+
+Other things that cost time once:
+
+- Turkish for new strings: `python3 -I ios/tools/add-turkish.py ios/Freeband/Resources/Localizable.xcstrings` with a JSON object on stdin; it keeps the catalog's formatting.
+- Screens with demo data in the simulator: `xcrun simctl launch <id> dev.cobanov.freeband -freeband-demo full -freeband-screen today|sleep|trends|band|score-recovery [-freeband-day -1]`, then `xcrun simctl io <id> screenshot`. Wait about 7 seconds first, or the picture catches the opening animation.
+- `python3 check_vectors.py` needs `cryptography`: `uv run -q --no-project --with cryptography python check_vectors.py`.
 
 ## Committing
 

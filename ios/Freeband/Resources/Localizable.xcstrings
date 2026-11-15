@@ -349,7 +349,6 @@
       }
     },
     "%lld–%lld bpm": {
-      "comment": "Heart-rate zone range",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2227,16 +2226,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Normalin öğreniliyor"
-          }
-        }
-      }
-    },
-    "Lets %@ find this phone. Mi Fitness can't connect while it's on.": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ bu telefonu bulabilsin. Açıkken Mi Fitness bağlanamaz."
           }
         }
       }
@@ -5295,6 +5284,836 @@
           "stringUnit": {
             "state": "translated",
             "value": "Demo veriyle kullanılamaz."
+          }
+        }
+      }
+    },
+    "Reading from the band…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banttan okunuyor…"
+          }
+        }
+      }
+    },
+    "Couldn't read the settings. Close Mi Fitness, keep the band close and try again.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar okunamadı. Mi Fitness'ı kapat, bandı yakın tut ve tekrar dene."
+          }
+        }
+      }
+    },
+    "Smart": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akıllı"
+          }
+        }
+      }
+    },
+    "Heart rate during sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uykuda nabız"
+          }
+        }
+      }
+    },
+    "Every minute gives Strain and resting heart rate the most to work with, and uses the most battery.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dakikada bir ölçüm, Yük ve dinlenik nabız için en çok veriyi sağlar ve en çok pili harcar."
+          }
+        }
+      }
+    },
+    "During sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uykuda"
+          }
+        }
+      }
+    },
+    "All day": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm gün"
+          }
+        }
+      }
+    },
+    "Stress, all day": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stres, tüm gün"
+          }
+        }
+      }
+    },
+    "Worth noticing": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikkat çekenler"
+          }
+        }
+      }
+    },
+    "Resting heart rate is high": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dinlenik nabız yüksek"
+          }
+        }
+      }
+    },
+    "Lowest resting heart rate in two weeks": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İki haftanın en düşük dinlenik nabzı"
+          }
+        }
+      }
+    },
+    "HRV is low": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HRV düşük"
+          }
+        }
+      }
+    },
+    "You're short on sleep": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyku açığın var"
+          }
+        }
+      }
+    },
+    "You slept later than usual": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her zamankinden geç uyudun"
+          }
+        }
+      }
+    },
+    "You slept earlier than usual": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her zamankinden erken uyudun"
+          }
+        }
+      }
+    },
+    "Hard days, low recovery": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yoğun günler, düşük toparlanma"
+          }
+        }
+      }
+    },
+    "%@, your normal is %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, normalin %2$@."
+          }
+        }
+      }
+    },
+    "%@, your normal is %@. %lld days in a row.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, normalin %2$@. %3$lld gündür böyle."
+          }
+        }
+      }
+    },
+    "%lld ms, your normal is %lld ms.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld ms, normalin %2$lld ms."
+          }
+        }
+      }
+    },
+    "%lld ms, your normal is %lld ms. %lld nights in a row.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld ms, normalin %2$lld ms. %3$lld gecedir böyle."
+          }
+        }
+      }
+    },
+    "%@ less than you need over the last %lld nights.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son %2$lld gecede ihtiyacından %1$@ az uyudun."
+          }
+        }
+      }
+    },
+    "The middle of your night moved by %@.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gecenin ortası %@ kaydı."
+          }
+        }
+      }
+    },
+    "Recovery is %lld after %lld days of strain above your normal.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normalinin üstünde yükle geçen %2$lld günün ardından toparlanma %1$lld."
+          }
+        }
+      }
+    },
+    "Lets %@ find this phone and sync on its own. Mi Fitness can't connect while it's on.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ bu telefonu bulabilir ve kendiliğinden senkron olur. Açıkken Mi Fitness bağlanamaz."
+          }
+        }
+      }
+    },
+    "The day, hour by hour": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gün, saat saat"
+          }
+        }
+      }
+    },
+    "%lld ms": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ms"
+          }
+        }
+      }
+    },
+    "HRV": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HRV"
+          }
+        }
+      }
+    },
+    "Clear the band after sync": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senkrondan sonra bandı temizle"
+          }
+        }
+      }
+    },
+    "The band deletes records Freeband has stored. Mi Fitness won't get them.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bant, Freeband'in sakladığı kayıtları siler. Mi Fitness onları alamaz."
+          }
+        }
+      }
+    },
+    "Active calories": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktif kalori"
+          }
+        }
+      }
+    },
+    "kcal": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kcal"
+          }
+        }
+      }
+    },
+    "Probe the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bandı yokla"
+          }
+        }
+      }
+    },
+    "Moving": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hareket"
+          }
+        }
+      }
+    },
+    "Share location with the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konumu bantla paylaş"
+          }
+        }
+      }
+    },
+    "The band asks where this phone is at every sync. Freeband answers only while this is on.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bant her senkronda bu telefonun konumunu soruyor. Freeband yalnız bu açıkken cevap verir."
+          }
+        }
+      }
+    },
+    "Connection and data": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantı ve veri"
+          }
+        }
+      }
+    },
+    "Stays connected": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı kalıyor"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantı"
+          }
+        }
+      }
+    },
+    "Records": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıtlar"
+          }
+        }
+      }
+    },
+    "Phone": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefon"
+          }
+        }
+      }
+    },
+    "Show sleep on the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uykuyu bantta göster"
+          }
+        }
+      }
+    },
+    "After a night is synced, Freeband writes its summary to the band, so the band's own sleep screen fills in.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir gece senkronlanınca Freeband özetini banda yazar; bandın kendi uyku ekranı böylece dolar."
+          }
+        }
+      }
+    },
+    "Ask the band how it pairs": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banda nasıl eşleştiğini sor"
+          }
+        }
+      }
+    },
+    "Ask the band how it pairs?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banda nasıl eşleştiği sorulsun mu?"
+          }
+        }
+      }
+    },
+    "Ask": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sor"
+          }
+        }
+      }
+    },
+    "Freeband sends the first step of pairing and stops. The answer shows in the log. On a band that is already paired this has not been tried: it should only be refused, but the band may show a pairing screen.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband eşleşmenin ilk adımını gönderir ve durur. Cevap günlükte görünür. Zaten eşli bir bantta bu denenmedi: yalnızca reddedilmesi beklenir, ama bant bir eşleşme ekranı gösterebilir."
+          }
+        }
+      }
+    },
+    "Workouts": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antrenmanlar"
+          }
+        }
+      }
+    },
+    "Pace and cadence": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo ve kadans"
+          }
+        }
+      }
+    },
+    "Training": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antrenman"
+          }
+        }
+      }
+    },
+    "Outdoor run": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık hava koşusu"
+          }
+        }
+      }
+    },
+    "Trail run": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Patika koşusu"
+          }
+        }
+      }
+    },
+    "Treadmill": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koşu bandı"
+          }
+        }
+      }
+    },
+    "Walk": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yürüyüş"
+          }
+        }
+      }
+    },
+    "Outdoor walk": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık hava yürüyüşü"
+          }
+        }
+      }
+    },
+    "Indoor walk": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı alan yürüyüşü"
+          }
+        }
+      }
+    },
+    "Hike": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğa yürüyüşü"
+          }
+        }
+      }
+    },
+    "Trek": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trekking"
+          }
+        }
+      }
+    },
+    "Outdoor ride": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık hava bisikleti"
+          }
+        }
+      }
+    },
+    "Indoor ride": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı alan bisikleti"
+          }
+        }
+      }
+    },
+    "Free training": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serbest antrenman"
+          }
+        }
+      }
+    },
+    "Indoor fitness": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı alan fitness"
+          }
+        }
+      }
+    },
+    "HIIT": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HIIT"
+          }
+        }
+      }
+    },
+    "Rowing": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kürek"
+          }
+        }
+      }
+    },
+    "Elliptical": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliptik"
+          }
+        }
+      }
+    },
+    "Distance": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesafe"
+          }
+        }
+      }
+    },
+    "Total calories": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toplam kalori"
+          }
+        }
+      }
+    },
+    "Average pace": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama tempo"
+          }
+        }
+      }
+    },
+    "Best pace": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En iyi tempo"
+          }
+        }
+      }
+    },
+    "Average speed": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama hız"
+          }
+        }
+      }
+    },
+    "Top speed": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En yüksek hız"
+          }
+        }
+      }
+    },
+    "Average cadence": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortalama kadans"
+          }
+        }
+      }
+    },
+    "Highest cadence": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En yüksek kadans"
+          }
+        }
+      }
+    },
+    "Aerobic effect": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aerobik etki"
+          }
+        }
+      }
+    },
+    "Anaerobic effect": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anaerobik etki"
+          }
+        }
+      }
+    },
+    "Training load": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antrenman yükü"
+          }
+        }
+      }
+    },
+    "VO₂ max": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VO₂ maks"
+          }
+        }
+      }
+    },
+    "Recovery time": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toparlanma süresi"
+          }
+        }
+      }
+    },
+    "%@ /km": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ /km"
+          }
+        }
+      }
+    },
+    "%lld spm": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld adım/dk"
+          }
+        }
+      }
+    },
+    "Experimental. After a night is synced, Freeband sends its summary to the band, as Mi Fitness does to fill the band's own sleep screen. Not tried on a band yet.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deneysel. Bir gece senkronlanınca Freeband özetini banda gönderir; Mi Fitness bandın uyku ekranını böyle dolduruyor. Bantta henüz denenmedi."
+          }
+        }
+      }
+    },
+    "Battery, about %@ left": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pil, yaklaşık %@ kaldı"
+          }
+        }
+      }
+    },
+    "Add your birth year": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğum yılını ekle"
+          }
+        }
+      }
+    },
+    "Strain is worked out from your maximum heart rate, which depends on your age. Until you add it, Freeband assumes one.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yük, yaşına bağlı olan en yüksek nabzından hesaplanır. Sen ekleyene kadar Freeband bir yaş varsayar."
           }
         }
       }

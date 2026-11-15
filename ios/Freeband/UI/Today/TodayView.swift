@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// Home: the day's verdict, the band in one line, the score triad, context while it is true,
-/// quick actions and today's metrics against the 7-day average.
+/// Home: the day's verdict, the band in one line, the Recovery card with Sleep and Strain, the
+/// day's trace, what stands out, the day's workouts and its numbers as tiles.
 struct TodayView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var router: AppRouter
@@ -111,6 +111,59 @@ private struct TodayContent: View {
         return [.steps: totals.reduce(0, +) / Double(totals.count)]
     }
 
+    /// The shown day's minute file, for the day trace.
+    private var dayMinutes: MinuteSeries? {
+        let id = band.id
+        let index = day.index
+        return (try? context.fetch(FetchDescriptor<MinuteDay>(predicate: #Predicate { $0.bandID == id && $0.dayIndex == index })))?.first?.series
+    }
+
+    /// The newest heart rate of the shown day, wherever it came from: a measurement started on
+    /// the band, the band's own minutes, or (today) a live reading.
+    private func latestHeartRate(_ minutes: MinuteSeries?) -> (value: Int, at: Date)? {
+        var best: (value: Int, at: Date)?
+        func offer(_ value: Int, _ at: Date) {
+            if ValidRange.hr(value) != nil, best.map({ at > $0.at }) ?? true { best = (value, at) }
+        }
+        let id = band.id
+        let index = day.index
+        let manual = (try? context.fetch(FetchDescriptor<ManualReading>(
+            predicate: #Predicate { $0.bandID == id && $0.dayIndex == index && $0.kind == "heart_rate" }))) ?? []
+        for reading in manual { offer(reading.value, reading.ts) }
+        if let minutes, let last = (0 ..< MinuteSeries.slots).last(where: { ValidRange.hr(minutes.heartRate[$0]) != nil }) {
+            offer(minutes.heartRate[last] ?? 0, minutes.time(ofMinute: last))
+        }
+        if isToday, let live = liveSamples.last(where: { $0.heartRate > 10 }) { offer(live.heartRate, live.ts) }
+        return best
+    }
+
+    /// Heart rate the band recorded in the sleep files that touch the shown day.
+    private var dayNightHeart: [(at: Date, bpm: Int)] {
+        let next = day.adding(days: 1)
+        let records = [history.mainSleep(day), history.mainSleep(next)].compactMap { $0 } + history.naps(day) + history.naps(next)
+        return records.flatMap { $0.heartRatePoints.map { (at: $0.date, bpm: Int($0.value)) } }
+    }
+
+    /// When the shown day's workouts ran, for the shading on the day trace.
+    private var dayWorkouts: [ClosedRange<Date>] {
+        let id = band.id
+        let index = day.index
+        let rows = (try? context.fetch(FetchDescriptor<Workout>(predicate: #Predicate { $0.bandID == id && $0.dayIndex == index }))) ?? []
+        return rows.filter { $0.end > $0.start }.map { $0.start ... $0.end }
+    }
+
+    /// Every sleep that touches the shown day: the night that ended on it, its naps, and the
+    /// night that began on it. A session without stages is drawn as one stretch of light sleep.
+    private var daySleep: [StageSegment] {
+        let next = day.adding(days: 1)
+        let records = [history.mainSleep(day), history.mainSleep(next)].compactMap { $0 } + history.naps(day) + history.naps(next)
+        return records.flatMap { record -> [StageSegment] in
+            let stages = StageSegment.unpack(record.stageTimeline)
+            guard stages.isEmpty else { return stages }
+            return [StageSegment(start: record.bedTime, minutes: Int(record.wakeTime.timeIntervalSince(record.bedTime) / 60), stage: .light)]
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.l) {
@@ -129,36 +182,44 @@ private struct TodayContent: View {
                 emptyState
 
                 if !isFirstSync {
-                    triad
-                        .opacity(syncing ? 0.5 : 1)
-                        .fbStateAnimation(syncing)
+                    VStack(spacing: FBSpace.xs) {
+                        hero
+                        pillars
+                        Card {
+                            DayTrace(minutes: dayMinutes, sleep: daySleep, dayStart: day.date, now: isToday ? Date() : nil,
+                                     nightHeart: dayNightHeart, workouts: dayWorkouts)
+                        }
+                    }
+                    .opacity(syncing ? 0.5 : 1)
+                    .fbStateAnimation(syncing)
+                    WorkoutsSection(bandID: band.id, day: day)
+                    InsightList(insights: history.insights(day, sleepNeedMinutes: Profile.load().sleepNeed), day: day)
                 }
-
+                if isToday, !Profile.load().maxHRIsKnown {
+                    NavigationLink(value: Route.profile) {
+                        Card {
+                            HStack(alignment: .firstTextBaseline, spacing: FBSpace.s) {
+                                Image(systemName: "person.crop.circle")
+                                    .foregroundStyle(.textSecondary)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: FBSpace.xxs) {
+                                    Text("Add your birth year")
+                                        .textStyle(.headline)
+                                        .foregroundStyle(.textPrimary)
+                                    Text("Strain is worked out from your maximum heart rate, which depends on your age. Until you add it, Freeband assumes one.")
+                                        .textStyle(.subhead)
+                                        .foregroundStyle(.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
                 if isToday {
                     BandContextCard(band: band)
                 }
-
-                QuickActionRow {
-                    QuickActionButton(title: String(localized: "Sync"), systemImage: "arrow.triangle.2.circlepath",
-                                      isBusy: BandPresentation.isSyncing(link, band)) {
-                        model.start(band, .sync)
-                    }
-                    .disabled(link.phase.isBusy)
-                    QuickActionButton(title: String(localized: "Live HR"), systemImage: "heart",
-                                      isOn: BandPresentation.isLive(link, band)) {
-                        router.startLive(band, model: model)
-                    }
-                    if band.supportsFind {
-                        QuickActionButton(title: String(localized: "Find"), systemImage: "dot.radiowaves.left.and.right",
-                                          isOn: router.isFinding) {
-                            if router.isFinding { router.stopFinding(band, model: model) } else { router.find(band, model: model) }
-                        }
-                    }
-                    if BandFeatures.controls {
-                        QuickActionButton(title: String(localized: "Alarms"), systemImage: "alarm") {}
-                    }
-                }
-
                 if !isFirstSync {
                     metrics
                         .opacity(syncing ? 0.5 : 1)
@@ -249,19 +310,60 @@ private struct TodayContent: View {
 
     // MARK: scores
 
-    private var triad: some View {
-        let rows = dynamicTypeSize >= .xxLarge
-        let layout = rows ? AnyLayout(VStackLayout(alignment: .leading, spacing: FBSpace.s))
-                          : AnyLayout(HStackLayout(alignment: .top, spacing: 0))
-        return layout {
-            ForEach([ScoreKind.sleep, .recovery, .strain]) { kind in
-                NavigationLink(value: Route.score(kind, day: day.index)) {
-                    VStack(alignment: rows ? .leading : .center, spacing: FBSpace.xxs) {
-                        ScoreTile(kind: kind, value: history.score(kind, day), layout: rows ? .row : .column)
-                        confidenceMarker(kind)
+    /// Recovery leads the day: its ring, and beside it what it was made of.
+    private var hero: some View {
+        NavigationLink(value: Route.score(.recovery, day: day.index)) {
+            Card(padding: FBSpace.m) {
+                HStack(alignment: .center, spacing: FBSpace.m) {
+                    ScoreArc(kind: .recovery, value: history.score(.recovery, day), style: .hero)
+                    VStack(alignment: .leading, spacing: FBSpace.xs) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(ScoreKind.recovery.name)
+                                .textStyle(.headline)
+                                .foregroundStyle(.textPrimary)
+                            Text(history.score(.recovery, day).map { ScoreKind.recovery.band(for: $0).word } ?? String(localized: "No data"))
+                                .textStyle(.subhead)
+                                .foregroundStyle(.textSecondary)
+                        }
+                        VStack(spacing: FBSpace.xxs) {
+                            fact(TodayMetric.restingHeartRate.title, history.value(.restingHeartRate, on: day).map(FBFormat.bpm))
+                            fact(String(localized: "HRV"), history.score(day)?.hrv.map { String(localized: "\(Int($0.rounded())) ms") })
+                            fact(TodayMetric.sleep.title, history.sleepMinutes(day).map { FBFormat.duration(minutes: $0) })
+                        }
+                        confidenceMarker(.recovery)
                     }
-                    .frame(maxWidth: .infinity, alignment: rows ? .leading : .center)
-                    .contentShape(Rectangle())
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func fact(_ label: String, _ value: String?) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .textStyle(.subhead)
+                .foregroundStyle(.textSecondary)
+            Spacer(minLength: FBSpace.xs)
+            Text(value ?? "–")
+                .textStyle(.figureS)
+                .foregroundStyle(value == nil ? Color.textTertiary : Color.textPrimary)
+        }
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Sleep and Strain, side by side; one under the other at large text sizes.
+    private var pillars: some View {
+        let layout = dynamicTypeSize >= .xxLarge ? AnyLayout(VStackLayout(spacing: FBSpace.xs)) : AnyLayout(HStackLayout(spacing: FBSpace.xs))
+        return layout {
+            ForEach([ScoreKind.sleep, .strain]) { kind in
+                NavigationLink(value: Route.score(kind, day: day.index)) {
+                    Card {
+                        VStack(alignment: .leading, spacing: FBSpace.xxs) {
+                            ScoreTile(kind: kind, value: history.score(kind, day), layout: .row)
+                            confidenceMarker(kind)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
             }
@@ -284,22 +386,48 @@ private struct TodayContent: View {
     // MARK: metrics
 
     private var metrics: some View {
-        VStack(alignment: .leading, spacing: FBSpace.xs) {
-            SectionHeader(title: isToday ? String(localized: "Today") : FBFormat.shortDay(day.noon))
-            VStack(spacing: 0) {
-                let averages = isToday ? todayAverages : [:]
-                ForEach(TodayMetric.allCases) { metric in
-                    NavigationLink(value: Route.trend(metric.trend, day: day.index)) {
-                        let reading = metric.reading(history: history, day: day, overrides: metric == .steps ? overrides : [:],
-                                                     average: averages[metric], hidesDelta: isToday && hidesTodayDelta(metric, averages))
-                        MetricRow(title: metric.title, value: reading.value, unit: reading.unit,
-                                  trend: reading.trend, delta: reading.delta)
-                    }
-                    .buttonStyle(.fbRow)
-                }
+        let averages = isToday ? todayAverages : [:]
+        func tile(_ metric: TodayMetric, wide: Bool = false) -> some View {
+            let reading = metric.reading(history: history, day: day, overrides: metric == .steps ? overrides : [:],
+                                         average: averages[metric], hidesDelta: isToday && hidesTodayDelta(metric, averages))
+            return NavigationLink(value: Route.trend(metric.trend, day: day.index)) {
+                StatTile(title: metric.title, value: reading.value, unit: reading.unit, trend: reading.trend, delta: reading.delta,
+                         color: metric.color, wide: wide)
             }
-            .padding(.horizontal, FBSpace.s)
-            .fbCardBackground()
+            .buttonStyle(.plain)
+        }
+        return VStack(alignment: .leading, spacing: FBSpace.xs) {
+            SectionHeader(title: isToday ? String(localized: "Today") : FBFormat.shortDay(day.noon))
+            let minutes = dayMinutes
+            let heart = latestHeartRate(minutes)
+            StatTile(title: String(localized: "Heart rate"), value: heart.map { FBFormat.number($0.value) }, unit: String(localized: "bpm"),
+                     trend: minutes.map { $0.heartRate.compactMap { ValidRange.hr($0).map(Double.init) } } ?? [],
+                     color: .heart, wide: true, note: heart.map { FBFormat.time($0.at) })
+            tile(.steps, wide: true)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: FBSpace.xs), GridItem(.flexible())], spacing: FBSpace.xs) {
+                // From the band's own daily summary: what it counts as burned by moving, and stress.
+                let summary = history.summary(day)
+                StatTile(title: String(localized: "Active calories"), value: summary?.activeCalories.map { FBFormat.number($0) },
+                         unit: String(localized: "kcal"),
+                         trend: (0..<7).reversed().map { history.summary(day.adding(days: -$0))?.activeCalories.map(Double.init) },
+                         color: .activity)
+                // The band's Moving minutes when the day's minute files carry the level; else our own count.
+                if let moving = minutes?.movingMinutes {
+                    StatTile(title: String(localized: "Moving"), value: FBFormat.number(moving), unit: String(localized: "min"), color: .activity)
+                } else {
+                    tile(.activeMinutes)
+                }
+                tile(.restingHeartRate)
+                NavigationLink(value: Route.trend(.stress, day: day.index)) {
+                    StatTile(title: String(localized: "Stress"), value: summary?.stressAvg.map { FBFormat.number($0) },
+                             trend: (0..<7).reversed().map { history.value(.stress, on: day.adding(days: -$0)) },
+                             color: .textSecondary,
+                             note: summary.flatMap { s in s.stressMin.flatMap { low in s.stressMax.map { "\(low)–\($0)" } } })
+                }
+                .buttonStyle(.plain)
+                tile(.sleep)
+                tile(.bloodOxygen)
+            }
             Footnote(String(localized: "Compared with your 7-day average."))
         }
     }
@@ -318,6 +446,16 @@ enum TodayMetric: String, CaseIterable, Identifiable {
         case .sleep: .sleepHours
         case .activeMinutes: .activeMinutes
         case .bloodOxygen: .bloodOxygen
+        }
+    }
+
+    /// The colour of the metric's line on its tile.
+    var color: Color {
+        switch self {
+        case .steps, .activeMinutes: .activity
+        case .restingHeartRate: .heart
+        case .sleep: .sleep
+        case .bloodOxygen: .textSecondary
         }
     }
 
