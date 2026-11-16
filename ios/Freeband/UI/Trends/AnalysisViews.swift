@@ -427,24 +427,38 @@ struct SleepTimingChart: View {
     let range: TrendRange
     let timing: SleepTiming?
 
-    /// Clock minutes after noon to a time of day in the phone's format.
+    /// Clock minutes after noon to a time of day in the phone's format. Worked out in GMT from
+    /// a fixed date, so a daylight-saving change today cannot move the labels by an hour.
     static func clock(_ minute: Double) -> String {
-        let noon = Calendar.current.startOfDay(for: Date()).addingTimeInterval(12 * 3600)
-        return FBFormat.time(noon.addingTimeInterval(minute.rounded() * 60))
+        Date(timeIntervalSinceReferenceDate: (720 + minute.rounded()) * 60)
+            .formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: .gmt))
+    }
+
+    private struct Night: Identifiable {
+        let date: Date
+        let bed: Double
+        let wake: Double
+        var id: Date { date }
+    }
+
+    /// The rows' nights on one side of the clock (`Analysis.aligned`), as `timing` has them.
+    private var nights: [Night] {
+        let with = rows.compactMap { row in row.day.bedMinute.flatMap { bed in row.day.wakeMinute.map { (row.date, bed, $0) } } }
+        return zip(with, Analysis.aligned(with.map { ($0.1, $0.2) })).map { Night(date: $0.0, bed: $1.bed, wake: $1.wake) }
     }
 
     var body: some View {
-        let nights = rows.filter { $0.day.bedMinute != nil && $0.day.wakeMinute != nil }
+        let nights = nights
         if let first = rows.first, let last = rows.last, !nights.isEmpty {
-            let earliest = (nights.compactMap(\.day.bedMinute).min() ?? 600) - 45
-            let latest = (nights.compactMap(\.day.wakeMinute).max() ?? 1200) + 45
+            let earliest = (nights.map(\.bed).min() ?? 600) - 45
+            let latest = (nights.map(\.wake).max() ?? 1200) + 45
             let ticks = Array(stride(from: (earliest / 120).rounded(.up) * 120, through: latest, by: 120))
             VStack(alignment: .leading, spacing: FBSpace.s) {
                 // The clock is drawn negated so that earlier is higher.
                 Chart {
-                    ForEach(nights) { row in
-                        BarMark(x: .value("Day", row.date, unit: .day),
-                                yStart: .value("Bed", -(row.day.bedMinute ?? 0)), yEnd: .value("Wake", -(row.day.wakeMinute ?? 0)),
+                    ForEach(nights) { night in
+                        BarMark(x: .value("Day", night.date, unit: .day),
+                                yStart: .value("Bed", -night.bed), yEnd: .value("Wake", -night.wake),
                                 width: range == .week ? .fixed(14) : .automatic)
                             .foregroundStyle(Color.sleep)
                             .cornerRadius(range == .quarter ? 1 : 4)

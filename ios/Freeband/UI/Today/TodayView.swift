@@ -326,7 +326,7 @@ private struct TodayContent: View {
                                 .foregroundStyle(.textSecondary)
                         }
                         VStack(spacing: FBSpace.xxs) {
-                            fact(TodayMetric.restingHeartRate.title, history.value(.restingHeartRate, on: day).map(FBFormat.bpm))
+                            fact(TodayMetric.restingHeartRate.title, history.settledRestingHR(day).map(FBFormat.bpm))
                             fact(String(localized: "HRV"), history.score(day)?.hrv.map { String(localized: "\(Int($0.rounded())) ms") })
                             fact(TodayMetric.sleep.title, history.sleepMinutes(day).map { FBFormat.duration(minutes: $0) })
                         }

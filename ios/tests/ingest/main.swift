@@ -428,6 +428,21 @@ if let c = cases.first(where: { $0.name.contains("daily details v4") }) {
 }
 check("check kinds", Set(report.checks.map(\.name)).isSuperset(of: ["heart_rate_range", "heart_rate_coverage", "records_vs_elapsed", "sleep_plausible", "rr_present"]))
 equal("record checks pass", report.checks.filter { $0.name == "records_vs_elapsed" }.map(\.status), Array(repeating: .pass, count: minuteFiles.count))
+// Two bands in one pass: a file's successor is its own band's next file, not the other band's. Band A's
+// file holds 120 records and was fetched 120 minutes in; band B's file began 40 minutes after A's.
+do {
+    let a = UUID(), b = UUID()
+    func fid(_ ts: Int) -> ActivityFileID {
+        var le = UInt32(ts).littleEndian
+        return ActivityFileID(withUnsafeBytes(of: &le) { Data($0) } + Data([0x0c, 0x04, 0x00]))!
+    }
+    let fileA = fid(1_700_000_000), fileB = fid(1_700_000_000 + 40 * 60)
+    let two = [Calibration.MinuteFile(bandID: a, fileID: fileA, records: 120, fetchedAt: fileA.ts.addingTimeInterval(120 * 60 + 30)),
+               Calibration.MinuteFile(bandID: b, fileID: fileB, records: 80, fetchedAt: fileB.ts.addingTimeInterval(80 * 60 + 30))]
+    let mixed = Calibration.build(files: [], minuteFiles: two, minuteDays: [], summaries: [], sleeps: [],
+                                  bandID: nil, outcome: nil, parserVersion: 0, algoVersion: 0)
+    equal("another band's file is not a successor", mixed.checks.filter { $0.name == "records_vs_elapsed" }.map(\.status), [.pass, .pass])
+}
 let decoded = CalibrationReport.decode(report.json())
 check("JSON round trip", decoded?.files == report.files && decoded?.checks == report.checks)
 check("JSON is an object", (try? JSONSerialization.jsonObject(with: report.json())) is [String: Any])

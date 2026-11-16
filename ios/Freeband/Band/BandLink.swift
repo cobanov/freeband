@@ -213,11 +213,10 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var lastOutcome: Outcome?
     /// After authentication: which candidate key worked and the band's own Bluetooth name.
     var onIdentified: ((UUID, Int, String?) -> Void)?
-    /// Past activity files already stored need not be fetched again (today's always are).
     /// When the copy of a file on the phone was fetched; nil when there is none.
     var storedActivityFile: ((UUID, String) -> Date?)?
-    /// A complete, CRC-checked activity file; `today` when it came from the band's today list.
-    var onActivityFile: ((UUID, ActivityFileID, Data, Bool) -> Void)?
+    /// A complete, CRC-checked activity file.
+    var onActivityFile: ((UUID, ActivityFileID, Data) -> Void)?
 
     /// Firmware, serial and model, read after authentication.
     var onDeviceInfo: ((UUID, MiAuth.DeviceInfo) -> Void)?
@@ -864,7 +863,7 @@ final class BandLink: NSObject, ObservableObject {
             let queued = fileQueue.contains(got)
             fileQueue.removeAll { $0 == got }
             if receivedFiles.insert(got).inserted, let id = target?.id {
-                onActivityFile?(id, got, data, todayIDs.contains(got))
+                onActivityFile?(id, got, data)
             }
             if got == file || queued { advanceFileProgress() }
             if got == file {

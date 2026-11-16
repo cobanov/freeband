@@ -6918,6 +6918,16 @@
           }
         }
       }
+    },
+    "It did not fall from the evening before bed; a fall of 10% or more is usual.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yatmadan önceki akşama göre düşmedi; %10 ve üstü düşüş olağandır."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -958,8 +958,10 @@ check("sync plan: a file is left alone or acknowledged only with a final copy on
     let summaryOldEvening = fid(1_700_042_400 - 58 * 3600, "0501") // 58 h old, but the copy is from its own evening (20 h)
     let sleepLastNight = fid(1_700_042_400 - 11 * 3600, "0620")
     let manualNew = fid(1_699_900_000, "0218")                     // 39 h old, not on the phone
+    // The band closed minuteOld and minuteA at a fetch and began the next file then: minuteOld's copy
+    // is from the moment minuteA began, minuteA's from 30 s before minuteB (inside the slack).
     let stored: [ActivityFileID: Date] = [
-        minuteOld: fetched(hoursAfterFileTime: 0.1, minuteOld), minuteA: fetched(hoursAfterFileTime: 0.1, minuteA),
+        minuteOld: minuteA.ts, minuteA: minuteB.ts.addingTimeInterval(-30),
         summaryToday: fetched(hoursAfterFileTime: 9, summaryToday), sleepOld: fetched(hoursAfterFileTime: 40, sleepOld),
         summaryOldEvening: fetched(hoursAfterFileTime: 20, summaryOldEvening), sleepLastNight: fetched(hoursAfterFileTime: 8, sleepLastNight),
     ]
@@ -977,6 +979,30 @@ check("sync plan: a file is left alone or acknowledged only with a final copy on
     if plan(clear: true).acknowledge != [minuteOld, minuteA, sleepOld].sorted() { e.append("ack \(plan(clear: true).acknowledge.map(\.hex))") }
     if !plan(clear: false).acknowledge.isEmpty { e.append("acknowledged with clearing off") }
     if plan(clear: false).fetch != wantFetch { e.append("fetch changes with clearing") }
+    return e
+}
+
+check("sync plan: a copy taken while a day-long minute file was still growing is not final") {
+    // A band that keeps one minute file a day. Yesterday's began at 00:00 and was fetched at 18:00;
+    // today's file follows it, and it is 09:00. The copy lacks the evening: fetch again, never acknowledge.
+    let day = 1_700_006_400
+    func fid(_ ts: Int) -> ActivityFileID {
+        var le = UInt32(ts).littleEndian
+        return ActivityFileID(withUnsafeBytes(of: &le) { Data($0) } + hexData("000400"))!
+    }
+    let yesterday = fid(day), today = fid(day + 86_400)
+    let now = Date(timeIntervalSince1970: TimeInterval(day + 86_400 + 9 * 3600))
+    func plan(fetchedAt: Int) -> ActivitySyncPlan {
+        ActivitySyncPlan.make(today: [today], past: [yesterday], now: now,
+                              storedAt: { $0 == yesterday ? Date(timeIntervalSince1970: TimeInterval(fetchedAt)) : nil }, mayAcknowledge: { _ in true })
+    }
+    var e: [String] = []
+    let evening = plan(fetchedAt: day + 18 * 3600)
+    if evening.fetch != [yesterday, today] { e.append("fetch \(evening.fetch.map(\.hex))") }
+    if !evening.acknowledge.isEmpty { e.append("acknowledged a short copy") }
+    // Fetched again this morning, after today's file began: now the copy is whole.
+    let morning = plan(fetchedAt: day + 86_400 + 8 * 3600)
+    if morning.fetch != [today] || morning.acknowledge != [yesterday] { e.append("a whole copy is still fetched") }
     return e
 }
 

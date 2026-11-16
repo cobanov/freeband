@@ -77,7 +77,7 @@ private struct AnalysisSection: View {
         // Twice the range: the review compares it with the period before.
         let all = history.analysisRows(ending: today, count: 2 * length)
         let rows = Array(all.suffix(length))
-        let review = Analysis.review(all.map(\.day), ending: today, length: length, sleepNeedMinutes: need)
+        let review = Analysis.review(all.map(\.day), ending: today, length: length, sleepNeedMinutes: need, endingIsUnfinished: true)
 
         ReviewCard(review: review)
         chart(String(localized: "Strain and recovery")) { StrainRecoveryChart(rows: rows, range: range) }
@@ -89,7 +89,7 @@ private struct AnalysisSection: View {
             // The vitals are the night's: before tonight's sleep is in, yesterday is the latest full reading.
             let reference = history.mainSleep(today) != nil ? today : today.adding(days: -1)
             SectionHeader(title: String(localized: "Health monitor"), trailing: FBFormat.shortDay(reference.noon))
-            HealthMonitorCard(rows: vitals(reference))
+            HealthMonitorCard(rows: vitals(reference, lastFullDay: today.adding(days: -1)))
         }
         .padding(.top, FBSpace.s)
         .id("Health monitor")
@@ -106,20 +106,23 @@ private struct AnalysisSection: View {
     }
 
     /// The day's vitals against the 60 days before (Baseline uses the latest 14 valid ones).
-    private func vitals(_ today: DayKey) -> [VitalRow] {
-        func row(_ title: String, _ floor: Baseline.Floor, _ value: (DayKey) -> Double?,
-                 _ text: (Double) -> String) -> VitalRow {
-            let now = value(today)
-            let before = (1 ... Baseline.lookbackDays).compactMap { value(today.adding(days: -$0)) }
-            return VitalRow(title: title, value: now, text: now.map(text) ?? "", range: Analysis.range(now, previous: before, floor: floor))
+    /// `night`: the day whose night is read. Stress is a whole day's average, so it is read from
+    /// `lastFullDay` when `night` is the day still running.
+    private func vitals(_ night: DayKey, lastFullDay: DayKey) -> [VitalRow] {
+        func row(_ title: String, on day: DayKey, _ floor: Baseline.Floor, bounds: ClosedRange<Double>? = nil,
+                 _ value: (DayKey) -> Double?, _ text: (Double) -> String) -> VitalRow {
+            let now = value(day)
+            let before = (1 ... Baseline.lookbackDays).compactMap { value(day.adding(days: -$0)) }
+            return VitalRow(title: title, value: now, text: now.map(text) ?? "",
+                            range: Analysis.range(now, previous: before, floor: floor, bounds: bounds))
         }
         return [
-            row(String(localized: "Resting heart rate"), .restingHR, { history.settledRestingHR($0) }, FBFormat.bpm),
-            row(String(localized: "Heart rate variability"), .hrv, { history.score($0)?.hrv },
+            row(String(localized: "Resting heart rate"), on: night, .restingHR, { history.settledRestingHR($0) }, FBFormat.bpm),
+            row(String(localized: "Heart rate variability"), on: night, .hrv, { history.score($0)?.hrv },
                 { String(localized: "\(FBFormat.number($0)) ms") }),
-            row(String(localized: "Blood oxygen"), Baseline.Floor(absolute: 1, relative: 0), { history.value(.bloodOxygen, on: $0) },
+            row(String(localized: "Blood oxygen"), on: night, Baseline.Floor(absolute: 1, relative: 0), bounds: 0 ... 100, { history.value(.bloodOxygen, on: $0) },
                 { FBFormat.percent($0 / 100) }),
-            row(String(localized: "Stress"), Baseline.Floor(absolute: 5, relative: 0), { history.value(.stress, on: $0) },
+            row(String(localized: "Stress"), on: min(night, lastFullDay), Baseline.Floor(absolute: 5, relative: 0), bounds: 0 ... 100, { history.value(.stress, on: $0) },
                 { FBFormat.number($0) }),
         ]
     }

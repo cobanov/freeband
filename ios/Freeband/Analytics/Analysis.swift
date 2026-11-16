@@ -10,7 +10,6 @@ struct AnalysisDay: Equatable, Sendable {
     /// 23:30 is 690, 07:00 the next morning is 1140. Wake is bed plus the time in bed.
     var bedMinute: Double?
     var wakeMinute: Double?
-    var sleepScore: Double?
     var recovery: Double?
     var strain: Double?
     var restingHR: Double?
@@ -141,6 +140,17 @@ enum Analysis {
     static let steadyNights = 5
     static let rangeSigmas = 2.0
 
+    /// The resting heart rate a day gives to trends, reviews, ranges and insights. The night's
+    /// value always counts. Anything else (the band's own daily figure, or one worked out from
+    /// daytime minutes) counts only once the day is over: early in a day it is a running
+    /// daytime value, not a resting one (measured 2026-11-16: 75 at 02:00 against a normal of 64).
+    /// `scored`: the value stored with the day's scores; `bandValue`: the band's summary figure,
+    /// used when the day was never scored.
+    static func settledRestingHR(scored: Double?, fromSleep: Bool, bandValue: Double?, dayIsOver: Bool) -> Double? {
+        guard let scored else { return dayIsOver ? bandValue : nil }
+        return fromSleep || dayIsOver ? scored : nil
+    }
+
     /// Minutes after local noon: 23:30 is 690, 00:30 is 750, 11:00 in the morning is 1380.
     static func clockMinute(_ date: Date, offsetMinutes: Int) -> Double {
         let local = date.timeIntervalSince1970 + Double(offsetMinutes) * 60
@@ -148,7 +158,19 @@ enum Analysis {
         return minuteOfDay >= 720 ? minuteOfDay - 720 : minuteOfDay + 720
     }
 
-    static func timing(_ nights: [(bed: Double, wake: Double)]) -> SleepTiming? {
+    /// Nights moved onto one side of the clock. A day sleeper's bed times fall either side of
+    /// noon, where the clock wraps (11:30 is 1410, 12:30 is 30); each night is shifted by a day
+    /// to the side nearest the median bed time, so those two are an hour apart again.
+    static func aligned(_ nights: [(bed: Double, wake: Double)]) -> [(bed: Double, wake: Double)] {
+        guard let middle = Stats.median(nights.map(\.bed)) else { return nights }
+        return nights.map { night in
+            let shift: Double = night.bed - middle > 720 ? -1440 : (night.bed - middle < -720 ? 1440 : 0)
+            return (night.bed + shift, night.wake + shift)
+        }
+    }
+
+    static func timing(_ unaligned: [(bed: Double, wake: Double)]) -> SleepTiming? {
+        let nights = aligned(unaligned)
         guard nights.count >= minDays, let bed = Stats.mean(nights.map(\.bed)), let wake = Stats.mean(nights.map(\.wake)),
               let bedSpread = Stats.mean(nights.map { abs($0.bed - bed) }),
               let wakeSpread = Stats.mean(nights.map { abs($0.wake - wake) }) else { return nil }
@@ -156,7 +178,11 @@ enum Analysis {
     }
 
     /// The `length` days ending on `ending` against the `length` days before them.
-    static func review(_ days: [AnalysisDay], ending: DayKey, length: Int, sleepNeedMinutes: Double) -> PeriodReview {
+    /// `endingIsUnfinished`: `ending` is today. Strain and steps add up over a day, so a day
+    /// that is still running is left out of their means (at 08:00 it would make every week
+    /// look easier than the last).
+    static func review(_ days: [AnalysisDay], ending: DayKey, length: Int, sleepNeedMinutes: Double,
+                       endingIsUnfinished: Bool = false) -> PeriodReview {
         var byDay: [Int: AnalysisDay] = [:]
         for d in days { byDay[d.day.index] = d }
         let current = (0 ..< length).compactMap { byDay[ending.index - $0] }
@@ -177,8 +203,9 @@ enum Analysis {
             return (Stats.mean(values), values.count)
         }
 
+        let finished = endingIsUnfinished ? current.filter { $0.day != ending } : current
         let changes = ReviewMetric.allCases.map { metric -> PeriodChange in
-            let now = mean(metric, current), before = mean(metric, previous)
+            let now = mean(metric, metric == .strain || metric == .steps ? finished : current), before = mean(metric, previous)
             return PeriodChange(metric: metric, current: now.mean, previous: before.mean, days: now.days, previousDays: before.days)
         }
         func change(_ metric: ReviewMetric) -> PeriodChange { changes.first { $0.metric == metric }! }
@@ -220,11 +247,10 @@ enum Analysis {
         return PeriodReview(length: length, changes: changes, findings: ordered, timing: timing)
     }
 
-    /// Minutes slept under the need over the `length` days ending on `ending`, counting naps;
-    /// negative when the nights ran over. Nil when none of the days has a night.
-    static func sleepDebt(_ days: [AnalysisDay], ending: DayKey, length: Int = 7, sleepNeedMinutes: Double) -> (minutes: Double, nights: Int)? {
-        let slept = days.filter { (0 ..< length).contains(ending.index - $0.day.index) }
-            .compactMap { d in d.sleepMinutes.map { $0 + d.napMinutes } }
+    /// Minutes slept under the need over some days (`slept`: each day's sleep with its naps);
+    /// negative when they ran over. Nil when there is no day. Today's "sleep debt" insight and
+    /// the Sleep screen's balance both read this, over the last `Insights.debtNights` days.
+    static func sleepDebt(slept: [Double], sleepNeedMinutes: Double) -> (minutes: Double, nights: Int)? {
         guard !slept.isEmpty else { return nil }
         return (slept.reduce(0) { $0 + (sleepNeedMinutes - $1) }, slept.count)
     }
@@ -264,12 +290,14 @@ enum Analysis {
     }
 
     /// `previous`: the values of the days before, most recent first (Baseline takes the first 14).
-    static func range(_ value: Double?, previous: [Double], floor: Baseline.Floor) -> VitalRange {
+    /// `bounds`: what the metric itself allows (0...100 for a percentage), so that the range
+    /// shown never reads "95-101%".
+    static func range(_ value: Double?, previous: [Double], floor: Baseline.Floor, bounds: ClosedRange<Double>? = nil) -> VitalRange {
         guard let baseline = Baseline.compute(previous, floor: floor) else {
             return VitalRange(status: .calibrating, median: nil, low: nil, high: nil, days: 0)
         }
-        let low = baseline.median - rangeSigmas * baseline.sigma
-        let high = baseline.median + rangeSigmas * baseline.sigma
+        let low = max(baseline.median - rangeSigmas * baseline.sigma, bounds?.lowerBound ?? -.infinity)
+        let high = min(baseline.median + rangeSigmas * baseline.sigma, bounds?.upperBound ?? .infinity)
         guard baseline.status != .calibrating, let value else {
             return VitalRange(status: .calibrating, median: baseline.median, low: low, high: high, days: baseline.count)
         }

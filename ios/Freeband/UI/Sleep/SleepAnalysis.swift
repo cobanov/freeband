@@ -174,6 +174,9 @@ extension NightNote {
         case .restless:
             return String(localized: "\(FBFormat.duration(minutes: value)) awake in bed; \(FBFormat.percent(reference ?? 0)) of the time in bed was sleep.")
         case .heartRateStayedUp:
+            if value <= 0 {
+                return String(localized: "It did not fall from the evening before bed; a fall of 10% or more is usual.")
+            }
             return String(localized: "It fell \(FBFormat.percent(value)) from the evening before bed; a fall of 10% or more is usual.")
         }
     }

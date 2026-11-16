@@ -105,9 +105,9 @@ enum Insights {
         }
 
         let nights = (0 ..< debtNights).compactMap { byDay[day.index - $0]?.sleepMinutes }
-        let debt = nights.reduce(0) { $0 + (sleepNeedMinutes - $1) }
-        if today.sleepMinutes != nil, nights.count >= debtMinNights, debt >= debtNotice {
-            out.append(Insight(kind: .sleepDebt, tone: debt >= debtWarning ? .warning : .notice, value: debt, days: nights.count))
+        if today.sleepMinutes != nil, let debt = Analysis.sleepDebt(slept: nights, sleepNeedMinutes: sleepNeedMinutes),
+           debt.nights >= debtMinNights, debt.minutes >= debtNotice {
+            out.append(Insight(kind: .sleepDebt, tone: debt.minutes >= debtWarning ? .warning : .notice, value: debt.minutes, days: debt.nights))
         }
 
         let mids = (1 ... debtNights).compactMap { byDay[day.index - $0]?.midSleepMinute }

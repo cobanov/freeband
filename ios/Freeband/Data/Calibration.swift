@@ -147,7 +147,7 @@ enum Calibration {
             status = .fail
         }
         return .init(name: "records_vs_elapsed", status: status, subject: fileID.hex,
-                     detail: "\(records) records, \(expected) minutes from file start to \(until == dayEnd ? "day end" : "fetch"), diff \(diff)")
+                     detail: "\(records) records, \(expected) minutes from file start to \(until == dayEnd ? "day end" : (until == nextStart ? "the next file" : "fetch")), diff \(diff)")
     }
 
     /// Bed and wake times that make sense for a sleep fetched at `fetchedAt`.
@@ -191,6 +191,8 @@ enum Calibration {
     // MARK: report
 
     struct MinuteFile: Sendable {
+        /// A file's successor is looked for among its own band's files.
+        var bandID: UUID?
         var fileID: ActivityFileID
         var records: Int
         var fetchedAt: Date
@@ -214,8 +216,8 @@ enum Calibration {
             checks.append(heartRateCoverageCheck(minutes))
         }
         let ordered = minuteFiles.sorted(by: { $0.fileID.ts < $1.fileID.ts })
-        for (i, f) in ordered.enumerated() {
-            let next = i + 1 < ordered.count ? ordered[i + 1].fileID.ts : nil
+        for f in ordered {
+            let next = ordered.first { $0.bandID == f.bandID && $0.fileID.ts > f.fileID.ts }?.fileID.ts
             checks.append(recordCountCheck(fileID: f.fileID, records: f.records, fetchedAt: f.fetchedAt, nextStart: next))
         }
         for s in sleeps.sorted(by: { $0.bedTime < $1.bedTime }) {
