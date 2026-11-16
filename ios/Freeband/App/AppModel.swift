@@ -15,6 +15,8 @@ final class AppModel: ObservableObject {
     let link: BandLink
     let context: ModelContext
     let ingest: ActivityIngest
+    let healthExport: HealthExportService
+    @Published var dataDeletionError: String?
 
     /// Local midnight of the current day; changes at midnight and on clock/time-zone changes.
     @Published private(set) var today = Calendar.current.startOfDay(for: Date())
@@ -32,6 +34,7 @@ final class AppModel: ObservableObject {
     /// Earliest day per band whose scores must be recomputed once no session is running.
     var pendingRollup: [UUID: DayKey] = [:]
     private var ingestTask: Task<Void, Never>?
+    var syncProcessingTask: Task<Void, Never>?
     private var ingestAgain = false
     private var dayObservers: [NSObjectProtocol] = []
 
@@ -48,6 +51,8 @@ final class AppModel: ObservableObject {
     // Background sync state (methods in AppModel+Background.swift).
     var lastBackgroundSync = Date.distantPast
     var syncBackgroundTask = UIBackgroundTaskIdentifier.invalid
+    var backgroundSessionActive = false
+    var backgroundOwnsLink = false
     var watchers: Set<AnyCancellable> = []
     /// Show sleep on the band (docs/SLEEP-WRITEBACK.md): once per night, after the sync that
     /// brought it, the night's summary goes to the band (Command{8,41}), which is what fills the
@@ -63,6 +68,7 @@ final class AppModel: ObservableObject {
         link = BandLink(restoresState: !isDemo)
         findPhoneAlert = isDemo ? nil : FindPhoneAlert()
         ingest = ActivityIngest(context: context)
+        healthExport = HealthExportService(context: context, demo: isDemo)
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
@@ -356,11 +362,12 @@ final class AppModel: ObservableObject {
             try? context.save()
         }
         let device = Payload.Device(band)
-        Task {
+        syncProcessingTask = Task {
             await waitForIngest()
             let parsed = sessionIngest
             sessionIngest = IngestSummary()
             runPendingRollups()
+            healthExport.schedule()
             notifyMorningSummary(id)
             writeBackSleep(id)
             if !parsed.isEmpty {
@@ -392,6 +399,7 @@ final class AppModel: ObservableObject {
     /// One band per MAC: folds bands added twice (Mi Fitness keeps several entries per band)
     /// into the oldest one, moving their samples, files, derived data and keys.
     func mergeDuplicateBands() {
+        healthExport.invalidate()
         let bands = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).sorted { $0.addedAt < $1.addedAt }
         var keeper: [String: Band] = [:]
         var changed = false
@@ -400,6 +408,11 @@ final class AppModel: ObservableObject {
             guard let first = keeper[suffix] else {
                 keeper[suffix] = band
                 continue
+            }
+            if first.healthExportNamespace != nil || band.healthExportNamespace != nil {
+                guard let a = first.mac, let b = band.mac, a.caseInsensitiveCompare(b) == .orderedSame else { continue }
+                if let a = first.healthExportNamespace, let b = band.healthExportNamespace, a != b { continue }
+                if first.healthExportNamespace == nil { first.healthExportNamespace = band.healthExportNamespace }
             }
             let from = band.id
             reassign(from: from, to: first.id)
@@ -464,6 +477,7 @@ final class AppModel: ObservableObject {
     /// Stores (or replaces: a file can grow between fetches) a raw file, then parses it. The
     /// fetch time is what ActivitySyncPlan later judges the copy by.
     private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data) {
+        healthExport.invalidate()
         if let existing = blob(bandID, file.hex) {
             existing.data = data
             existing.fetchedAt = Date()
@@ -493,6 +507,7 @@ final class AppModel: ObservableObject {
             } while self.ingestAgain
             self.ingestTask = nil
             self.runPendingRollups()
+            self.healthExport.schedule()
         }
     }
 
@@ -548,6 +563,7 @@ final class AppModel: ObservableObject {
 
     /// Diagnostics: drops every derived row and score, parses every stored file again, rescores.
     func reparseAll() async {
+        healthExport.invalidate()
         guard !ingestBusy else { return }
         ingestBusy = true
         defer { ingestBusy = false }
@@ -559,6 +575,7 @@ final class AppModel: ObservableObject {
         ingestTask = nil
         rescoreAll()
         setCalibration(makeReport(summary, bandID: nil, outcome: "reparse all"))
+        healthExport.schedule()
         if ingestAgain {
             ingestAgain = false
             scheduleIngest()

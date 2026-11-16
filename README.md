@@ -67,6 +67,24 @@ The full write-up, with source references:
 
 The docs are in Turkish, except `docs/BLE-V1.md` and `docs/STAY-CONNECTED.md`.
 
+## Apple Health
+
+Apple Health export is optional under Band → Freeband settings → Integrations → Apple Health.
+When enabled, Freeband writes eligible steps, heart rate and sleep stages from the phone's stored
+band history after syncing, including during permitted background runs. It requests no Health read access. Incomplete files and days
+with ambiguous timestamps are withheld. Corrections can update or remove Freeband's own Health
+entries. Use one exporting iPhone per band; reinstalling or switching phones can create duplicates.
+Turning export off, removing a band, or deleting local data does not delete
+Health entries. Health-side deletions cannot be detected. Deleting local data also prevents older
+history from being automatically exported again on that phone.
+
+The export also supports the band's daily resting-heart-rate estimate and individually timed
+blood-oxygen readings. A daily step summary is exported as one cumulative interval when detailed
+steps are incomplete; it is replaced by minute records only when a complete day is available.
+Daily oxygen averages lack an exact measurement time and are not exported. RMSSD is not written
+as SDNN, and Freeband's recovery, sleep and strain scores are not mapped to unrelated Health types.
+
+
 ## Repository
 
 | Path | What |
@@ -91,6 +109,15 @@ cd ios/tests/analytics && swiftc ../../Freeband/Analytics/*.swift main.swift -o 
 cd hub && npm install && npx tsc --noEmit && npx vitest run
 ```
 
+For the Apple Health mapping and migration tests, run these from the repository root on macOS
+with Xcode:
+
+```sh
+(cd ios/tests/health-export && swiftc ../../Freeband/Analytics/*.swift ../../Freeband/Integrations/HealthExportPlan.swift ../../Freeband/Integrations/HealthExportMapping.swift main.swift -o /tmp/health-export && /tmp/health-export)
+sh ios/tests/health-export/migration/test.sh
+(cd ios/tests/ingest/store && F=../../../Freeband && swiftc -D DEBUG stub.swift $F/Band/ActivityFiles.swift $F/Analytics/*.swift $F/Data/*.swift $F/App/DemoData.swift $F/Integrations/HealthExportPlan.swift main.swift -o /tmp/store && /tmp/store)
+```
+
 ## Try it yourself
 
 Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10, 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1 Active (a Mi Band 8 should work too, untested), and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
@@ -104,6 +131,9 @@ Freeband isn't on the App Store yet, so for now you build it from source. You ne
    brew install xcodegen
    ```
 4. **Sign it as yourself.** In `ios/project.yml`, set `DEVELOPMENT_TEAM` to your team ID and `PRODUCT_BUNDLE_IDENTIFIER` to an identifier of your own. With a free Apple ID the app runs for 7 days, then you build it again.
+
+   **Apple Health note:** This version needs a development provisioning profile that supports the
+   HealthKit entitlement. Check its availability for your Apple Developer team in Xcode.
 5. **Generate the project and install it:**
    ```sh
    xcodegen generate

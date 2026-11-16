@@ -35,6 +35,10 @@
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Freeband uses Bluetooth to talk directly to the band on your wrist.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Freeband uses HealthKit to export your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. Freeband does not read health data.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Freeband writes your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health when you choose to export them.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>If you turn on Share location with the band, Freeband sends this phone's location to your band when the band asks for it. It goes nowhere else.</string>
 	<key>UIAppFonts</key>

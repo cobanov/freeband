@@ -31,9 +31,20 @@ extension AppModel {
             MainActor.assumeIsolated {
                 guard let model = AppModel.shared else { return task.setTaskCompleted(success: false) }
                 model.scheduleBackgroundRefresh()
-                task.expirationHandler = { Task { @MainActor in AppModel.shared?.stop() } }
+                var finished = false
+                task.expirationHandler = { Task { @MainActor in
+                    guard !finished else { return }
+                    finished = true
+                    if model.backgroundSessionActive {
+                        model.healthExport.pause()
+                        if model.backgroundOwnsLink { model.stop() }
+                    }
+                    task.setTaskCompleted(success: false)
+                } }
                 Task {
                     await model.backgroundSync("background refresh")
+                    guard !finished else { return }
+                    finished = true
                     task.setTaskCompleted(success: true)
                 }
             }
@@ -61,10 +72,15 @@ extension AppModel {
 
     /// Syncs the selected band if its last complete sync is old. Returns when the session ended.
     func backgroundSync(_ reason: String, now: Date = Date()) async {
-        guard !isDemo, UserDefaults.standard.bool(forKey: "onboarded"), let band = selectedBand(), !link.phase.isBusy else { return }
+        guard !isDemo, !backgroundSessionActive, UserDefaults.standard.bool(forKey: "onboarded"),
+              let band = selectedBand(), !link.phase.isBusy else { return }
+        healthExport.resume()
         guard Self.backgroundSyncDue(lastSync: band.lastSyncAt, lastAttempt: lastBackgroundSync, now: now) else { return }
         lastBackgroundSync = now
         link.note("background sync: \(reason)")
+        backgroundSessionActive = true
+        backgroundOwnsLink = true
+        defer { backgroundSessionActive = false; backgroundOwnsLink = false }
         start(band, .sync)
         await finishInBackground()
     }
@@ -120,12 +136,18 @@ extension AppModel {
     /// stops: the files that arrived are kept and the rest come with the next sync.
     func finishInBackground() async {
         endSyncBackgroundTask()
+        var awaitingSession = true
         syncBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Sync") { [weak self] in
-            self?.stop()
+            self?.healthExport.pause()
+            if awaitingSession { self?.stop() }
             self?.endSyncBackgroundTask()
         }
         try? await Task.sleep(for: .milliseconds(300))
         while link.phase.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
+        awaitingSession = false
+        backgroundOwnsLink = false
+        if let processing = syncProcessingTask { await processing.value }
+        await healthExport.waitUntilIdle()
         // A held session opens again 2 s after another session ends, on a timer.
         try? await Task.sleep(for: .seconds(3))
         endSyncBackgroundTask()

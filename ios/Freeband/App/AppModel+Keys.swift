@@ -40,7 +40,9 @@ extension AppModel {
     }
 
     /// Removes the band with everything stored for it: samples, raw files, derived rows, scores.
-    func remove(_ band: Band) {
+    @discardableResult func remove(_ band: Band) -> Bool {
+        do { try healthExport.suppressHistory(); dataDeletionError = nil }
+        catch { dataDeletionError = String(localized: "Could not safely delete local data. Try again."); return false }
         let id = band.id
         Vault.removeBandKey(id)
         try? context.delete(model: Sample.self, where: #Predicate { $0.bandID == id })
@@ -51,10 +53,13 @@ extension AppModel {
         context.delete(band)
         try? context.save()
         updateHold()
+        return true
     }
 
     /// Deletes every observation, raw file, derived row and score; bands, keys and webhooks stay.
     func deleteAllData() {
+        do { try healthExport.suppressHistory(); dataDeletionError = nil }
+        catch { dataDeletionError = String(localized: "Could not safely delete local data. Try again."); return }
         try? context.delete(model: Sample.self)
         try? context.delete(model: ActivityBlob.self)
         ActivityIngest.deleteDerived(context: context, bandID: nil, includingScores: true)

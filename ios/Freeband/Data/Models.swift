@@ -14,6 +14,9 @@ final class Band {
     var lastBattery: Int?
     var firmware: String?
     var hardwareModel: String?
+    /// A pseudonymous Apple Health export namespace. It is local to this install and intentionally
+    /// separate from the public band id and Bluetooth address.
+    var healthExportNamespace: UUID?
 
     init(name: String, mac: String?) {
         id = UUID()
