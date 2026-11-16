@@ -75,7 +75,7 @@ final class AppModel: ObservableObject {
             band.hardwareModel = info.model.isEmpty ? band.hardwareModel : info.model
             try? self.context.save()
         }
-        link.onActivityFile = { [weak self] id, file, data, today in self?.storeActivityFile(id, file, data, today: today) }
+        link.onActivityFile = { [weak self] id, file, data in self?.storeActivityFile(id, file, data) }
         link.onFindPhone = { [weak self] id, ring in self?.findPhone(id, ring) }
         link.phoneLocation = { [weak self] in
             // A fix older than six hours says little about where the phone is now.
@@ -461,24 +461,17 @@ final class AppModel: ObservableObject {
         try? context.fetch(FetchDescriptor<ActivityBlob>(predicate: #Predicate { $0.bandID == bandID && $0.fileID == hex })).first
     }
 
-    /// Asked for files in the band's past list only: a stored file is not fetched again unless
-    /// it was last fetched from the "today" list. Such a file kept growing after that fetch (the
-    /// rest of its day), so it is fetched once more now that its day is over; the copy fetched
-    /// from the past list is final.
-
-    /// Stores (or replaces: today's files grow during the day) a raw file, then parses it.
-    private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data, today: Bool) {
+    /// Stores (or replaces: a file can grow between fetches) a raw file, then parses it. The
+    /// fetch time is what ActivitySyncPlan later judges the copy by.
+    private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data) {
         if let existing = blob(bandID, file.hex) {
             existing.data = data
             existing.fetchedAt = Date()
             existing.parsedAt = nil
             existing.parserVersion = 0
             existing.parseStatus = ParseStatus.pending.rawValue
-            existing.fetchedFromToday = today
         } else {
-            let blob = ActivityBlob(bandID: bandID, id: file, data: data)
-            blob.fetchedFromToday = today
-            context.insert(blob)
+            context.insert(ActivityBlob(bandID: bandID, id: file, data: data))
         }
         try? context.save()
         scheduleIngest()

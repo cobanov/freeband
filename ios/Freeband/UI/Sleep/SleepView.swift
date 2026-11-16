@@ -108,14 +108,14 @@ struct SleepNightScreen: View {
         }
         .buttonStyle(.plain)
         let need = Double(Profile.load().sleepNeed)
-        let napMinutes = result?.naps.reduce(0) { $0 + $1.minutes } ?? 0
+        let napMinutes = history.napMinutes(day)
         if let metrics {
             NightReviewCard(notes: Analysis.nightNotes(metrics, napMinutes: napMinutes, sleepNeedMinutes: need), napped: napMinutes > 0)
         }
         VStack(alignment: .leading, spacing: FBSpace.xs) {
             SectionHeader(title: String(localized: "Sleep need"))
             SleepNeedCard(slept: asleep, naps: napMinutes, need: need,
-                          debt: Analysis.sleepDebt(history.analysisRows(ending: day, count: 7).map(\.day), ending: day, sleepNeedMinutes: need))
+                          debt: Analysis.sleepDebt(slept: lastNights(day), sleepNeedMinutes: need))
         }
         .id("need")
         let segments = night.hypnogramSegments
@@ -174,6 +174,14 @@ struct SleepNightScreen: View {
         }
 
         Footnote(sourceNote(night: night, result: result))
+    }
+
+    /// Each of the last days' sleep with its naps, as the sleep debt insight counts them.
+    private func lastNights(_ day: DayKey) -> [Double] {
+        (0 ..< Insights.debtNights).compactMap { back in
+            let d = day.adding(days: -back)
+            return history.sleepMinutes(d).map { $0 + history.napMinutes(d) }
+        }
     }
 
     @ViewBuilder private func details(day: DayKey, night: SleepRecord, result: DayScoreResult?) -> some View {

@@ -273,10 +273,10 @@ struct ActivityFileID: Hashable, Comparable, Sendable, CustomStringConvertible {
     }
 
     /// The daily details files of a list that a later daily details file of the same list
-    /// follows. A Band 10 Pro closes the minute file each time it is fetched and opens a new one
-    /// (docs/ACTIVITY.md section 2.6), so a file with a successor is finished: it will not change
-    /// again. On a band that keeps one growing file a day, that file has no successor and is
-    /// never in the result.
+    /// follows. Such a file is finished: it will not change again. A Band 10 Pro closes the
+    /// minute file each time it is fetched and opens a new one (docs/ACTIVITY.md section 2.6); a
+    /// band that keeps one growing file a day finishes it when the next day's begins. Whether a
+    /// stored copy holds all of a finished file is another question (`ActivitySyncPlan`).
     static func finishedDetails(in list: [ActivityFileID]) -> Set<ActivityFileID> {
         let details = list.filter { $0.kind == .dailyDetails }
         guard let newest = details.map(\.ts).max() else { return [] }
@@ -1669,13 +1669,17 @@ struct ActivitySyncPlan: Equatable, Sendable {
 
     /// A night that began yesterday evening can still grow until the morning; nothing older can.
     static let settledAfter: TimeInterval = 36 * 3600
+    /// A band that closes the minute file at a fetch starts the next one within the minute, so
+    /// the fetch that closed a file is this close to its successor's start.
+    static let closeSlack: TimeInterval = 60
 
     /// A file is settled when it can no longer change on the band: a minute file that a later
     /// one follows (`finishedDetails`, over both lists), or any file whose time is more than 36
     /// hours before `now`. A stored copy is final when it was fetched from a file that could no
-    /// longer change: a finished minute file (the band closes it at the fetch), or a copy fetched
-    /// after the file's 36 hours. A summary fetched in the evening is a copy of an unfinished
-    /// day, however old the file is now.
+    /// longer change: a finished minute file fetched once its successor had begun (give or take
+    /// `closeSlack`), or a copy fetched after the file's 36 hours. A summary fetched in the
+    /// evening is a copy of an unfinished day, however old the file is now; so is a copy of a
+    /// day-long minute file taken at 18:00, though the next day's file now follows it.
     ///
     /// Which of the band's two lists a file is on decides nothing: a Band 10 Pro was seen to
     /// hand over the current day's summary and that afternoon's nap on its "past" list.
@@ -1690,9 +1694,11 @@ struct ActivitySyncPlan: Equatable, Sendable {
                      storedAt: (ActivityFileID) -> Date?, mayAcknowledge: (ActivityFileID) -> Bool) -> ActivitySyncPlan {
         let all = Set(today).union(past)
         let finished = ActivityFileID.finishedDetails(in: Array(all))
+        let detailStarts = all.filter { $0.kind == .dailyDetails }.map(\.ts).sorted()
         let done = all.filter { file in
             guard let fetched = storedAt(file) else { return false }
-            if finished.contains(file) { return true }
+            if finished.contains(file), let next = detailStarts.first(where: { $0 > file.ts }),
+               fetched >= next.addingTimeInterval(-closeSlack) { return true }
             return now.timeIntervalSince(file.ts) > settledAfter && fetched.timeIntervalSince(file.ts) > settledAfter
         }
         return ActivitySyncPlan(fetch: all.subtracting(done).sorted(), acknowledge: done.filter(mayAcknowledge).sorted())

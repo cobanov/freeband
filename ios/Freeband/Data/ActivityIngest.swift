@@ -95,8 +95,8 @@ final class ActivityIngest {
 
     /// Moves each stored file that carries another id to that id (`refilePlan`), or drops it when
     /// that id holds its own bytes. Whatever sat under the old id is no longer stored, so the next
-    /// sync fetches it from the band's past list. A moved file counts as fetched from today, so it
-    /// is fetched once more too, now under the id it carries. Returns how many files changed.
+    /// sync fetches it if the band still has it. A moved file keeps its fetch time, and
+    /// ActivitySyncPlan judges that copy as it does any other. Returns how many files changed.
     @discardableResult
     func refileMisfiled() -> Int {
         let blobs = (try? context.fetch(FetchDescriptor<ActivityBlob>())) ?? []
@@ -116,7 +116,6 @@ final class ActivityIngest {
                     blob.subtype = Int(id.subtype)
                     blob.detailType = Int(id.detailType)
                     blob.version = Int(id.version)
-                    blob.fetchedFromToday = true
                     blob.parserVersion = 0
                     blob.parsedAt = nil
                     blob.parseStatus = ParseStatus.pending.rawValue
@@ -206,7 +205,7 @@ final class ActivityIngest {
             summary.touchedDays[job.bandID, default: []].formUnion(out.touchedDays)
             summary.files.append(Calibration.fileEntry(p.result, output: out, size: job.data.count, fetchedAt: job.fetchedAt))
             if let id = p.result.fileID, let records = out.minuteRecords {
-                summary.minuteFiles.append(Calibration.MinuteFile(fileID: id, records: records, fetchedAt: job.fetchedAt))
+                summary.minuteFiles.append(Calibration.MinuteFile(bandID: job.bandID, fileID: id, records: records, fetchedAt: job.fetchedAt))
             }
             if let s = out.summary { summary.summaries.append(s) }
             summary.sleeps += out.sleeps

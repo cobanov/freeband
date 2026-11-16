@@ -674,7 +674,7 @@ check("two nights say nothing", Analysis.timing([(690, 1140), (720, 1170)]) == n
 func aDay(_ back: Int, sleep: Double? = nil, nap: Double = 0, bed: Double? = nil, wake: Double? = nil,
           recovery: Double? = nil, strain: Double? = nil, rhr: Double? = nil, hrv: Double? = nil) -> AnalysisDay {
     AnalysisDay(day: day0.adding(days: -back), sleepMinutes: sleep, napMinutes: nap, bedMinute: bed, wakeMinute: wake,
-                sleepScore: nil, recovery: recovery, strain: strain, restingHR: rhr, hrv: hrv, steps: nil)
+                recovery: recovery, strain: strain, restingHR: rhr, hrv: hrv, steps: nil)
 }
 let reviewDays = [
     // Now: sleep with naps 400, 420, 380, 440 -> 410; RHR 58, 60, 62 -> 60; HRV 40, 44, 42 -> 42;
@@ -714,10 +714,43 @@ equal("a deficit of 90 is a warning", Analysis.review(reviewDays, ending: day0, 
 check("nothing to say about an empty period", Analysis.review([], ending: day0, length: 7, sleepNeedMinutes: 480).findings.isEmpty)
 
 // Four nights in the week: 480 - 400, - 420, - 380, - 440 = 80 + 60 + 100 + 40.
-let debt = Analysis.sleepDebt(reviewDays, ending: day0, sleepNeedMinutes: 480)
+let debt = Analysis.sleepDebt(slept: [400, 420, 380, 440], sleepNeedMinutes: 480)
 near("debt over the week", debt?.minutes, 280)
 equal("debt nights", debt?.nights, 4)
-check("no nights, no debt", Analysis.sleepDebt([aDay(0, recovery: 50)], ending: day0, sleepNeedMinutes: 480) == nil)
+check("no nights, no debt", Analysis.sleepDebt(slept: [], sleepNeedMinutes: 480) == nil)
+near("nights over the need are a negative debt", Analysis.sleepDebt(slept: [500, 520], sleepNeedMinutes: 480)?.minutes, -60)
+
+// The band's running figure early in a day (75 at 02:00) is not a resting heart rate; the night's always is.
+check("a running daytime value waits for the day to end",
+      Analysis.settledRestingHR(scored: 75, fromSleep: false, bandValue: 75, dayIsOver: false) == nil)
+near("the same value once the day is over", Analysis.settledRestingHR(scored: 75, fromSleep: false, bandValue: 75, dayIsOver: true), 75)
+near("the night's value counts at once", Analysis.settledRestingHR(scored: 64, fromSleep: true, bandValue: 75, dayIsOver: false), 64)
+near("an unscored finished day uses the band's", Analysis.settledRestingHR(scored: nil, fromSleep: false, bandValue: 66, dayIsOver: true), 66)
+check("an unscored running day has none", Analysis.settledRestingHR(scored: nil, fromSleep: false, bandValue: 66, dayIsOver: false) == nil)
+
+// Today at 08:00 has strain 1 and 400 steps after six days of 13 and 9,000. Left in, the week's strain
+// is (6 x 13 + 1) / 7 = 11.29; as an unfinished day it is left out of strain and steps, not of recovery.
+var busyWeek = (1 ... 6).map { back -> AnalysisDay in
+    var d = aDay(back, recovery: 60, strain: 13)
+    d.steps = 9000
+    return d
+}
+var early = aDay(0, recovery: 67, strain: 1)
+early.steps = 400
+busyWeek.append(early)
+let asIfOver = Analysis.review(busyWeek, ending: day0, length: 7, sleepNeedMinutes: 480)
+near("a running day counted as a whole one", asIfOver.change(.strain)?.current, 79.0 / 7)
+let running = Analysis.review(busyWeek, ending: day0, length: 7, sleepNeedMinutes: 480, endingIsUnfinished: true)
+near("strain without the running day", running.change(.strain)?.current, 13)
+near("steps without the running day", running.change(.steps)?.current, 9000)
+equal("six finished days", running.change(.strain)?.days, 6)
+near("recovery is the morning's and stays in", running.change(.recovery)?.current, 61)
+
+// A day sleeper: beds at 11:30, 12:30 and 11:20, which are 1410, 30 and 1400 on the noon clock. Around
+// the median (1400) the 30 becomes 1470: mean 1426.67, distances 16.67, 43.33, 26.67 -> spread 28.89.
+let daySleeper = Analysis.timing([(1410, 1890), (30, 510), (1400, 1880)])
+near("beds either side of noon average near noon", daySleeper?.meanBed, 4280.0 / 3)
+near("and are close together", daySleeper?.bedSpread, 260.0 / 9)
 
 // One night on its own. 470 of 480 is within 15: met. Deep 90 + REM 110 = 200 of 470 = 42.6%: a good share.
 var goodNight = m1
@@ -761,6 +794,10 @@ equal("below", Analysis.range(56, previous: normal, floor: .zero).status, .below
 equal("two days are calibrating", Analysis.range(64, previous: [60, 62], floor: .zero).status, .calibrating)
 equal("no value", Analysis.range(nil, previous: normal, floor: .zero).status, .calibrating)
 check("no history", Analysis.range(60, previous: [], floor: .zero).median == nil)
+// Blood oxygen 97, 98, 99, 98, 96, 98, 99: median 98, MAD 1, so 98 +- 2.9652 = 95.03...100.97; no one has 101%.
+let oxygen = Analysis.range(98, previous: [97, 98, 99, 98, 96, 98, 99], floor: .zero, bounds: 0 ... 100)
+near("the range stops at what the metric allows", oxygen.high, 100)
+near("and is untouched below", oxygen.low, 98 - 2 * 1.4826)
 
 // MARK: - Done
 
