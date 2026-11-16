@@ -137,9 +137,6 @@ final class ActivityBlob {
     var parserVersion: Int = 0
     /// ParseStatus raw value: pending, parsed, partial, unsupported, error, crc.
     var parseStatus: String = "pending"
-    /// Last fetched from the band's "today" list, so it may still have grown since; such a file
-    /// is fetched once more when it shows up in the past list (AppModel.hasActivityFile).
-    var fetchedFromToday: Bool = false
 
     init(bandID: UUID, id: ActivityFileID, data: Data) {
         self.bandID = bandID
@@ -153,7 +150,6 @@ final class ActivityBlob {
         fetchedAt = Date()
         parserVersion = 0
         parseStatus = ParseStatus.pending.rawValue
-        fetchedFromToday = false
     }
 
     /// "Daily details v4" style label for diagnostics.

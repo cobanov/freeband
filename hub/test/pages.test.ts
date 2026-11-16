@@ -1,5 +1,15 @@
+import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { DEV_B, bearer, call, createAccount, ingest, live, login, syncBody } from "./helpers";
+import worker from "../src/index";
+
+/** Runs one request through the Worker. */
+async function call(path: string, init: RequestInit = {}): Promise<Response> {
+  const ctx = createExecutionContext();
+  const res = await worker.fetch(new Request("https://freeband.cobanov.dev" + path, init), env, ctx);
+  await waitOnExecutionContext(ctx);
+  return res;
+}
 
 function cspNonce(csp: string): string {
   const m = /script-src 'nonce-([A-Za-z0-9_-]+)'/.exec(csp);
@@ -8,17 +18,16 @@ function cspNonce(csp: string): string {
 }
 
 describe("analytics", () => {
-  it("runs on public pages and never on the sign-in forms", async () => {
+  it("runs on public pages and not on error pages", async () => {
     expect(await (await call("/")).text()).toContain("oa-c.cobanov.run/oa.js");
     expect(await (await call("/tr/privacy")).text()).toContain("oa-c.cobanov.run/oa.js");
-    expect(await (await call("/login")).text()).not.toContain("oa-c.cobanov.run");
-    expect(await (await call("/tr/join")).text()).not.toContain("oa-c.cobanov.run");
+    expect(await (await call("/does-not-exist")).text()).not.toContain("oa-c.cobanov.run");
   });
 });
 
 describe("security headers", () => {
   it("sends a nonce-based CSP and hardening headers on HTML", async () => {
-    for (const path of ["/", "/story", "/guide", "/tr", "/tr/story", "/tr/guide", "/tr/privacy", "/login", "/tr/login", "/join", "/tr/join", "/docs", "/tr/docs", "/privacy", "/does-not-exist", "/tr/does-not-exist"]) {
+    for (const path of ["/", "/story", "/guide", "/tr", "/tr/story", "/tr/guide", "/tr/privacy", "/privacy", "/does-not-exist", "/tr/does-not-exist"]) {
       const res = await call(path);
       expect(res.headers.get("content-type"), path).toContain("text/html");
       const csp = res.headers.get("content-security-policy") ?? "";
@@ -54,18 +63,6 @@ describe("security headers", () => {
     const b = cspNonce((await call("/")).headers.get("content-security-policy") ?? "");
     expect(a).not.toBe(b);
   });
-
-  it("locks down JSON responses too", async () => {
-    const { token } = await createAccount();
-    const res = await call("/v1/me", { headers: bearer(token) });
-    expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
-    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(res.headers.get("access-control-allow-origin")).toBeNull();
-    const nf = await call("/v1/nope");
-    expect(nf.status).toBe(404);
-    expect(((await nf.json()) as { error: string }).error).toBe("not_found");
-  });
 });
 
 describe("pages", () => {
@@ -80,7 +77,7 @@ describe("pages", () => {
     expect(home).toContain("Screens show demo data.");
     expect(home).toMatch(/<a class="btn" href="\/story">How we did it<\/a>/);
     expect(home).toMatch(/<a class="btn ghost" href="https:\/\/github.com\/cobanov\/freeband">GitHub<\/a>/);
-    for (const s of ["No Mi Fitness, no account", "Sleep", "Recovery", "Strain", "Optional web access", "TestFlight", "App Store"]) {
+    for (const s of ["No Mi Fitness, no account", "Sleep", "Recovery", "Strain", "TestFlight", "App Store"]) {
       expect(home).toContain(s);
     }
     // The public beta link, no old dial, no pixel wordmark.
@@ -109,7 +106,7 @@ describe("pages", () => {
     const tr = await (await call("/tr")).text();
     expect(tr).toContain('<html lang="tr">');
     for (const img of ["today", "score-recovery", "sleep", "band"]) expect(tr).toContain(`src="/img/${img}-tr.webp"`);
-    for (const s of ["Ekranlar demo veriyle", "Mi Fitness&#39;sız, hesapsız", "Toparlanma", "İsteğe bağlı web erişimi", "Xiaomi ile bağlantısı yoktur"]) {
+    for (const s of ["Ekranlar demo veriyle", "Mi Fitness&#39;sız, hesapsız", "Toparlanma", "Xiaomi ile bağlantısı yoktur"]) {
       expect(tr).toContain(s);
     }
     expect(tr).toMatch(/<a class="btn" href="\/tr\/story">Nasıl yaptık<\/a>/);
@@ -119,21 +116,11 @@ describe("pages", () => {
     expect(tr).toContain('<a href="/tr" hreflang="tr" lang="tr" aria-current="true">Türkçe</a>');
   });
 
-  it("renders the docs and both privacy pages", async () => {
-    const docs = await (await call("/docs")).text();
-    expect(docs).toContain("<h1>API docs</h1>");
-    expect(docs).toContain("verify the signature over the raw body");
-    const belge = await (await call("/tr/docs")).text();
-    expect(belge).toContain("<h1>API belgesi</h1>");
-    expect(belge).toContain('id="imza"');
-    expect(docs).toContain("X-Freeband-Signature");
-    expect(docs).toContain("createHmac");
-    expect(docs).toContain("hmac.new");
-    expect(docs).toContain("curl");
+  it("renders both privacy pages", async () => {
     const privacy = await (await call("/privacy")).text();
-    for (const s of ["Cloudflare", "DELETE /v1/account", "Web access", "SHA-256", "Minute data"]) expect(privacy).toContain(s);
+    for (const s of ["Cloudflare Workers", "keeps your data on your phone", "OpenAnalytics"]) expect(privacy).toContain(s);
     const gizlilik = await (await call("/tr/privacy")).text();
-    for (const s of ["Cloudflare", "DELETE /v1/account", "Web erişimi", "SHA-256", "Dakikalık veri"]) expect(gizlilik).toContain(s);
+    for (const s of ["Cloudflare Workers", "verini telefonda tutar", "OpenAnalytics"]) expect(gizlilik).toContain(s);
   });
 
   it("renders the story page as a numbered timeline with diagrams, in both languages", async () => {
@@ -177,18 +164,16 @@ describe("pages", () => {
   });
 
   it("has the shared nav on public pages and marks the current one", async () => {
-    // English pages link English pages; pages that exist only in Turkish link the Turkish ones.
+    // English pages link English pages, Turkish pages link Turkish ones.
     const en = ["/", "/story", "/guide", '<a href="/privacy">Privacy</a>'] as const;
     const tr = ["/tr", "/tr/story", "/tr/guide", '<a href="/tr/privacy">Gizlilik</a>'] as const;
     const cases: Array<[path: string, links: readonly [string, string, string, string]]> = [
-      ["/", en], ["/story", en], ["/guide", en], ["/privacy", en], ["/docs", en], ["/join", en],
-      ["/tr", tr], ["/tr/story", tr], ["/tr/guide", tr], ["/tr/docs", tr], ["/tr/join", tr],
+      ["/", en], ["/story", en], ["/guide", en], ["/privacy", en],
+      ["/tr", tr], ["/tr/story", tr], ["/tr/guide", tr], ["/tr/privacy", tr],
     ];
     for (const [path, [home, story, guide, privacy]] of cases) {
       const page = await (await call(path)).text();
-      const docs = home === "/" ? "/docs" : "/tr/docs";
-      const login = home === "/" ? "/login" : "/tr/login";
-      for (const href of [story, guide, docs, "https://github.com/cobanov/freeband", login]) {
+      for (const href of [story, guide, "https://github.com/cobanov/freeband"]) {
         expect(page, `${path} → ${href}`).toContain(`class="navlink" href="${href}"`);
       }
       expect(page, path).toContain(`<a class="brand" href="${home}">Freeband</a>`);
@@ -219,61 +204,26 @@ describe("pages", () => {
     expect(await (await call("/")).text()).toContain('<a class="btn ghost" href="/guide">Try it yourself</a>');
     expect(await (await call("/tr")).text()).toContain('<a class="btn ghost" href="/tr/guide">Kendin dene</a>');
   });
+});
 
-  it("swaps the sign-in link for the panel when signed in", async () => {
-    const { token } = await createAccount();
-    const cookie = await login(token);
-    const home = await (await call("/", { headers: { Cookie: cookie } })).text();
-    expect(home).toContain('<a class="navlink" href="/app">Open panel</a>');
-    const tr = await (await call("/tr", { headers: { Cookie: cookie } })).text();
-    expect(tr).toContain('<a class="navlink" href="/tr/app">Panele git</a>');
-    expect(home).not.toContain('href="/login" aria-current');
-  });
-
-  it("renders the panel with the dial and escapes user data", async () => {
-    const { token } = await createAccount({ tz: "Europe/Istanbul" });
-    const evil = `<script>alert(1)</script>"'&`;
-    await ingest(token, syncBody([live("2026-10-13T10:00:00Z", 4200, 77)], { name: evil }));
-    const cookie = await login(token);
-    const page = await (await call("/tr/app?date=2026-10-13", { headers: { Cookie: cookie } })).text();
-    expect(page).toContain('<svg class="dial"');
-    expect(page).toContain('class="bar h13"'); // 10:00Z = 13:00 Istanbul
-    expect(page).toContain('class="hr"');
-    expect(page).toContain("Salı, 13 Ekim");
-    expect(page).toContain("4 200");
-    expect(page).not.toContain(evil);
-    expect(page).toContain("&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;");
-    // One band: no switcher.
-    expect(page).not.toContain('class="devices"');
-  });
-
-  it("shows a device switcher when the account has more than one band", async () => {
-    const { token } = await createAccount();
-    await ingest(token, syncBody([live("2026-10-13T10:00:00Z", 1)]));
-    await ingest(token, syncBody([live("2026-10-13T10:00:00Z", 2)], { id: DEV_B, name: "Band 10 4F21", model: "band10" }));
-    const cookie = await login(token);
-    const page = await (await call(`/tr/app?device=${DEV_B}&date=2026-10-13`, { headers: { Cookie: cookie } })).text();
-    expect(page).toContain('class="devices"');
-    expect(page).toMatch(new RegExp(`href="/tr/app\\?device=${DEV_B}&amp;date=2026-10-13" aria-current="true"`));
-    expect(page).toContain("Band 10 4F21");
-  });
-
-  it("shows an empty state when there is no data", async () => {
-    const { token } = await createAccount();
-    const cookie = await login(token);
-    const page = await (await call("/tr/app", { headers: { Cookie: cookie } })).text();
-    expect(page).toContain('<svg class="dial"');
-    expect(page).toContain("Henüz veri gelmedi.");
-    const en = await (await call("/app", { headers: { Cookie: cookie } })).text();
-    expect(en).toContain("No data yet. Open Freeband on your phone and tap Sync.");
-    expect(en).toContain('<a href="/tr/app" hreflang="tr" lang="tr" aria-current="false">Türkçe</a>');
-    expect(page).not.toContain('class="bar');
-  });
-
-  it("keeps the login token out of server requests", async () => {
-    const page = await (await call("/login")).text();
-    expect(page).toContain("location.hash");
-    expect(page).toContain("history.replaceState");
-    expect(page).toContain('fetch("/v1/session"');
+describe("the removed account half", () => {
+  it("answers 404 on every old page and API endpoint and links none of them", async () => {
+    const gone: Array<[method: string, path: string]> = [
+      ["GET", "/login"], ["GET", "/tr/login"], ["GET", "/join"], ["GET", "/tr/join"],
+      ["GET", "/app"], ["GET", "/tr/app"], ["GET", "/docs"], ["GET", "/tr/docs"],
+      ["POST", "/v1/accounts"], ["POST", "/v1/ingest"], ["POST", "/v1/session"], ["DELETE", "/v1/session"],
+      ["GET", "/v1/me"], ["DELETE", "/v1/account"], ["POST", "/v1/token/rotate"], ["GET", "/v1/devices"],
+      ["GET", "/v1/samples"], ["GET", "/v1/days"], ["GET", "/v1/minutes"], ["GET", "/v1/sleep"], ["GET", "/v1/scores"],
+      ["GET", "/v1/export.json"], ["GET", "/v1/export.csv"], ["GET", "/v1/webhooks"], ["POST", "/v1/webhooks"],
+    ];
+    for (const [method, path] of gone) {
+      const res = await call(path, { method, headers: { Authorization: "Bearer fb_x", Cookie: "__Host-fb_session=x" } });
+      expect(res.status, `${method} ${path}`).toBe(404);
+      expect(res.headers.get("set-cookie"), path).toBeNull();
+    }
+    for (const path of ["/", "/tr", "/story", "/tr/story", "/guide", "/tr/guide", "/privacy", "/tr/privacy"]) {
+      const page = await (await call(path)).text();
+      expect(page, path).not.toMatch(/href="(\/tr)?\/(login|join|app|docs|v1)\b/);
+    }
   });
 });

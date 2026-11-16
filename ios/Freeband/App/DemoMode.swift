@@ -23,7 +23,6 @@ final class AppSession: ObservableObject {
     /// Demo mode never touches the real store or the onboarding flag; leaving it returns to the
     /// app as it was, and to the app proper whenever a real band is already set up.
     func setDemo(_ on: Bool) {
-        BackgroundSync.shared.sessionWillChange()
         model.stop()
         model.healthExport.invalidate()
         // The old model's link goes away with it; let go of a held session first.
@@ -38,8 +37,27 @@ final class AppSession: ObservableObject {
 
     static let models: [any PersistentModel.Type] = [Band.self, Sample.self, Webhook.self, ActivityBlob.self,
                                                      MinuteDay.self, DaySummary.self, SleepRecord.self, SleepRR.self,
-                                                     ManualReading.self, DailyScore.self, HealthExportLedgerRow.self,
-                                                     HealthExportSettings.self]
+                                                     ManualReading.self, DailyScore.self, Workout.self, HealthExportLedgerRow.self, HealthExportSettings.self]
+
+    /// When the store exists but can't be opened or migrated, crashing would crash at every
+    /// launch. The store's files are set aside under another name (nothing is deleted) and a new
+    /// store starts; the band's key is in the Keychain, so the band can be added again. If even
+    /// that fails the app runs on a store in memory. `storeSetAside` holds what happened, for
+    /// Diagnostics.
+    static let storeSetAsideKey = "storeSetAside"
+
+    private static func recovered(after error: Error, demo: Bool) -> ModelContainer {
+        let url = ModelConfiguration().url
+        let stamp = Int(Date().timeIntervalSince1970)
+        for suffix in ["", "-wal", "-shm"] {
+            let file = URL(fileURLWithPath: url.path + suffix)
+            try? FileManager.default.moveItem(at: file, to: URL(fileURLWithPath: url.path + ".set-aside-\(stamp)" + suffix))
+        }
+        UserDefaults.standard.set("\(Date().formatted(date: .abbreviated, time: .shortened)): \(error.localizedDescription)", forKey: storeSetAsideKey)
+        if let fresh = try? ModelContainer(for: Schema(models), configurations: ModelConfiguration(isStoredInMemoryOnly: demo)) { return fresh }
+        // shortcut: nothing is saved in this state; it only keeps the app from crashing at launch.
+        return try! ModelContainer(for: Schema(models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    }
 
     private static func make(demo: Bool) -> (ModelContainer, AppModel) {
         let container: ModelContainer
@@ -49,7 +67,7 @@ final class AppSession: ObservableObject {
             container = try ModelContainer(for: Schema(models),
                                            configurations: ModelConfiguration(isStoredInMemoryOnly: demo))
         } catch {
-            fatalError("Couldn't open the data store: \(error)")
+            container = recovered(after: error, demo: demo)
         }
         if demo {
             DemoData.seed(container.mainContext, .full)

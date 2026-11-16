@@ -1,6 +1,5 @@
-// The public pages (home, story, privacy) exist in English and Turkish. English
-// lives at the root ("/", "/story"), Turkish under "/tr". The signed-in pages, the
-// docs and the join flow stay Turkish for now.
+// The pages (home, story, guide, privacy) exist in English and Turkish. English
+// lives at the root ("/", "/story"), Turkish under "/tr".
 
 export type Lang = "en" | "tr";
 

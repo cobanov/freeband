@@ -270,18 +270,26 @@ struct TrendChart: View {
                 }
                 .padding(.bottom, FBSpace.xs)
             case .compact:
-                HStack(alignment: .firstTextBaseline, spacing: FBSpace.xs) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(heading)
-                        .textStyle(.body)
-                        .foregroundStyle(.textPrimary)
-                    Spacer(minLength: FBSpace.xs)
-                    if let average {
+                        .textStyle(.subhead)
+                        .foregroundStyle(.textSecondary)
+                    HStack(alignment: .firstTextBaseline, spacing: FBSpace.xs) {
+                        Text(average.map { format($0, locale) } ?? "–")
+                            .textStyle(.figureM)
+                            .foregroundStyle(average == nil ? Color.textTertiary : Color.textPrimary)
                         Text("avg")
                             .textStyle(.caption)
                             .foregroundStyle(.textSecondary)
-                        Text(format(average, locale))
-                            .textStyle(.figureS)
-                            .foregroundStyle(.textPrimary)
+                        Spacer(minLength: FBSpace.xs)
+                        if let change = changeOnPreviousPeriod {
+                            Text("\(Image(systemName: change.symbol)) \(change.text)")
+                                .textStyle(.subhead)
+                                .imageScale(.small)
+                                .monospacedDigit()
+                                .foregroundStyle(.textSecondary)
+                                .accessibilityLabel(Text(change.spoken))
+                        }
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -301,7 +309,19 @@ struct TrendChart: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var chartHeight: CGFloat { style == .full ? fullHeight : 56 }
+    private var chartHeight: CGFloat { style == .full ? fullHeight : 72 }
+
+    /// The mean of the shown days against the mean of the same number of days before them.
+    /// Nil when either side has fewer than 3 days, so for 90 days (the points go back 90).
+    private var changeOnPreviousPeriod: MetricDelta? {
+        let now = points.suffix(range.rawValue).compactMap(\.value)
+        let before = points.dropLast(range.rawValue).suffix(range.rawValue).compactMap(\.value)
+        guard now.count >= 3, before.count >= 3 else { return nil }
+        let difference = now.reduce(0, +) / Double(now.count) - before.reduce(0, +) / Double(before.count)
+        let text = format(abs(difference), locale)
+        if format(0, locale) == text { return MetricDelta(.flat, text) }
+        return MetricDelta(difference > 0 ? .up : .down, text)
+    }
 
     private var heading: String { [title, unit].compactMap { $0 }.joined(separator: ", ") }
 

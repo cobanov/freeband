@@ -12,7 +12,7 @@ struct FreebandApp: App {
         // the held session there is no window, and the Bluetooth manager must exist at launch
         // (docs/STAY-CONNECTED.md section 3).
         _ = AppSession.shared
-        BackgroundSync.shared.register()
+        AppModel.registerBackgroundRefresh()
     }
 
     var body: some Scene {
@@ -69,7 +69,6 @@ struct RootView: View {
                             .tag(AppTab.band)
                     }
                 }
-                .sheet(item: $model.pendingInvite) { JoinSheet(invite: $0) }
                 .sheet(isPresented: $router.showsLive) {
                     if let band { LiveSheet(band: band) }
                 }
@@ -83,20 +82,20 @@ struct RootView: View {
         .environmentObject(router)
         .tint(.textPrimary)
         .preferredColorScheme(AppearanceSetting(rawValue: appearance)?.colorScheme)
-        .onOpenURL { model.handle($0) }
         .onChange(of: scenePhase) { _, phase in
             // Live mode keeps the band measuring; never leave it running in the background.
             if phase == .background { model.enterBackground() }
             if phase == .active {
                 model.healthExport.resume()
-                autoSync()
                 model.healthExport.schedule()
+                model.refreshSharedLocation()
+                autoSync()
                 // A held session waiting out a retry opens now (after the sync, if one started).
                 model.updateHold()
             }
         }
         .onChange(of: link.bluetooth) { _, state in
-            if state == .poweredOn && scenePhase == .active { autoSync() }
+            if state == .poweredOn { autoSync() }
         }
         .onChange(of: selectedBand) { model.updateHold() }
         .onChange(of: bands.count) { model.updateHold() }
@@ -163,6 +162,17 @@ enum DebugScreen: String {
         return min(0, Int(args[i + 1]) ?? 0)
         #else
         return 0
+        #endif
+    }
+
+    /// DEBUG `-freeband-scroll <id>`: the section a screen scrolls to, to screenshot what is below the fold.
+    static var scrollTarget: String? {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-freeband-scroll"), i + 1 < args.count else { return nil }
+        return args[i + 1]
+        #else
+        return nil
         #endif
     }
 

@@ -30,6 +30,8 @@ final class MinuteDay {
     /// Metres per minute.
     var distance: Data = Data()
     var energy: Data = Data()
+    /// Activity level per minute, packed like the others (added with parser version 5).
+    var activity: Data = Data()
     /// The minute files merged into this day, in file order.
     var sourceFileIDs: [String] = []
     var recordCount: Int = 0
@@ -52,6 +54,7 @@ final class MinuteDay {
         kcal = Packed.pack8(s.kcal)
         distance = Packed.pack16(s.distance)
         energy = Packed.pack8(s.energy)
+        activity = Packed.pack8(s.activityLevel)
         sourceFileIDs = draft.sourceFileIDs
         recordCount = draft.recordCount
         updatedAt = Date()
@@ -69,6 +72,7 @@ final class MinuteDay {
         s.kcal = Packed.unpack8(kcal, count: n)
         s.distance = Packed.unpack16(distance, count: n)
         s.energy = Packed.unpack8(energy, count: n)
+        s.activityLevel = Packed.unpack8(activity, count: n)
         return s
     }
 
@@ -233,6 +237,73 @@ final class SleepRecord {
     var totalSleepMinutes: Int? {
         guard deepMinutes != nil || lightMinutes != nil || remMinutes != nil else { return nil }
         return (deepMinutes ?? 0) + (lightMinutes ?? 0) + (remMinutes ?? 0)
+    }
+}
+
+/// One workout, from its summary file. See WorkoutDraft for units.
+@Model
+final class Workout {
+    var bandID: UUID = UUID()
+    var sourceFileID: String = ""
+    var sport: String = ""
+    var start: Date = Date()
+    var end: Date = Date()
+    /// The local day the workout starts on.
+    var day: String = ""
+    var dayIndex: Int = 0
+    var tzOffsetMinutes: Int = 0
+    var activeSeconds: Int = 0
+    var distanceMeters: Int?
+    var steps: Int?
+    var calories: Int?
+    var totalCalories: Int?
+    var hrAvg: Int?
+    var hrMax: Int?
+    var hrMin: Int?
+    var paceAvg: Int?
+    var paceBest: Int?
+    var speedAvg: Double?
+    var speedMax: Double?
+    var cadenceAvg: Int?
+    var cadenceMax: Int?
+    var aerobicEffect: Double?
+    var anaerobicEffect: Double?
+    var vo2max: Int?
+    var recoveryHours: Int?
+    var load: Int?
+    var vitality: Int?
+    var updatedAt: Date = Date()
+
+    init(bandID: UUID, draft d: WorkoutDraft) {
+        self.bandID = bandID
+        sourceFileID = d.sourceFileID
+        sport = d.sport
+        start = d.start
+        end = d.end
+        day = d.day.string
+        dayIndex = d.day.index
+        tzOffsetMinutes = d.tzOffsetMinutes
+        activeSeconds = d.activeSeconds
+        distanceMeters = d.distanceMeters
+        steps = d.steps
+        calories = d.calories
+        totalCalories = d.totalCalories
+        hrAvg = d.hrAvg
+        hrMax = d.hrMax
+        hrMin = d.hrMin
+        paceAvg = d.paceAvg
+        paceBest = d.paceBest
+        speedAvg = d.speedAvg
+        speedMax = d.speedMax
+        cadenceAvg = d.cadenceAvg
+        cadenceMax = d.cadenceMax
+        aerobicEffect = d.aerobicEffect
+        anaerobicEffect = d.anaerobicEffect
+        vo2max = d.vo2max
+        recoveryHours = d.recoveryHours
+        load = d.load
+        vitality = d.vitality
+        updatedAt = Date()
     }
 }
 

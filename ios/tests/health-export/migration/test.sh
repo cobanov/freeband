@@ -15,3 +15,12 @@ swiftc -parse-as-library -module-cache-path "$tmp/cache" $common ios/Freeband/An
     ios/Freeband/Data/IngestMapper.swift ios/Freeband/Data/Calibration.swift ios/Freeband/Integrations/HealthExportPlan.swift \
     ios/tests/health-export/migration/main.swift -o "$tmp/new"
 "$tmp/new"
+
+# Also migrate a current upstream store, including its Workout model.
+export FREEBAND_MIGRATION_STORE="$tmp/upstream.sqlite"
+swiftc -parse-as-library -D UPSTREAM -module-cache-path "$tmp/cache" $common ios/Freeband/Analytics/*.swift \
+    ios/tests/health-export/migration/Models-v0.5.3.swift ios/Freeband/Data/HealthModels.swift \
+    ios/Freeband/Data/IngestMapper.swift ios/Freeband/Data/Calibration.swift \
+    ios/tests/health-export/migration/main.swift -o "$tmp/upstream"
+"$tmp/upstream"
+"$tmp/new"

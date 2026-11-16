@@ -1,6 +1,7 @@
 // Prints MiProtocol outputs for fixed inputs; check_vectors.py recomputes them independently.
-// Build: swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift main.swift -o /tmp/mitest
+// Build: swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift main.swift -o /tmp/mitest
 // Run with TZ=UTC: check_vectors.py formats notify_cmd's timestamp in UTC.
+import CryptoKit
 import Foundation
 
 func hex(_ d: Data) -> String { d.map { String(format: "%02x", $0) }.joined() }
@@ -27,7 +28,7 @@ var power = PBWriter(); power.message(1, battery)
 var system = PBWriter(); system.message(2, power)
 var resp = PBWriter(); resp.varint(1, 2); resp.varint(2, 1); resp.message(4, system)
 
-var rts = PBWriter(); rts.varint(1, 8421); rts.varint(2, 312); rts.varint(3, 5); rts.varint(4, 74); rts.varint(6, 9)
+var rts = PBWriter(); rts.varint(1, 8421); rts.varint(2, 312); rts.varint(3, 5); rts.varint(4, 74); rts.varint(5, 49); rts.varint(6, 9)
 var health = PBWriter(); health.message(39, rts)
 var liveCmd = PBWriter(); liveCmd.varint(1, 8); liveCmd.varint(2, 47); liveCmd.message(10, health)
 let live = MiAuth.liveStats(PBMessage(liveCmd.data)!)!
@@ -148,6 +149,135 @@ let v1: [String: Any] = [
     "v1_auth_reset": authReset,
 ]
 
+// Health monitoring settings (docs/CAPABILITIES.md §9.1-9.3). hrBody is what a band could
+// return, with fields the app doesn't know (20, 21, a fixed32 22) that must come back unchanged.
+func pb(_ build: (inout PBWriter) -> Void) -> PBWriter { var w = PBWriter(); build(&w); return w }
+let hrBody = pb {
+    $0.varint(1, 0); $0.varint(2, 30); $0.varint(3, 1); $0.varint(4, 120)
+    $0.message(5, pb { $0.varint(1, 1) }); $0.varint(7, 1)
+    $0.message(8, pb { $0.varint(1, 0); $0.varint(2, 40) })
+    $0.varint(9, 2); $0.varint(10, 0); $0.varint(11, 1); $0.varint(20, 300); $0.string(21, "ab")
+}.data + Data([0xB5, 0x01, 1, 2, 3, 4])
+let spo2Body = pb { $0.varint(1, 1); $0.varint(2, 0); $0.message(4, pb { $0.varint(1, 1); $0.varint(2, 90) }) }.data
+let stressBody = pb { $0.varint(1, 0); $0.message(2, pb { $0.varint(1, 1); $0.varint(2, 0) }) }.data
+let hrReply = pb { $0.varint(1, 8); $0.varint(2, 10); $0.message(10, pb { $0.bytes(8, hrBody) }) }.data
+func hrSet(_ body: Data, _ mode: MiMonitoring.HeartRateMode?, _ sleep: Bool? = nil) -> String {
+    MiMonitoring.heartRate(body, mode: mode, sleep: sleep).map { hex(MiMonitoring.set(.heartRate, $0)) } ?? "nil"
+}
+let monitoring: [String: Any] = [
+    "mon_get": MiMonitoring.Setting.allCases.map { hex(MiMonitoring.get($0)) },
+    "mon_reply": hex(MiMonitoring.reply(PBMessage(hrReply)!, .heartRate) ?? Data()),
+    "mon_reply_other": MiMonitoring.reply(PBMessage(hrReply)!, .spo2) == nil,
+    "mon_hr_parsed": "\(MiMonitoring.heartRateMode(hrBody)!)/\(MiMonitoring.sleepHeartRate(hrBody)!)",
+    "mon_hr_1min": hrSet(hrBody, .every(1)),
+    "mon_hr_off": hrSet(hrBody, .off),
+    "mon_hr_smart_nosleep": hrSet(hrBody, .smart, false),
+    "mon_hr_empty_smart": hrSet(Data(), .smart),
+    "mon_hr_garbage": hrSet(Data([0x0A, 0x05, 0x01]), .smart),
+    "mon_spo2_parsed": MiMonitoring.spo2Mode(spo2Body) ?? -1,
+    "mon_spo2_allday": hex(MiMonitoring.set(.spo2, MiMonitoring.spo2(spo2Body, mode: 2)!)),
+    "mon_stress_parsed": MiMonitoring.stressAllDay(stressBody) ?? true,
+    "mon_stress_on": hex(MiMonitoring.set(.stress, MiMonitoring.stress(stressBody, allDay: true)!)),
+]
+
+// The band's state. batteryReply and basicState have the shape a Band 10 Pro sent (firmware 3.201.026).
+func batteryReply(_ state: UInt64?) -> PBMessage {
+    let battery = pb { $0.varint(1, 82); if let state { $0.varint(2, state) }; $0.message(3, pb { $0.varint(1, 3); $0.varint(2, 1_760_000_000) }) }
+    return PBMessage(pb { $0.varint(1, 2); $0.varint(2, 1); $0.message(4, pb { $0.message(2, pb { $0.message(1, battery) }) }) }.data)!
+}
+let basicState = pb { $0.varint(1, 2); $0.varint(2, 78); $0.message(4, pb { $0.message(48, pb { $0.varint(1, 1); $0.varint(2, 0); $0.varint(3, 0); $0.varint(4, 0) }) }) }.data
+let pushedState = pb { $0.varint(1, 2); $0.varint(2, 79); $0.message(4, pb { $0.message(49, pb { $0.varint(1, 2); $0.varint(2, 1); $0.varint(3, 2) }) }) }.data
+let pushedCharging = pb { $0.varint(1, 2); $0.varint(2, 79); $0.message(4, pb { $0.message(49, pb { $0.varint(1, 2) }) }) }.data
+func stateText(_ s: MiAuth.DeviceStateChange?) -> String {
+    func t(_ b: Bool?) -> String { b.map { "\($0)" } ?? "nil" }
+    return s.map { "\(t($0.charging))/\(t($0.worn))/\(t($0.asleep))" } ?? "nil"
+}
+let bandState: [String: Any] = [
+    "battery_charging": [batteryReply(2), batteryReply(1), batteryReply(3), batteryReply(nil)].map { MiAuth.batteryCharging($0).map { "\($0)" } ?? "nil" },
+    "battery_level_with_state": MiAuth.batteryLevel(batteryReply(2)) ?? 0,
+    "state_basic_not_read": stateText(MiAuth.deviceStateChange(PBMessage(basicState)!)),
+    "state_pushed": stateText(MiAuth.deviceStateChange(PBMessage(pushedState)!)),
+    "state_pushed_one_field": stateText(MiAuth.deviceStateChange(PBMessage(pushedCharging)!)),
+]
+
+// Local bind (docs/BIND.md). The band below is glue with fixed keys: check_vectors.py plays the
+// band on its own, so it checks these replies as well as every packet the machine sends.
+let bindPhoneKey = try! P256.KeyAgreement.PrivateKey(rawRepresentation: Data(0x01...0x20))
+let bindBandKey = try! P256.KeyAgreement.PrivateKey(rawRepresentation: Data(0x21...0x40))
+let bindSecret = try! bindBandKey.sharedSecretFromKeyAgreement(with: bindPhoneKey.publicKey).withUnsafeBytes { Data($0) }
+let bindAppRandom = Data(0x50...0x5F)
+let bindBandRandom = Data(0x60...0x6F)
+func bandReply(_ id: UInt64, _ field: Int, _ build: (inout PBWriter) -> Void) -> Data {
+    var body = PBWriter(); build(&body)
+    var account = PBWriter(); account.message(field, body)
+    var command = PBWriter(); command.varint(1, 1); command.varint(2, id); command.message(3, account)
+    return command.data
+}
+func bandError(_ id: UInt64, _ code: UInt64) -> Data {
+    var account = PBWriter(); account.varint(3, code)
+    var command = PBWriter(); command.varint(1, 1); command.varint(2, id); command.message(3, account)
+    return command.data
+}
+func bandInfo(verify: UInt64, oob: UInt64) -> Data {
+    bandReply(17, 12) {
+        $0.varint(1, verify); $0.string(2, "SN0000"); $0.string(3, "AA:BB:CC:DD:5E:6F"); $0.string(4, "M0000")
+        $0.varint(5, oob); $0.bytes(6, Data(0x70...0x7F)); $0.string(7, "did0")
+    }
+}
+func bandVerify(code: String = "", key: Data = bindBandKey.publicKey.rawRepresentation, flip: Bool = false) -> Data {
+    var sign = MiCrypto.hmacSHA256(key: bindSecret, bindBandRandom + Data(code.utf8))
+    if flip { sign[5] ^= 1 }
+    return bandReply(18, 18) { $0.bytes(1, key); $0.bytes(2, bindBandRandom); $0.bytes(3, sign) }
+}
+func bandConfirm(_ ok: Bool) -> Data { bandReply(19, 20) { $0.bool(1, ok) } }
+func bindStep(_ step: MiBind.Step) -> String {
+    switch step {
+    case .send(let data, let confirmOnBand): return "send:\(hex(data)):\(confirmOnBand)"
+    case .bound(let b):
+        return "bound:" + [b.authKey, b.keys.decryptionKey, b.keys.encryptionKey, b.keys.decryptionNonce, b.keys.encryptionNonce].map(hex).joined(separator: ":")
+            + ":\(b.appDeviceID):\(b.info.model):\(b.info.oobMode)"
+    case .failed(let failure, let tellBand): return "failed:\(failure):" + (tellBand.map(hex) ?? "-")
+    case .ignored: return "ignored"
+    }
+}
+/// Starts a bind and feeds it the replies: the start command, then one line per reply.
+func bindRun(name: String = "Freeband", code: String = "", _ replies: [Data]) -> [String] {
+    let config = MiBind.Config(userID: "freeband-test", appDeviceID: "0123456789abcdef", deviceName: name, dynamicCode: code)
+    var machine = MiBind.Machine(config: config, privateKey: bindPhoneKey, appRandom: bindAppRandom)!
+    return [hex(machine.start())] + replies.map { bindStep(machine.receive($0)) }
+}
+let bindAAD = Data("bind-data".utf8)
+let bindCCM = MiCrypto.ccmEncrypt(key: key, nonce: ccmNonce, plaintext: long, aad: bindAAD)
+var offCurve = bindBandKey.publicKey.rawRepresentation
+offCurve[63] ^= 1
+let bind: [String: Any] = [
+    "ccm_aad": hex(bindCCM),
+    "ccm_aad_roundtrip": MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: bindCCM, aad: bindAAD) == long,
+    "ccm_aad_wrong_rejected": MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: bindCCM, aad: Data("bind-datb".utf8)) == nil
+        && MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: bindCCM) == nil,
+    "nonce_cmd_app_id": hex(MiAuth.nonceCommand(phoneNonce: phone, appDeviceID: "0123456789abcdef")),
+    "bind_band_replies": [bandInfo(verify: 2, oob: 3), bandVerify(), bandConfirm(true), bandError(25, 0)].map(hex),
+    // The whole bind, button mode; a stray reply and a non-bind command in between change nothing.
+    "bind_ok": bindRun([bandInfo(verify: 2, oob: 3), bandConfirm(true), resp.data, bandVerify(), bandConfirm(true), bandError(25, 0), bandError(25, 0)]),
+    // Dynamic-code mode with a code, no device name, and a last reply that carries no error code.
+    "bind_code": bindRun(name: "", code: "123456", [bandInfo(verify: 2, oob: 2), bandVerify(code: "123456"), bandConfirm(true), bandReply(25, 29) { _ in }]),
+    "bind_server_psk": bindRun([bandInfo(verify: 1, oob: 0), bandVerify()]),
+    "bind_verify_mode_3": bindRun([bandInfo(verify: 3, oob: 0)]),
+    "bind_oob_numeric": bindRun([bandInfo(verify: 2, oob: 1)]),
+    "bind_already_bound": bindRun([bandError(17, 1)]),
+    "bind_wrong_proof": bindRun([bandInfo(verify: 2, oob: 0), bandVerify(flip: true), bandConfirm(true)]),
+    "bind_wrong_code": bindRun(code: "123456", [bandInfo(verify: 2, oob: 2), bandVerify(code: "123457")]),
+    "bind_off_curve": bindRun([bandInfo(verify: 2, oob: 0), bandVerify(key: offCurve)]),
+    "bind_declined": bindRun([bandInfo(verify: 2, oob: 3), bandVerify(), bandConfirm(false)]),
+    "bind_cancelled": bindRun([bandInfo(verify: 2, oob: 3), bandVerify(), bandError(19, 6)]),
+    "bind_state_error": bindRun([bandInfo(verify: 2, oob: 3), bandError(18, 8)]),
+    "bind_result_error": bindRun([bandInfo(verify: 2, oob: 3), bandVerify(), bandConfirm(true), bandError(25, 3)]),
+    "bind_unexpected": bindRun([bandReply(17, 4) { $0.string(1, "x") }]),
+    "bind_bad_config": [MiBind.Config(userID: "", appDeviceID: "a", deviceName: ""), MiBind.Config(userID: "u", appDeviceID: String(repeating: "a", count: 65), deviceName: ""),
+                        MiBind.Config(userID: "u\0", appDeviceID: "a", deviceName: ""), MiBind.Config(userID: "u", appDeviceID: String(repeating: "a", count: 64), deviceName: "")]
+        .map { MiBind.Machine(config: $0) == nil },
+]
+
 let out: [String: Any] = [
     "crc_123456789": String(format: "%04x", MiFrame.crc16arc(Data("123456789".utf8))),
     "okm": hex(okm),
@@ -171,10 +301,26 @@ let out: [String: Any] = [
     "find_phone_parsed": findPhoneParsed,
     "activity_today": hex(MiAuth.activityListCommand(today: true)),
     "activity_past": hex(MiAuth.activityListCommand(today: false)),
+    "activity_ack": hex(MiAuth.activityAckCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
     "activity_fetch": hex(MiAuth.activityFetchCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
+    "sleep_result": hex(MiAuth.sleepResultCommand([
+        SleepResultSection(bedTime: Date(timeIntervalSince1970: 1_794_090_600), wakeTime: Date(timeIntervalSince1970: 1_794_117_600),
+                           tzQuarterHours: 12, minutesAsleep: 437, averageHeartRate: 56, averageSpO2: 96, extra: nil),
+    ])),
+    // given newest first: goes out oldest first; no averages on the nap; a negative offset; ExtraData on one
+    "sleep_result_two": hex(MiAuth.sleepResultCommand([
+        SleepResultSection(bedTime: Date(timeIntervalSince1970: 1_794_140_000), wakeTime: Date(timeIntervalSince1970: 1_794_143_000),
+                           tzQuarterHours: -16, minutesAsleep: 45, averageHeartRate: nil, averageSpO2: nil, extra: nil),
+        SleepResultSection(bedTime: Date(timeIntervalSince1970: 1_794_090_600), wakeTime: Date(timeIntervalSince1970: 1_794_117_600),
+                           tzQuarterHours: -16, minutesAsleep: 437, averageHeartRate: 56, averageSpO2: 96,
+                           extra: .init(bedtime: 1_794_089_700, sleepTime: 26_220, quality: 82, efficiency: 91, breathing: 15)),
+    ])),
+    "sleep_result_empty": hex(MiAuth.sleepResultCommand([])),
     "clock_istanbul": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "Europe/Istanbul")!, is24Hour: true)),
     "clock_newyork_12h": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "America/New_York")!, is24Hour: false)),
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
+    "gps_info": hex(MiAuth.gpsInfoCommand(at: Date(timeIntervalSince1970: 1_760_000_000), latitude: 41.0082, longitude: 28.9784, altitude: 35.5)),
+    "gps_info_no_altitude": hex(MiAuth.gpsInfoCommand(at: Date(timeIntervalSince1970: 1_760_000_000), latitude: -33.8688, longitude: 151.2093, altitude: nil)),
     "resend_seqs": [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)].map { MiFrame.resendSeqs(next: $0.0, nack: $0.1) },
 ]
-print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)
+print(String(data: try! JSONSerialization.data(withJSONObject: out.merging(v1) { $1 }.merging(monitoring) { $1 }.merging(bandState) { $1 }.merging(bind) { $1 }, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)

@@ -7,47 +7,25 @@
   "compatibility_date": "2026-09-26",
 
   // Serve only on the custom domain: no *.workers.dev URL, no preview URLs.
-  // Same-origin checks and the "never deliver webhooks to ourselves" rule
-  // assume a single public hostname.
   "workers_dev": false,
   "preview_urls": false,
   "routes": [{ "pattern": "freeband.cobanov.dev", "custom_domain": true }],
 
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "openband-hub",
-      // PLACEHOLDER: replace with the id printed by
-      // `wrangler d1 create openband-hub` before the first remote deploy.
-      // Local dev and tests do not need a real id.
-      "database_id": "e043f70e-bf93-458b-8728-5e015f58ea72",
-      "migrations_dir": "migrations"
-    }
-  ],
-
-  // Self-hosted Open Sauce Sans font files (SIL OFL) and the favicon. No third-party requests.
+  // Self-hosted Open Sauce Sans font files (SIL OFL), the favicon and images.
   "assets": { "directory": "./public" },
 
   "vars": {
-    // Hostname the hub is served on. Webhooks may not point here.
+    // Hostname the site is served on; Open Graph and hreflang URLs are built from it.
     "PUBLIC_HOSTNAME": "freeband.cobanov.dev",
-    // Public TestFlight link shown on the home page, /guide and /join; empty hides it.
+    // Public TestFlight link shown on the home page and /guide; empty hides it.
     "TESTFLIGHT_URL": "https://testflight.apple.com/join/Qq9A6c1E"
   },
 
-  // HUB_SECRET: at least 32 random characters. Used to encrypt webhook
-  // secrets at rest (AES-GCM) and to key IP hashes for rate limiting.
-  // Production: `wrangler secret put HUB_SECRET`. Local: `.dev.vars` (gitignored).
-  // HUB_INVITE_CODES: comma-separated invite codes; POST /v1/accounts needs one of them.
-  "secrets": { "required": ["HUB_SECRET", "HUB_INVITE_CODES"] },
+  // Explicitly empty: the Worker has no scheduled handler any more, and leaving
+  // "triggers" out would keep the old daily cron on the deployed Worker.
+  "triggers": { "crons": [] },
 
-  // Daily cleanup of expired sessions and old rate-limit counters.
-  "triggers": { "crons": ["17 3 * * *"] },
-
-  // Local dev: keep request.url on localhost so the same-origin (CSRF) check
-  // matches what the browser sends. Without this, wrangler dev rewrites the
-  // URL to the custom-domain route above.
-  "dev": { "port": 8787, "local_protocol": "http", "upstream_protocol": "http", "host": "localhost:8787" },
+  "dev": { "port": 8787, "local_protocol": "http" },
 
   "observability": {
     "enabled": true,

@@ -14,7 +14,7 @@ private struct AppleHealthDetails: View {
         Form {
             Section {
                 Text("Freeband can write eligible band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. It never reads Apple Health.")
-                Text("Turning on exports eligible history stored on this phone and later syncs while Freeband is open. Corrections can update or remove entries Freeband previously wrote.")
+                Text("Turning on exports eligible history stored on this phone and later syncs. Corrections can update or remove entries Freeband previously wrote.")
                 Text("Use one exporting iPhone per band. Reinstalling or using another phone can create duplicates. Health-side deletions cannot be detected.")
                 Text("Deleting Freeband data or removing a band does not delete Health entries. Older history on this phone will not be exported again.")
             }.fbFormRow()

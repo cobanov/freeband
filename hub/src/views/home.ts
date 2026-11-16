@@ -1,5 +1,5 @@
 // The public home page in English ("/") and Turkish ("/tr"): the product first
-// (one line, the app screens, two actions), then four short sections.
+// (one line, the app screens, two actions), then three short sections.
 
 import { html, raw, type Safe } from "./html";
 import { localPath, type Lang, type Text } from "./i18n";
@@ -69,7 +69,6 @@ interface Card {
 }
 
 interface Copy {
-  deleted: string;
   h1: string;
   lede: string;
   story: string;
@@ -77,13 +76,11 @@ interface Copy {
   shotsCaption: string;
   noAccount: { h: string; p: string; cards: Card[] };
   scores: { h: string; p: string; cards: Card[] };
-  web: { h: string; p: string; cards: Card[]; note: Safe; docs: string; privacy: string };
   status: { h: string; line: string; lineSoon: string; p: Safe; join: string };
 }
 
 const COPY: Record<Lang, Copy> = {
   en: {
-    deleted: "Your account and all your data on this server have been deleted.",
     h1: "An iPhone app for the Xiaomi Smart Band 10, no account needed",
     lede: "Freeband reads your band without Mi Fitness or a Xiaomi account and works out your scores on the phone. Your data stays on your phone.",
     story: "How we did it",
@@ -108,19 +105,6 @@ const COPY: Record<Lang, Copy> = {
         { title: "Confidence", wide: true, text: "High, medium, low or none, always with a reason, such as “no RR data” or “5 of 14 nights in the baseline”." },
       ],
     },
-    web: {
-      h: "Optional web access",
-      p: "This site is the Freeband hub. If you turn on Web access in the app, your phone sends your data here too. If you don't, nothing comes here.",
-      cards: [
-        { title: "Web panel", text: "See your day in the browser. Tap Open web panel in the app and the browser takes you straight to it." },
-        { title: "REST API", text: "Reach your data with your personal key. Endpoints and examples are in the API docs." },
-        { title: "Webhooks", text: "After every sync, your data also goes to your own server in a signed request." },
-        { title: "Export", text: "Download everything stored here as CSV or JSON." },
-      ],
-      note: html`To sign in from another computer, copy the key from the app and paste it on the <a href="/login">sign-in page</a>. The <a href="/privacy">privacy page</a> explains what is stored.`,
-      docs: "API docs",
-      privacy: "Privacy",
-    },
     status: {
       h: "Status",
       line: "Public beta on TestFlight",
@@ -130,7 +114,6 @@ const COPY: Record<Lang, Copy> = {
     },
   },
   tr: {
-    deleted: "Hesabın ve bu sunucudaki tüm verin silindi.",
     h1: "Xiaomi Smart Band 10 için hesapsız bir iPhone uygulaması",
     lede: "Freeband bandını Mi Fitness ve Xiaomi hesabı olmadan okur, skorlarını telefonda hesaplar. Verin telefonunda kalır.",
     story: "Nasıl yaptık",
@@ -155,19 +138,6 @@ const COPY: Record<Lang, Copy> = {
         { title: "Güven", wide: true, text: "Yüksek, orta, düşük ya da yok; her zaman gerekçesiyle, örneğin “RR yok” ya da “bazalde 5/14 gece”." },
       ],
     },
-    web: {
-      h: "İsteğe bağlı web erişimi",
-      p: "Bu sayfa Freeband hub'ı. Uygulamada Web erişimini açarsan telefon verini buraya da gönderir. Açmazsan buraya hiçbir şey gelmez.",
-      cards: [
-        { title: "Web paneli", text: "Günü tarayıcıdan gör. Uygulamada Web paneli aç'a dokun; tarayıcı seni doğrudan panele alır." },
-        { title: "REST API", text: "Verine kişisel anahtarınla ulaş. Uç noktalar ve örnekler API belgesinde." },
-        { title: "Webhook'lar", text: "Her senkronizasyondan sonra veri imzalı bir istekle kendi sunucuna da gider." },
-        { title: "Dışa aktarma", text: "Buradaki tüm verini CSV ya da JSON olarak indir." },
-      ],
-      note: html`Başka bir bilgisayardan girmek için anahtarı uygulamadan kopyala ve <a href="/tr/login">giriş sayfasına</a> yapıştır. Neyin saklandığını <a href="/tr/privacy">gizlilik sayfası</a> anlatıyor.`,
-      docs: "API belgesi",
-      privacy: "Gizlilik",
-    },
     status: {
       h: "Durum",
       line: "TestFlight'ta herkese açık beta",
@@ -185,11 +155,10 @@ function card(c: Card): Safe {
   return html`<li class="card${c.wide ? " wide" : ""}">${head}<p>${c.text}</p></li>`;
 }
 
-export function homeBody(o: { deleted: boolean; lang: Lang; testflight: string }): Safe {
+export function homeBody(o: { lang: Lang; testflight: string }): Safe {
   const t = COPY[o.lang];
   const suffix = o.lang === "en" ? "" : `-${o.lang}`;
   return html`
-${o.deleted ? html`<p class="banner small" role="status">${t.deleted}</p>` : ""}
 <section class="hero">
   <h1>${t.h1}</h1>
   <p class="lede">${t.lede}</p>
@@ -217,18 +186,6 @@ ${o.deleted ? html`<p class="banner small" role="status">${t.deleted}</p>` : ""}
     <p>${t.scores.p}</p>
   </header>
   <ul class="cards c3">${t.scores.cards.map(card)}</ul>
-</section>
-
-<section class="sect">
-  <header>
-    <h2>${t.web.h}</h2>
-    <p>${t.web.p}</p>
-  </header>
-  <div>
-    <ul class="cards c2">${t.web.cards.map(card)}</ul>
-    <p class="small muted note">${t.web.note}</p>
-    <div class="actions"><a class="btn ghost" href="${localPath(o.lang, "/docs")}">${t.web.docs}</a><a class="btn ghost" href="${localPath(o.lang, "/privacy")}">${t.web.privacy}</a></div>
-  </div>
 </section>
 
 <section class="sect">

@@ -88,6 +88,24 @@
           }
         }
       }
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "comment": "Privacy - Location When In Use Usage Description",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "If you turn on Share location with the band, Freeband sends this phone's location to your band when the band asks for it. It goes nowhere else."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konumu bantla paylaş'ı açarsan Freeband, bant istediğinde bu telefonun konumunu bandına gönderir. Başka hiçbir yere gitmez."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

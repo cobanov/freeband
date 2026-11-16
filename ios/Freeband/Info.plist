@@ -4,7 +4,7 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>$(PRODUCT_BUNDLE_IDENTIFIER).background-sync</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).sync</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
@@ -27,17 +27,6 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.rfivesix.freeband</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>freeband</string>
-			</array>
-		</dict>
-	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -50,6 +39,8 @@
 	<string>Freeband uses HealthKit to export your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. Freeband does not read health data.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Freeband writes your band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health when you choose to export them.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>If you turn on Share location with the band, Freeband sends this phone's location to your band when the band asks for it. It goes nowhere else.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>OpenSauceSans-Regular.otf</string>

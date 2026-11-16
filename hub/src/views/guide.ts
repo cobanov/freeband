@@ -72,7 +72,7 @@ const STEPS: Record<Lang, Step[]> = {
     },
     {
       title: "Optional: Apple Health",
-      body: html`<p>Under Band → Freeband settings → Integrations → Apple Health you can opt in to write eligible steps, heart rate and sleep stages, including local history, while Freeband is open. Freeband does not read Health data. Corrections can change its own entries; turning export off leaves them in Health. Use one exporting iPhone per band.</p><p>When building this version from source, check in Xcode that your Apple Developer team's development provisioning profile supports the HealthKit entitlement.</p>`,
+      body: html`<p>Under Band → Freeband settings → Integrations → Apple Health you can opt in to write eligible steps, heart rate and sleep stages, including local history, when Freeband syncs. Freeband does not read Health data. Corrections can change its own entries; turning export off leaves them in Health. Use one exporting iPhone per band.</p><p>When building this version from source, check in Xcode that your Apple Developer team's development provisioning profile supports the HealthKit entitlement.</p>`,
     },
   ],
   tr: [
@@ -107,7 +107,7 @@ const STEPS: Record<Lang, Step[]> = {
     },
     {
       title: "İsteğe bağlı: Apple Health",
-      body: html`<p>Bant → Freeband ayarları → Entegrasyonlar → Apple Health bölümünden uygun adım, nabız ve uyku evrelerinin, telefondaki geçmiş dahil, Freeband açıkken aktarılmasını açabilirsin. Freeband Sağlık verilerini okumaz. Düzeltmeler kendi kayıtlarını değiştirebilir; kapatmak Sağlık'taki kayıtları silmez. Her bileklik için tek iPhone kullan.</p><p>Bu sürümü kaynak koddan derlerken Apple Developer ekibinin geliştirme hazırlama profilinin HealthKit yetkisini desteklediğini Xcode'da kontrol et.</p>`,
+      body: html`<p>Bant → Freeband ayarları → Entegrasyonlar → Apple Health bölümünden uygun adım, nabız ve uyku evrelerinin, telefondaki geçmiş dahil, Freeband eşzamanlandığında aktarılmasını açabilirsin. Freeband Sağlık verilerini okumaz. Düzeltmeler kendi kayıtlarını değiştirebilir; kapatmak Sağlık'taki kayıtları silmez. Her bileklik için tek iPhone kullan.</p><p>Bu sürümü kaynak koddan derlerken Apple Developer ekibinin geliştirme hazırlama profilinin HealthKit yetkisini desteklediğini Xcode'da kontrol et.</p>`,
     },
   ],
 };
@@ -161,8 +161,6 @@ const LABELS = {
     devH: "Build it from source instead",
     devP: "For developers: a Mac with Xcode 27 and a free Apple ID. These steps replace step 3; the rest stay the same.",
     never: "Never unpair the band in Mi Fitness and never factory-reset it. Either one changes the key, and you would need Mi Fitness again to get the new one.",
-    optionalH: "Optional: web access",
-    optional: html`The hub on this site is invite-only, so turning on Web access in the app needs an invite code. You can also run your own hub from ${c("hub/")} in the repository (Cloudflare Workers and D1); its README walks through it.`,
     stuckH: "Stuck?",
     stuck: html`Open an issue on <a href="${GITHUB_URL}/issues">GitHub</a>. Freeband's Diagnostics screen (Band → Freeband settings → Diagnostics) has a log and a report you can attach; check them for anything personal first.`,
     repo: "Source code on GitHub",
@@ -177,8 +175,6 @@ const LABELS = {
     devH: "Ya da kaynak koddan derle",
     devP: "Geliştiriciler için: Xcode 27 kurulu bir Mac ve ücretsiz bir Apple ID. Bu adımlar 3. adımın yerine geçer; gerisi aynı.",
     never: "Bandı Mi Fitness'ta asla eşleşmeden çıkarma ve fabrika ayarlarına döndürme. İkisi de anahtarı değiştirir; yenisini almak için yine Mi Fitness gerekir.",
-    optionalH: "İsteğe bağlı: web erişimi",
-    optional: html`Bu sitedeki hub davetle çalışıyor; uygulamada Web erişimini açmak için davet kodu gerekir. İstersen repodaki ${c("hub/")} klasöründen kendi hub'ını da kurabilirsin (Cloudflare Workers ve D1); README'si adım adım anlatıyor.`,
     stuckH: "Takıldın mı?",
     stuck: html`<a href="${GITHUB_URL}/issues">GitHub</a>'da bir issue aç. Freeband'in Tanılama ekranında (Bant → Freeband ayarları → Tanılama) ekleyebileceğin bir günlük ve rapor var; eklemeden önce kişisel bir şey içerip içermediğine bak.`,
     repo: "Kaynak kod GitHub'da",
@@ -231,8 +227,6 @@ export function guideBody(lang: Lang, testflight: string): Safe {
   </section>
 
   <section class="story-more">
-    <h2>${l.optionalH}</h2>
-    <p>${l.optional}</p>
     <h2>${l.stuckH}</h2>
     <p>${l.stuck}</p>
     <div class="actions note"><a class="btn ghost" href="${GITHUB_URL}">${l.repo}</a></div>

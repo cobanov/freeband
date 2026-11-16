@@ -59,7 +59,7 @@ final class FakeWriter: HealthKitWriting {
             bytes += [UInt8(truncatingIfNeeded: crc), UInt8(truncatingIfNeeded: crc >> 8),
                       UInt8(truncatingIfNeeded: crc >> 16), UInt8(truncatingIfNeeded: crc >> 24)]
         }
-        let band = Band(name: "Band 10 Pro", mac: "00:11:22:33:44:55")
+        let band = Band(name: "Band 10 Pro", mac: "AA:BB:CC:DD:5E:6F")
         let id = ActivityFileID(Data(bytes.prefix(7)))!
         context.insert(band)
         let blob = ActivityBlob(bandID: band.id, id: id, data: Data(bytes))
@@ -149,7 +149,7 @@ final class FakeWriter: HealthKitWriting {
         // A summary-only band and live observation must export without a minute file.
         let freshContainer = try ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let fresh = freshContainer.mainContext
-        let summaryBand = Band(name: "Synthetic band", mac: "00:11:22:33:44:66")
+        let summaryBand = Band(name: "Synthetic band", mac: "AA:BB:CC:DD:5E:70")
         fresh.insert(summaryBand)
         let summaryFixture = cases.first { ($0["name"] as? String)?.contains("daily summary v5 ending") == true }!
         let summaryHex = summaryFixture["hex"] as! String

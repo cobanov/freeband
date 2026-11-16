@@ -1,4 +1,5 @@
 """Independent recomputation of the MiProtocol test vectors (stdlib + cryptography)."""
+import struct
 import hashlib, hmac, json, sys
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
@@ -40,6 +41,16 @@ def clock(ts, tzname, h24):
     clk = f_bytes(1, date) + f_bytes(2, time) + f_bytes(3, zone) + f_varint(4, 0 if h24 else 1)
     return (f_varint(1, 2) + f_varint(2, 3) + f_bytes(4, f_bytes(4, clk))).hex()
 
+# SleepResult.Section: timezone 1{offset 1, zigzag}, valid_sleep_time 2 (seconds), sleep_timestamp 3,
+# wakeup_timestamp 4, average_heart_rate 5, average_blood_oxygen 6, extra_data 7 (five varints, optional)
+def sleep_section(tz, seconds, bed, wake, hr, spo2, extra=None):
+    s = f_bytes(1, f_sint(1, tz)) + f_varint(2, seconds) + f_varint(3, bed) + f_varint(4, wake) + f_varint(5, hr) + f_varint(6, spo2)
+    if extra: s += f_bytes(7, b"".join(f_varint(n + 1, v) for n, v in enumerate(extra)))
+    return s
+
+def sleep_result(*sections):
+    return (f_varint(1, 8) + f_varint(2, 41) + f_bytes(10, f_bytes(37, b"".join(f_bytes(1, s) for s in sections)))).hex()
+
 def crc16arc(data):
     crc = 0
     for b in data:
@@ -72,6 +83,65 @@ in_ct = from_watch(in_big)
 in_slices = [u16(1) + in_ct[:18], u16(2) + in_ct[18:36], u16(3) + in_ct[36:]]
 PLAIN, ENC = b"\0\0\x02\x02", b"\0\0\x02\x01"
 ACK, READY, DONE = w(b"\0\0\x03\0"), w(b"\0\0\x01\x01"), w(b"\0\0\x01\0")
+
+# Local bind (docs/BIND.md): the phone and the band, each from its own fixed key, with cryptography's
+# P-256. The band is played here; main.swift's band replies are checked against it too.
+from cryptography.hazmat.primitives.asymmetric import ec
+def p256(scalar): return ec.derive_private_key(int.from_bytes(scalar, "big"), ec.SECP256R1())
+def xy(k): n = k.public_key().public_numbers(); return n.x.to_bytes(32, "big") + n.y.to_bytes(32, "big")
+phone_key, band_key = p256(bytes(range(0x01, 0x21))), p256(bytes(range(0x21, 0x41)))
+app_random, band_random = bytes(range(0x50, 0x60)), bytes(range(0x60, 0x70))
+secret = band_key.exchange(ec.ECDH(), phone_key.public_key())
+assert secret == phone_key.exchange(ec.ECDH(), band_key.public_key())
+def sha_hmac(k, m): return hmac.new(k, m, hashlib.sha256).digest()
+def hkdf(salt, ikm, info, n):
+    prk, out, t, i = sha_hmac(salt, ikm), b"", b"", 1
+    while len(out) < n:
+        t = sha_hmac(prk, t + info + bytes([i])); out += t; i += 1
+    return out[:n]
+block = hkdf(app_random + band_random, secret, b"miwear-bind", 64)
+def acct(i, body): return f_varint(1, 1) + f_varint(2, i) + f_bytes(3, body)
+def b_err(i, code): return acct(i, f_varint(3, code)).hex()
+def b_info(verify, oob):
+    return acct(17, f_bytes(12, f_varint(1, verify) + f_bytes(2, b"SN0000") + f_bytes(3, b"AA:BB:CC:DD:5E:6F") + f_bytes(4, b"M0000")
+                            + f_varint(5, oob) + f_bytes(6, bytes(range(0x70, 0x80))) + f_bytes(7, b"did0"))).hex()
+def b_verify(code=b""):
+    return acct(18, f_bytes(18, f_bytes(1, xy(band_key)) + f_bytes(2, band_random) + f_bytes(3, sha_hmac(secret, band_random + code)))).hex()
+def b_confirm(ok): return acct(19, f_bytes(20, f_varint(1, int(ok)))).hex()
+def p_start(name=b"Freeband"):
+    return acct(17, f_bytes(11, f_varint(1, 0) + f_bytes(2, hashlib.md5(b"freeband-test").digest()) + (f_bytes(3, name) if name else b""))).hex()
+def send(b, wait): return "send:" + b.hex() + (":true" if wait else ":false")
+def p_verify(wait): return send(acct(18, f_bytes(17, f_bytes(1, b"0123456789abcdef") + f_bytes(2, xy(phone_key)))), wait)
+def p_confirm(wait, code=b""): return send(acct(19, f_bytes(19, f_bytes(1, app_random) + f_bytes(2, sha_hmac(secret, app_random + code)))), wait)
+def p_result(name=b"Freeband"):
+    info = f_bytes(1, b"freeband-test") + f_bytes(2, f_varint(1, 1) + f_bytes(3, name) + f_varint(4, 0xFFFFFFFF))
+    sealed = AESCCM(block[16:32], tag_length=4).encrypt(bytes(range(0x10, 0x1C)), info, b"bind-data")
+    return send(acct(25, f_bytes(29, f_bytes(1, sealed))), False)
+def p_bound(oob): return "bound:" + ":".join(x.hex() for x in (block[40:56], block[:16], block[16:32], block[32:36], block[36:40])) + f":0123456789abcdef:M0000:{oob}"
+def failed(what, tell=None): return f"failed:{what}:" + (tell or "-")
+tell_verify = b_err(19, 7)
+bind_want = {
+    "ccm_aad": AESCCM(key, tag_length=4).encrypt(ccm_nonce, b"BandProbe companion device test vector!", b"bind-data").hex(),
+    "ccm_aad_roundtrip": True,
+    "ccm_aad_wrong_rejected": True,
+    "nonce_cmd_app_id": (f_varint(1, 1) + f_varint(2, 26) + f_bytes(3, f_bytes(30, f_bytes(1, phone) + f_bytes(2, b"0123456789abcdef")))).hex(),
+    "bind_band_replies": [b_info(2, 3), b_verify(), b_confirm(True), b_err(25, 0)],
+    "bind_ok": [p_start(), p_verify(True), "ignored", "ignored", p_confirm(True), p_result(), p_bound(3), "ignored"],
+    "bind_code": [p_start(b""), p_verify(False), p_confirm(False, b"123456"), p_result(b""), p_bound(2)],
+    "bind_server_psk": [p_start(), failed("serverBindRequired"), "ignored"],
+    "bind_verify_mode_3": [p_start(), failed("unsupportedVerifyMode(3)")],
+    "bind_oob_numeric": [p_start(), failed("unsupportedOOB(1)")],
+    "bind_already_bound": [p_start(), failed("alreadyBound")],
+    "bind_wrong_proof": [p_start(), p_verify(False), failed("bandProofMismatch", tell_verify), "ignored"],
+    "bind_wrong_code": [p_start(), p_verify(False), failed("bandProofMismatch", tell_verify)],
+    "bind_off_curve": [p_start(), p_verify(False), failed("bandProofMismatch", tell_verify)],
+    "bind_declined": [p_start(), p_verify(True), p_confirm(True), failed("rejectedOnBand")],
+    "bind_cancelled": [p_start(), p_verify(True), p_confirm(True), failed("rejectedOnBand")],
+    "bind_state_error": [p_start(), p_verify(True), failed("band(code: 8, step: 18)")],
+    "bind_result_error": [p_start(), p_verify(True), p_confirm(True), p_result(), failed("band(code: 3, step: 25)")],
+    "bind_unexpected": [p_start(), failed("unexpectedReply(step: 17)")],
+    "bind_bad_config": [True, True, True, False],
+}
 
 want = {
     "ccm_decrypt": b"BandProbe companion device test vector!".hex(),
@@ -106,13 +176,26 @@ want = {
     "realtime_start": (f_varint(1, 8) + f_varint(2, 45)).hex(),
     "realtime_stop": (f_varint(1, 8) + f_varint(2, 46)).hex(),
     "live_parsed": "8421/312/74/9",
+    # gnss(18).gps_info(3){timestamp 1, longitude 2, latitude 3, altitude 4}; doubles are wire type 1, little-endian
+    "gps_info": (f_varint(1, 16) + f_varint(2, 2) + f_bytes(18, f_bytes(3, f_varint(1, 1760000000)
+                 + varint(2 << 3 | 1) + struct.pack("<d", 28.9784) + varint(3 << 3 | 1) + struct.pack("<d", 41.0082)
+                 + varint(4 << 3 | 1) + struct.pack("<d", 35.5)))).hex(),
+    "gps_info_no_altitude": (f_varint(1, 16) + f_varint(2, 2) + f_bytes(18, f_bytes(3, f_varint(1, 1760000000)
+                 + varint(2 << 3 | 1) + struct.pack("<d", 151.2093) + varint(3 << 3 | 1) + struct.pack("<d", -33.8688)))).hex(),
     # Gadgetbridge setCurrentTime: local date/time, sint32 (zigzag) 15-min offsets, name, isNot24hour
     "clock_istanbul": clock(1760000000, "Europe/Istanbul", True),
     "clock_newyork_12h": clock(1760000000, "America/New_York", False),
+    # docs/SLEEP-WRITEBACK.md: Command{8,41}, fitness(10).sleepResult(37), one section(1) per sleep
+    "sleep_result": sleep_result(sleep_section(12, 437 * 60, 1794090600, 1794117600, 56, 96)),
+    "sleep_result_two": sleep_result(
+        sleep_section(-16, 437 * 60, 1794090600, 1794117600, 56, 96, extra=(1794089700, 26220, 82, 91, 15)),
+        sleep_section(-16, 45 * 60, 1794140000, 1794143000, 0, 0)),
+    "sleep_result_empty": sleep_result(),
     # docs/ACTIVITY.md section 2.2
     "activity_today": "0808100152042a020800",
     "activity_past": "08081002",
     "activity_fetch": "080810035209120700f15365040001",
+    "activity_ack": (f_varint(1, 8) + f_varint(2, 5) + f_bytes(10, f_bytes(3, bytes.fromhex("00f15365040001")))).hex(),
     "notify_cmd": (f_varint(1, 7) + f_varint(2, 0) + f_bytes(9, f_bytes(3, f_bytes(1,
         f_bytes(1, b"dev.cobanov.freeband") + f_bytes(2, b"Freeband") + f_bytes(3, "Başlık".encode()) + f_bytes(4, b"")
         + f_bytes(5, b"Merhaba") + f_bytes(6, __import__("datetime").datetime.fromtimestamp(1760000000, __import__("datetime").timezone.utc).strftime("%Y%m%dT%H%M%S").encode())
@@ -126,6 +209,41 @@ want = {
     "resend_seqs": [[(nack + i) % 256 for i in range((next - nack) % 256)] if 0 < (next - nack) % 256 <= 32 else []
                     for next, nack in [(10, 10), (10, 7), (3, 250), (40, 8), (40, 7), (10, 11)]],
 }
+# Health monitoring settings: the expected bytes are built here field by field, in the order the
+# band sent them; a changed field keeps its place, a new one goes to the end.
+def hr_body(disabled, interval, sleep, tail9_11=True):
+    return (f_varint(1, disabled) + f_varint(2, interval) + f_varint(3, 1) + f_varint(4, 120)
+            + f_bytes(5, f_varint(1, sleep)) + f_varint(7, 1) + f_bytes(8, f_varint(1, 0) + f_varint(2, 40))
+            + f_varint(9, 2) + (f_varint(10, 0) if tail9_11 else b"") + f_varint(11, 1)
+            + f_varint(20, 300) + f_bytes(21, b"ab") + bytes([0xB5, 0x01, 1, 2, 3, 4]))
+def mon_set(sub, field, body): return (f_varint(1, 8) + f_varint(2, sub) + f_bytes(10, f_bytes(field, body))).hex()
+want.update({
+    "mon_get": [(f_varint(1, 8) + f_varint(2, s)).hex() for s in (8, 10, 14)],
+    "mon_reply": hr_body(0, 30, 1).hex(),
+    "mon_reply_other": True,
+    "mon_hr_parsed": "every(30)/true",
+    # field 10 came back as 0 (the band doesn't have it), so it is not sent
+    "mon_hr_1min": mon_set(11, 8, hr_body(0, 1, 1, tail9_11=False)),
+    "mon_hr_off": mon_set(11, 8, hr_body(1, 30, 1, tail9_11=False)),
+    "mon_hr_smart_nosleep": mon_set(11, 8, hr_body(0, 0, 0, tail9_11=False)),
+    "mon_hr_empty_smart": mon_set(11, 8, f_varint(1, 0) + f_varint(2, 0) + f_bytes(5, f_varint(1, 0)) + f_varint(7, 1)),
+    "mon_hr_garbage": "nil",
+    "mon_spo2_parsed": 0,
+    "mon_spo2_allday": mon_set(9, 7, f_varint(1, 1) + f_varint(2, 2) + f_bytes(4, f_varint(1, 1) + f_varint(2, 90))),
+    "mon_stress_parsed": False,
+    "mon_stress_on": mon_set(15, 10, f_varint(1, 1) + f_bytes(2, f_varint(1, 1) + f_varint(2, 0))),
+})
+# The band's state: charging is battery state 1 (2 and 3 are not); the 2/78 reply is not read;
+# the 2/79 push is {charging 1: 1 yes / 2 no, wearing 2, sleep 3}.
+want.update({
+    "battery_charging": ["false", "true", "false", "nil"],
+    "battery_level_with_state": 82,
+    "state_basic_not_read": "nil",
+    "state_pushed": "false/true/false",
+    # a push with only charging (2 = no): the other parts are not in it
+    "state_pushed_one_field": "false/nil/nil",
+})
+want.update(bind_want)
 bad = [k for k in want if got.get(k) != want[k]]
 for k in want:
     print(("OK  " if k not in bad else "FAIL"), k)

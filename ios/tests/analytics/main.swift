@@ -222,6 +222,10 @@ equal("full score", s1.score, 93)
 check("not estimated", !s1.estimated)
 equal("high confidence", s1.confidence.level, .high)
 near("duration sub", s1.contributors.first { $0.name == .duration }?.subscore, 430.0 / 480 * 100)
+// v2: the same night against a need of 12 h. Duration 430/720 -> 59.72; the other six are as above,
+// so the weighted mean is (35x59.72 + 15x98.611 + 1000 + 1000 + 770 + 1000 + 957.34) / 100 = 82.97,
+// but a score may stand at most 10 above its duration sub-score: 69.72 -> 70.
+equal("a short night can't be rescued by the rest", SleepScore.score(m1, sleepNeedMinutes: 720, previousMidSleeps: [180, 190, 170, 200]).score, 70)
 near("restfulness sub", s1.contributors.first { $0.name == .restfulness }?.subscore, 77)
 near("regularity value", s1.contributors.first { $0.name == .regularity }?.value, 5)
 near("regularity across midnight", SleepScore.regularityDeviation(10, previous: [1430, 1435, 5]), 15)
@@ -512,7 +516,7 @@ var inputs = (0 ..< 10).map { engineDay($0, rr: $0 >= 5) }
 for i in 1 ..< inputs.count { inputs[i].previousMinutes = inputs[i - 1].minutes; inputs[i].previousSleeps = inputs[i - 1].sleeps }
 let run = ScoreEngine.scoreRange(inputs, history: [], profile: athlete)
 equal("ten results", run.count, 10)
-equal("algorithm version", run[0].algoVersion, 1)
+equal("algorithm version", run[0].algoVersion, 3)
 check("day 0: no baseline, no recovery", run[0].recovery.score == nil && run[0].recovery.confidence.level == ConfidenceLevel.none)
 check("day 0: sleep scored", run[0].sleep.score != nil)
 equal("resting HR from sleep", run[0].restingHR?.source, .sleep)
@@ -546,6 +550,254 @@ noNightHR.sleeps[0].heartRate = []
 noNightHR.minutes = nil
 let bandOnly = ScoreEngine.score(noNightHR, history: [], profile: athlete)
 equal("band resting HR fallback", bandOnly.restingHR?.source, .band)
+// No night, only the band's running resting HR, and a full baseline that would otherwise score it:
+// 75 against a normal of 64 with sigma 1.92 (the 3% floor) is z = -5.7, f = 0. No night, no recovery.
+let restHistory = (1 ... 7).map { HistoryPoint(day: day0.adding(days: -$0), restingHR: 64) }
+let noNight = ScoreEngine.score(DayInputs(day: day0, bandRestingHR: 75), history: restHistory, profile: athlete)
+equal("the band's value is still the day's resting HR", noNight.restingHR?.value, 75)
+check("no night: no recovery", noNight.recovery.score == nil && noNight.recovery.confidence.level == ConfidenceLevel.none)
+equal("and the reason is the missing night", noNight.recovery.confidence.reasons.map(\.code), [.noSleep])
+
+// MARK: - Insights
+
+section("insights")
+/// `today` on day0, and before it `values` (the most recent first) on the days day0-1, day0-2, ...
+func insightDays(_ today: InsightDay, _ values: [Double?], _ set: (inout InsightDay, Double) -> Void) -> [InsightDay] {
+    [today] + values.enumerated().map { i, v in
+        var d = InsightDay(day: day0.adding(days: -(i + 1)))
+        if let v { set(&d, v) }
+        return d
+    }
+}
+func insights(_ history: [InsightDay], need: Double = 480) -> [Insight] {
+    Insights.compute(day: day0, history: history, sleepNeedMinutes: need)
+}
+func rhrCase(_ today: Double, _ before: [Double?]) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, restingHR: today), before) { $0.restingHR = $1 })
+}
+let flat50 = [Double?](repeating: 50, count: 14)
+// Normal 50, MAD 0, so sigma is the floor: max(1.5, 3% of 50) = 1.5.
+// 53.5: z = 3.5 / 1.5 = 2.33, a notice. 55: z = 3.33, a warning. 52: z = 1.33, nothing.
+equal("rhr 2.33 sigma", rhrCase(53.5, flat50), [Insight(kind: .restingHRHigh, tone: .notice, value: 53.5, reference: 50)])
+equal("rhr 3.33 sigma", rhrCase(55, flat50), [Insight(kind: .restingHRHigh, tone: .warning, value: 55, reference: 50)])
+equal("rhr 1.33 sigma", rhrCase(52, flat50), [])
+equal("rhr, 6-day baseline", rhrCase(55, Array(flat50.prefix(6))), [])
+equal("day without data", insights(insightDays(InsightDay(day: day0), flat50) { $0.restingHR = $1 }.filter { $0.day != day0 }), [])
+// Three days of 53.5: each day's own baseline still has median 50 and MAD 0 (two high days
+// among 14 don't move either), so each is 2.33 sigma: 3 days in a row is a warning.
+equal("rhr 3 days in a row", rhrCase(53.5, [53.5, 53.5] + flat50),
+      [Insight(kind: .restingHRHigh, tone: .warning, value: 53.5, reference: 50, days: 3)])
+// A day without a reading ends the run.
+equal("rhr run broken by a gap", rhrCase(53.5, [nil, 53.5] + flat50).first?.days, 1)
+// Normal 51 (seven 50s, seven 52s), MAD 1, sigma = max(1.4826, 1.5, 1.53) = 1.53.
+// 49: z = -1.31 and below every one of the 14 days. 50: not below the lowest.
+let alternating = (0 ..< 14).map { Double?($0 % 2 == 0 ? 50 : 52) }
+equal("rhr lowest in 14 days", rhrCase(49, alternating), [Insight(kind: .restingHRLowest, tone: .good, value: 49, reference: 51)])
+equal("rhr equal to the lowest", rhrCase(50, alternating), [])
+
+func hrvCase(_ today: Double) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, hrv: today), [Double?](repeating: 40, count: 14)) { $0.hrv = $1 })
+}
+// Normal 40, sigma floor max(3, 8% of 40) = 3.2. 33: z = -2.19. 30: z = -3.13. 35: z = -1.56.
+equal("hrv -2.19 sigma", hrvCase(33), [Insight(kind: .hrvLow, tone: .notice, value: 33, reference: 40)])
+equal("hrv -3.13 sigma", hrvCase(30).first?.tone, .warning)
+equal("hrv -1.56 sigma", hrvCase(35), [])
+
+func debtCase(_ minutes: Double, nights: Int) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, sleepMinutes: minutes), [Double?](repeating: minutes, count: nights - 1)) { $0.sleepMinutes = $1 })
+}
+// Need 480. Seven nights of 420: 7 x 60 = 420 min short. Of 390: 630. Of 450: 210.
+equal("sleep debt 7 h", debtCase(420, nights: 7), [Insight(kind: .sleepDebt, tone: .notice, value: 420, days: 7)])
+equal("sleep debt 10.5 h", debtCase(390, nights: 7), [Insight(kind: .sleepDebt, tone: .warning, value: 630, days: 7)])
+equal("sleep debt 3.5 h", debtCase(450, nights: 7), [])
+equal("sleep debt, 4 nights", debtCase(300, nights: 4), [])
+// Only the last 7 nights count: 10 nights of 420 is still 420.
+equal("sleep debt window", debtCase(420, nights: 10).first?.value, 420)
+
+func shiftCase(_ today: Double, _ before: Double, nights: Int = 7) -> [Insight] {
+    insights(insightDays(InsightDay(day: day0, midSleepMinute: today), [Double?](repeating: before, count: nights)) { $0.midSleepMinute = $1 })
+}
+// Middle of the night at 03:00 (180) on the nights before; 04:50 (290) is 110 min later.
+equal("sleep 110 min later", shiftCase(290, 180), [Insight(kind: .sleepShifted, tone: .notice, value: 110, days: 7)])
+equal("sleep 100 min earlier", shiftCase(80, 180).first?.value, -100)
+equal("sleep 60 min later", shiftCase(240, 180), [])
+// 23:50 (1430) before, 01:40 (100) now: 110 min later across midnight, not 1330 earlier.
+equal("sleep shift across midnight", shiftCase(100, 1430).first?.value, 110)
+// And the other way round: 01:40 before, 23:50 now is 110 min earlier.
+equal("sleep shift back across midnight", shiftCase(1430, 100).first?.value, -110)
+equal("sleep shift, 3 nights", shiftCase(290, 180, nights: 3), [])
+
+func loadCase(recovery: Double, hardDays: Int) -> [Insight] {
+    let before = [Double?](repeating: 11, count: hardDays) + [Double?](repeating: 8, count: 14)
+    return insights(insightDays(InsightDay(day: day0, recovery: recovery), before) { $0.strain = $1 })
+}
+// Strain normal 8, sigma floor 1.5; 11 is 2 sigma above on each of the three days.
+equal("3 hard days, recovery 30", loadCase(recovery: 30, hardDays: 3),
+      [Insight(kind: .loadWithoutRecovery, tone: .warning, value: 30, reference: 11, days: 3)])
+equal("3 hard days, recovery 40", loadCase(recovery: 40, hardDays: 3), [])
+equal("2 hard days, recovery 30", loadCase(recovery: 30, hardDays: 2), [])
+
+// Warnings come first: sleep debt (warning) before resting HR (notice), though its rule is later.
+var mixed = insightDays(InsightDay(day: day0, restingHR: 53.5, sleepMinutes: 390), flat50) { $0.restingHR = $1 }
+for i in 1 ... 6 { mixed[i].sleepMinutes = 390 }
+equal("warnings first", insights(mixed).map(\.kind), [.sleepDebt, .restingHRHigh])
+
+// MARK: - Battery estimate
+
+section("battery estimate")
+func reading(_ hours: Double, _ level: Int) -> (at: Date, level: Int) { (at(hours), level) }
+// 80% -> 68% in 24 h is 0.5% an hour; 68 / 0.5 = 136 h = 5.67 days.
+near("days left from one day of discharge", BatteryEstimate.daysLeft([reading(0, 80), reading(8, 76), reading(24, 68)]), 68 / 0.5 / 24, 1e-9)
+// A charge in between: only the readings after it count. 100 -> 94 in 12 h = 0.5% an hour; 94 / 0.5 / 24 = 7.83.
+near("only since the last charge", BatteryEstimate.daysLeft([reading(0, 60), reading(10, 40), reading(11, 100), reading(23, 94)]), 94 / 0.5 / 24, 1e-9)
+check("under 12 hours says nothing", BatteryEstimate.daysLeft([reading(0, 80), reading(6, 70)]) == nil)
+check("under 3 points says nothing", BatteryEstimate.daysLeft([reading(0, 80), reading(24, 78)]) == nil)
+check("no readings", BatteryEstimate.daysLeft([]) == nil)
+
+// MARK: - Analysis
+
+section("analysis")
+near("23:30 on the noon clock", Analysis.clockMinute(at(23.5), offsetMinutes: 0), 690)
+near("00:30 on the noon clock", Analysis.clockMinute(at(24.5), offsetMinutes: 0), 750)
+near("the file's own zone decides", Analysis.clockMinute(at(21.5), offsetMinutes: 180), 750)
+near("11:00 in the morning", Analysis.clockMinute(at(11), offsetMinutes: 0), 1380)
+
+// Beds 690, 720, 660 -> mean 690, distances 0, 30, 30 -> spread 20; wakes the same shape.
+let steady = Analysis.timing([(690, 1140), (720, 1170), (660, 1110)])
+near("mean bed", steady?.meanBed, 690)
+near("mean wake", steady?.meanWake, 1140)
+near("bed spread", steady?.bedSpread, 20)
+near("wake spread", steady?.wakeSpread, 20)
+check("two nights say nothing", Analysis.timing([(690, 1140), (720, 1170)]) == nil)
+
+// The 7 days ending on day0 against the 7 before.
+func aDay(_ back: Int, sleep: Double? = nil, nap: Double = 0, bed: Double? = nil, wake: Double? = nil,
+          recovery: Double? = nil, strain: Double? = nil, rhr: Double? = nil, hrv: Double? = nil) -> AnalysisDay {
+    AnalysisDay(day: day0.adding(days: -back), sleepMinutes: sleep, napMinutes: nap, bedMinute: bed, wakeMinute: wake,
+                recovery: recovery, strain: strain, restingHR: rhr, hrv: hrv, steps: nil)
+}
+let reviewDays = [
+    // Now: sleep with naps 400, 420, 380, 440 -> 410; RHR 58, 60, 62 -> 60; HRV 40, 44, 42 -> 42;
+    // recovery 70, 72, 74 -> 72; strain on two days only. Beds 600, 720, 840 (spread 80), wakes 1080, 1140, 1200 (40).
+    aDay(0, sleep: 400, bed: 600, wake: 1080, recovery: 70, strain: 9, rhr: 58, hrv: 40),
+    aDay(1, sleep: 420, bed: 720, wake: 1140, recovery: 72, strain: 11, rhr: 60, hrv: 44),
+    aDay(3, sleep: 380, bed: 840, wake: 1200, recovery: 74, rhr: 62, hrv: 42),
+    aDay(6, sleep: 400, nap: 40),
+    // Before: sleep 460, RHR 56, HRV 45, recovery 60 on three days.
+    aDay(7, sleep: 460, recovery: 60, rhr: 56, hrv: 45),
+    aDay(9, sleep: 460, recovery: 60, rhr: 56, hrv: 45),
+    aDay(13, sleep: 460, recovery: 60, rhr: 56, hrv: 45),
+    // Outside both periods.
+    aDay(14, sleep: 900, recovery: 5, rhr: 90, hrv: 5),
+]
+let review = Analysis.review(reviewDays, ending: day0, length: 7, sleepNeedMinutes: 480)
+near("sleep mean counts naps", review.change(.sleep)?.current, 410)
+near("sleep before", review.change(.sleep)?.previous, 460)
+near("sleep delta", review.change(.sleep)?.delta, -50)
+equal("sleep days", review.change(.sleep)?.days, 4)
+near("resting HR mean", review.change(.restingHR)?.current, 60)
+near("two days still have a mean", review.change(.strain)?.current, 10)
+check("but no change is read from them", review.change(.strain)?.delta == nil && review.change(.strain)?.settled == false)
+// Two short nights alone: a mean of 300 against 480, and nothing said yet.
+let twoNights = Analysis.review([aDay(0, sleep: 300), aDay(1, sleep: 300)], ending: day0, length: 7, sleepNeedMinutes: 480)
+near("two nights have a mean", twoNights.change(.sleep)?.current, 300)
+check("two nights are not a finding", twoNights.findings.isEmpty)
+equal("strain days", review.change(.strain)?.days, 2)
+check("no steps", review.change(.steps)?.current == nil)
+// 480 - 410 = 70: short, a notice (a warning from 90). Sleep fell 50. RHR +4. HRV 42 against 45 is
+// 3 under, less than 10% (4.5): silent. Recovery +12. Timing spread (80 + 40) / 2 = 60: irregular.
+equal("findings, notices before good news", review.findings.map(\.kind),
+      [.sleepShort, .sleepDown, .restingHRUp, .timingIrregular, .recoveryUp])
+equal("tones", review.findings.map(\.tone), [.notice, .notice, .notice, .notice, .good])
+near("irregular by", review.findings.first { $0.kind == .timingIrregular }?.value, 60)
+equal("a deficit of 90 is a warning", Analysis.review(reviewDays, ending: day0, length: 7, sleepNeedMinutes: 500).findings.first?.tone, .warning)
+check("nothing to say about an empty period", Analysis.review([], ending: day0, length: 7, sleepNeedMinutes: 480).findings.isEmpty)
+
+// Four nights in the week: 480 - 400, - 420, - 380, - 440 = 80 + 60 + 100 + 40.
+let debt = Analysis.sleepDebt(slept: [400, 420, 380, 440], sleepNeedMinutes: 480)
+near("debt over the week", debt?.minutes, 280)
+equal("debt nights", debt?.nights, 4)
+check("no nights, no debt", Analysis.sleepDebt(slept: [], sleepNeedMinutes: 480) == nil)
+near("nights over the need are a negative debt", Analysis.sleepDebt(slept: [500, 520], sleepNeedMinutes: 480)?.minutes, -60)
+
+// The band's running figure early in a day (75 at 02:00) is not a resting heart rate; the night's always is.
+check("a running daytime value waits for the day to end",
+      Analysis.settledRestingHR(scored: 75, fromSleep: false, bandValue: 75, dayIsOver: false) == nil)
+near("the same value once the day is over", Analysis.settledRestingHR(scored: 75, fromSleep: false, bandValue: 75, dayIsOver: true), 75)
+near("the night's value counts at once", Analysis.settledRestingHR(scored: 64, fromSleep: true, bandValue: 75, dayIsOver: false), 64)
+near("an unscored finished day uses the band's", Analysis.settledRestingHR(scored: nil, fromSleep: false, bandValue: 66, dayIsOver: true), 66)
+check("an unscored running day has none", Analysis.settledRestingHR(scored: nil, fromSleep: false, bandValue: 66, dayIsOver: false) == nil)
+
+// Today at 08:00 has strain 1 and 400 steps after six days of 13 and 9,000. Left in, the week's strain
+// is (6 x 13 + 1) / 7 = 11.29; as an unfinished day it is left out of strain and steps, not of recovery.
+var busyWeek = (1 ... 6).map { back -> AnalysisDay in
+    var d = aDay(back, recovery: 60, strain: 13)
+    d.steps = 9000
+    return d
+}
+var early = aDay(0, recovery: 67, strain: 1)
+early.steps = 400
+busyWeek.append(early)
+let asIfOver = Analysis.review(busyWeek, ending: day0, length: 7, sleepNeedMinutes: 480)
+near("a running day counted as a whole one", asIfOver.change(.strain)?.current, 79.0 / 7)
+let running = Analysis.review(busyWeek, ending: day0, length: 7, sleepNeedMinutes: 480, endingIsUnfinished: true)
+near("strain without the running day", running.change(.strain)?.current, 13)
+near("steps without the running day", running.change(.steps)?.current, 9000)
+equal("six finished days", running.change(.strain)?.days, 6)
+near("recovery is the morning's and stays in", running.change(.recovery)?.current, 61)
+
+// A day sleeper: beds at 11:30, 12:30 and 11:20, which are 1410, 30 and 1400 on the noon clock. Around
+// the median (1400) the 30 becomes 1470: mean 1426.67, distances 16.67, 43.33, 26.67 -> spread 28.89.
+let daySleeper = Analysis.timing([(1410, 1890), (30, 510), (1400, 1880)])
+near("beds either side of noon average near noon", daySleeper?.meanBed, 4280.0 / 3)
+near("and are close together", daySleeper?.bedSpread, 260.0 / 9)
+
+// One night on its own. 470 of 480 is within 15: met. Deep 90 + REM 110 = 200 of 470 = 42.6%: a good share.
+var goodNight = m1
+goodNight.totalSleepMinutes = 470
+goodNight.inBedMinutes = 495
+goodNight.stagesAvailable = true
+goodNight.deepMinutes = 90
+goodNight.remMinutes = 110
+goodNight.efficiency = 0.95
+goodNight.hrDip = 0.2
+equal("a good night", Analysis.nightNotes(goodNight, napMinutes: 0, sleepNeedMinutes: 480).map(\.kind), [.needMet, .restorativeHigh])
+// 300 of 480 is 3 h under: a warning. Deep 40 + REM 40 = 26.7%: small. 300 of 380 in bed = 78.9%: restless,
+// 80 min awake. Heart rate fell 5%: stayed up.
+var poorNight = goodNight
+poorNight.totalSleepMinutes = 300
+poorNight.inBedMinutes = 380
+poorNight.deepMinutes = 40
+poorNight.remMinutes = 40
+poorNight.efficiency = 300.0 / 380
+poorNight.hrDip = 0.05
+let poorNotes = Analysis.nightNotes(poorNight, napMinutes: 0, sleepNeedMinutes: 480)
+equal("a poor night, the warning first", poorNotes.map(\.kind), [.short, .restorativeLow, .restless, .heartRateStayedUp])
+equal("three hours short is a warning", poorNotes.first?.tone, .warning)
+near("minutes awake in bed", poorNotes.first { $0.kind == .restless }?.value, 80)
+near("restorative share", poorNotes.first { $0.kind == .restorativeLow }?.reference, 80.0 / 300)
+// A 150-minute nap brings the day to 450: 30 under, neither met nor short. No stages, no efficiency, no dip: silent.
+var plainNight = poorNight
+plainNight.stagesAvailable = false
+plainNight.efficiency = nil
+plainNight.hrDip = nil
+check("a nap counts, and nothing is said without data", Analysis.nightNotes(plainNight, napMinutes: 150, sleepNeedMinutes: 480).isEmpty)
+
+// Median 60, MAD 1, sigma 1.4826: the range is 60 +- 2.9652.
+let normal = [60.0, 62, 58, 61, 59]
+let inRange = Analysis.range(60, previous: normal, floor: .zero)
+near("range low", inRange.low, 60 - 2 * 1.4826)
+near("range high", inRange.high, 60 + 2 * 1.4826)
+equal("within", inRange.status, .within)
+equal("above", Analysis.range(64, previous: normal, floor: .zero).status, .above)
+equal("below", Analysis.range(56, previous: normal, floor: .zero).status, .below)
+equal("two days are calibrating", Analysis.range(64, previous: [60, 62], floor: .zero).status, .calibrating)
+equal("no value", Analysis.range(nil, previous: normal, floor: .zero).status, .calibrating)
+check("no history", Analysis.range(60, previous: [], floor: .zero).median == nil)
+// Blood oxygen 97, 98, 99, 98, 96, 98, 99: median 98, MAD 1, so 98 +- 2.9652 = 95.03...100.97; no one has 101%.
+let oxygen = Analysis.range(98, previous: [97, 98, 99, 98, 96, 98, 99], floor: .zero, bounds: 0 ... 100)
+near("the range stops at what the metric allows", oxygen.high, 100)
+near("and is untouched below", oxygen.low, 98 - 2 * 1.4826)
 
 // MARK: - Done
 

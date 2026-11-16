@@ -266,7 +266,7 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
             "records": .array(d.records.map { r -> JSON in
                 var x: [String: JSON] = [
                     "ts": jTime(r.ts), "steps": jInt(r.steps), "active_calories": jInt(r.activeCalories),
-                    "distance_m": jInt(r.distanceMeters), "heart_rate": jInt(r.heartRate), "energy": jInt(r.energy),
+                    "activity_level": jInt(r.activityLevel), "distance_m": jInt(r.distanceMeters), "heart_rate": jInt(r.heartRate), "energy": jInt(r.energy),
                     "spo2": jInt(r.spo2), "stress": jInt(r.stress),
                 ]
                 if let v = r.extraByte { x["extra_byte"] = jInt(v) }
@@ -322,6 +322,7 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
                 ])
             }),
             "rr": .array(s.rrIntervals.map { .object(["ts_raw": .int($0.tsRaw), "rr_ms": .array($0.intervalsMs.map { jInt($0) })]) }),
+            "respiratory": .array(s.respiratoryRate.map { .object(["ts": jTime($0.ts), "brpm": jInt($0.breathsPerMinute)]) }),
         ]
         if s.version >= 5 {
             o["v5_unknown_hex"] = jHex(s.unknownV5 ?? [])
@@ -356,6 +357,15 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
         if m.version >= 2 {
             o["zero_value_records"] = jInt(m.zeroValueRecords)
             if let e = m.stoppedReason { o["error"] = .string(e) }
+        }
+        return .object(o)
+
+    case let .workoutSummary(w):
+        // The reference's shape: integers as read, f32 fields to two decimals.
+        var o: [String: JSON] = ["sport": .string(w.sport)]
+        let floats: Set<String> = ["te_aerobic", "te_anaerobic", "speed_avg", "speed_max"]
+        for (key, value) in w.values {
+            o[key] = floats.contains(key) ? .double((value * 100).rounded() / 100) : jInt(Int64(value))
         }
         return .object(o)
 
@@ -874,12 +884,37 @@ check("pad byte != 0 warns but parses (except manual samples v1)") {
 
 check("workouts and unknown kinds are .unsupported(.kind), with the envelope checked") {
     var e: [String] = []
-    for (t, s, d, k) in [(UInt8(1), UInt8(8), UInt8(1), ActivityFileKind.workoutSummary), (1, 3, 0, .workoutDetails),
+    // 0x09 pool swimming: a sport without a summary table
+    for (t, s, d, k) in [(UInt8(1), UInt8(9), UInt8(1), ActivityFileKind.workoutSummary), (1, 3, 0, .workoutDetails),
                          (1, 23, 2, .workoutGPS), (1, 23, 3, .unknown), (0, 0x1F, 0, .unknown), (0, 0, 2, .unknown)] {
         let id = ActivityFileID(timestamp: 1_760_000_000, version: 9, type: t, subtype: s, detailType: d)
         let r = parsed(makeFile(id, body: [1, 2, 3]))
         e += expect(r.payload == .unsupported(.kind(k)) && r.crc?.ok == true && r.payloadLength == 3, "\(id): \(r.payload)")
     }
+    return e
+}
+
+check("workout summary: unknown version is unsupported, a short body is truncated, a route ride stays aligned") {
+    var e: [String] = []
+    let ride = [UInt8](fixtureBytes("workout summary OUTDOOR_CYCLING_V8"))
+    guard ride.count > 0x8D + 12, let id = ActivityFileID(bytes: ride[0 ..< 7]) else { return ["fixture"] }
+    let rideBody = Array(ride[8 ..< ride.count - 4])
+    for v: UInt8 in [0, 3, 7, 99] {
+        let other = ActivityFileID(timestamp: id.timestamp, version: v, type: 1, subtype: id.subtype, detailType: 1)
+        let r = parsed(makeFile(other, body: rideBody))
+        e += expect(r.payload == .unsupported(.version(.workoutSummary, v)), "v\(v): \(r.payload)")
+    }
+    for cut in [0, 1, 7, 40, 100] {
+        let r = parsed(makeFile(id, body: Array(rideBody.prefix(cut))))
+        if cut == 0 { e += expect(r.payload == .empty, "cut 0: \(r.payload)"); continue }
+        guard case .error(.truncated) = r.payload else { e.append("cut \(cut): \(r.payload)"); continue }
+    }
+    // Route byte at file offset 0x8D (docs 6.6): with 0xFF, eight more bytes follow it.
+    var route = rideBody
+    route[0x8D - 8] = 0xFF
+    route.insert(contentsOf: Array(repeating: 0x5A, count: 8), at: 0x8D - 8 + 1)
+    guard case let .workoutSummary(w) = parsed(makeFile(id, body: route)).payload else { return e + ["route ride"] }
+    e += expect(w.int("load") == 28 && w.int("vitality") == 7, "route ride load \(w.int("load") ?? -1) vitality \(w.int("vitality") ?? -1)")
     return e
 }
 
@@ -894,6 +929,89 @@ check("unknown versions of every parsed kind are .unsupported(.version)") {
         }
     }
     return e
+}
+
+check("finished minute files: every daily details id but the newest; other kinds never") {
+    // ids: ts u32 LE | tz | version | flags (0 details, 1 summary, 0x18 manual samples)
+    let ids = ["00f153650c0400", "3cf153650c0400", "78f153650c0400", "00f153650c0501", "00f153650c0218"].compactMap { ActivityFileID(hexData($0)) }
+    let finished = ActivityFileID.finishedDetails(in: ids).map(\.hex).sorted()
+    var e: [String] = []
+    if finished != ["00f153650c0400", "3cf153650c0400"] { e.append("got \(finished)") }
+    if !ActivityFileID.finishedDetails(in: [ids[0], ids[3]]).isEmpty { e.append("a single minute file is not finished") }
+    return e
+}
+
+check("sync plan: a file is left alone or acknowledged only with a final copy on the phone") {
+    // "now" is 2023-11-15 10:00 UTC. ids: ts u32 LE | tz 0 | version | flags (00 minute file,
+    // 01 summary, 20 sleep details, 18 manual samples).
+    let now = Date(timeIntervalSince1970: 1_700_042_400)
+    func fid(_ ts: Int, _ versionAndFlags: String) -> ActivityFileID {
+        var le = UInt32(ts).littleEndian
+        let bytes = withUnsafeBytes(of: &le) { Data($0) } + hexData("00" + versionAndFlags)
+        return ActivityFileID(bytes)!
+    }
+    func fetched(hoursAfterFileTime h: Double, _ file: ActivityFileID) -> Date { file.ts.addingTimeInterval(h * 3600) }
+    let minuteOld = fid(1_700_000_000, "0400")                     // on the past list, with successors on today's
+    let minuteA = fid(1_700_040_000, "0400"), minuteB = fid(1_700_040_600, "0400"), minuteNewest = fid(1_700_041_200, "0400")
+    let summaryToday = fid(1_700_006_400, "0501")                  // today 00:00, 10 h old, handed over on the past list
+    let sleepOld = fid(1_700_042_400 - 60 * 3600, "0620")          // 60 h old, copy fetched 40 h after it began: final
+    let summaryOldEvening = fid(1_700_042_400 - 58 * 3600, "0501") // 58 h old, but the copy is from its own evening (20 h)
+    let sleepLastNight = fid(1_700_042_400 - 11 * 3600, "0620")
+    let manualNew = fid(1_699_900_000, "0218")                     // 39 h old, not on the phone
+    // The band closed minuteOld and minuteA at a fetch and began the next file then: minuteOld's copy
+    // is from the moment minuteA began, minuteA's from 30 s before minuteB (inside the slack).
+    let stored: [ActivityFileID: Date] = [
+        minuteOld: minuteA.ts, minuteA: minuteB.ts.addingTimeInterval(-30),
+        summaryToday: fetched(hoursAfterFileTime: 9, summaryToday), sleepOld: fetched(hoursAfterFileTime: 40, sleepOld),
+        summaryOldEvening: fetched(hoursAfterFileTime: 20, summaryOldEvening), sleepLastNight: fetched(hoursAfterFileTime: 8, sleepLastNight),
+    ]
+    func plan(clear: Bool) -> ActivitySyncPlan {
+        ActivitySyncPlan.make(today: [minuteA, minuteB, minuteNewest, sleepOld, summaryOldEvening, sleepLastNight],
+                              past: [minuteOld, summaryToday, manualNew], now: now, storedAt: { stored[$0] }, mayAcknowledge: { _ in clear })
+    }
+    var e: [String] = []
+    // Left alone: minuteOld and minuteA (finished, stored) and sleepOld (settled, final copy).
+    // Fetched: today's summary though it came on the past list; summaryOldEvening, whose copy is of
+    // an unfinished day; and everything not stored or still changing.
+    let wantFetch = [minuteB, minuteNewest, summaryToday, summaryOldEvening, sleepLastNight, manualNew].sorted()
+    if plan(clear: true).fetch != wantFetch { e.append("fetch \(plan(clear: true).fetch.map(\.hex))") }
+    // Acknowledged: exactly the files left alone. Never one that is being fetched in this sync.
+    if plan(clear: true).acknowledge != [minuteOld, minuteA, sleepOld].sorted() { e.append("ack \(plan(clear: true).acknowledge.map(\.hex))") }
+    if !plan(clear: false).acknowledge.isEmpty { e.append("acknowledged with clearing off") }
+    if plan(clear: false).fetch != wantFetch { e.append("fetch changes with clearing") }
+    return e
+}
+
+check("sync plan: a copy taken while a day-long minute file was still growing is not final") {
+    // A band that keeps one minute file a day. Yesterday's began at 00:00 and was fetched at 18:00;
+    // today's file follows it, and it is 09:00. The copy lacks the evening: fetch again, never acknowledge.
+    let day = 1_700_006_400
+    func fid(_ ts: Int) -> ActivityFileID {
+        var le = UInt32(ts).littleEndian
+        return ActivityFileID(withUnsafeBytes(of: &le) { Data($0) } + hexData("000400"))!
+    }
+    let yesterday = fid(day), today = fid(day + 86_400)
+    let now = Date(timeIntervalSince1970: TimeInterval(day + 86_400 + 9 * 3600))
+    func plan(fetchedAt: Int) -> ActivitySyncPlan {
+        ActivitySyncPlan.make(today: [today], past: [yesterday], now: now,
+                              storedAt: { $0 == yesterday ? Date(timeIntervalSince1970: TimeInterval(fetchedAt)) : nil }, mayAcknowledge: { _ in true })
+    }
+    var e: [String] = []
+    let evening = plan(fetchedAt: day + 18 * 3600)
+    if evening.fetch != [yesterday, today] { e.append("fetch \(evening.fetch.map(\.hex))") }
+    if !evening.acknowledge.isEmpty { e.append("acknowledged a short copy") }
+    // Fetched again this morning, after today's file began: now the copy is whole.
+    let morning = plan(fetchedAt: day + 86_400 + 8 * 3600)
+    if morning.fetch != [today] || morning.acknowledge != [yesterday] { e.append("a whole copy is still fetched") }
+    return e
+}
+
+// Two v4 records in the shape a Band 10 Pro sends (header ff ff f8 cf ff ff). Group 2 is 0x83 in
+// the first (level 100b = 4, sport type 3) and 0xe0 in the second (level 7, a still wrist).
+check("daily details: activity level is the top three bits of group 2") {
+    guard case let .dailyDetails(d) = parsed(hexData("00f153650c040000fffff8cfffff3100038321005a64e40c000000000000000000e000000064e40c000000000000cf4fe1ae")).payload else { return ["parse"] }
+    let got = d.records.map { "\($0.steps ?? -1)/\($0.activityLevel ?? -1)/\($0.heartRate ?? -1)" }
+    return got == ["49/4/90", "0/7/0"] ? [] : ["got \(got)"]
 }
 
 check("daily details: every prefix keeps the whole records before the cut") {
@@ -977,6 +1095,18 @@ check("S1 Active sleep v2: no summary or stages, so the session comes from the f
         + expect(session.bedTime == at(1_794_124_320) && session.wakeTime == at(1_794_137_880), "08:52-12:38: \(session)")
         + expect(session.awakeMinutes == 30 && session.deepMinutes == nil && session.lightMinutes == nil && session.remMinutes == nil,
                  "30 min awake, no stages: \(session)")
+}
+
+check("type-10 packets: breaths per minute from byte 1, spread over the 10 minutes before the packet") {
+    let end: Int64 = 1_794_130_000
+    // three records: 14, none (0), 16; then a packet with an implausible 41 and a stray fifth byte
+    let extra = sleepPacket(10, ts: end * 1_000_000_000, payload: [120, 14, 77, 0, 90, 0, 60, 16, 131, 16, 80, 32])
+        + sleepPacket(10, ts: (end + 600) * 1_000_000_000, payload: [100, 41, 50, 0, 9])
+    guard case let .sleepDetails(s) = parsed(s1ActiveSleep(extra: extra)).payload else { return ["parse"] }
+    let got = s.respiratoryRate.map { [Int($0.ts.timeIntervalSince1970), $0.breathsPerMinute] }
+    // the file's own packet (1 record, 08:35:02 − 600 + 300), then 600·1/4 and 600·3/4 into the window
+    return expect(got == [[1_794_123_002, 7], [1_794_129_550, 14], [1_794_129_850, 16]], "breaths \(got)")
+        + expect(s.trailingBytes == 0 && s.skippedBytes == 0 && s.streamError == nil, "stream intact")
 }
 
 check("a type-16 summary keeps the header session even when events are present") {
@@ -1176,9 +1306,9 @@ check("random packets into the assembler never trap; completions always pass the
 check("available file list is fetched when the other list is missing") {
     let today = ActivityFileID(timestamp: 100, version: 4, type: 0, subtype: 0, detailType: 0)
     let past = ActivityFileID(timestamp: 200, version: 6, type: 0, subtype: 8, detailType: 1)
-    var errors = expect(ActivitySyncPlan.queue(today: [today], past: [], hasFile: { _ in false }) == [today], "missing past list lost today files")
-    errors += expect(ActivitySyncPlan.queue(today: [], past: [past], hasFile: { _ in false }) == [past], "missing today list lost past files")
-    errors += expect(ActivitySyncPlan.queue(today: [today], past: [today, past], hasFile: { $0 == past }) == [today], "duplicate or already stored file")
+    var errors = expect(ActivitySyncPlan.make(today: [today], past: [], now: Date(), storedAt: { _ in nil }, mayAcknowledge: { _ in false }).fetch == [today], "missing past list lost today files")
+    errors += expect(ActivitySyncPlan.make(today: [], past: [past], now: Date(), storedAt: { _ in nil }, mayAcknowledge: { _ in false }).fetch == [past], "missing today list lost past files")
+    errors += expect(ActivitySyncPlan.make(today: [today], past: [today, past], now: Date(), storedAt: { $0 == past ? Date() : nil }, mayAcknowledge: { _ in false }).fetch == [today], "duplicate or already stored file")
     return errors
 }
 

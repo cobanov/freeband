@@ -41,6 +41,7 @@ struct SleepNightScreen: View {
     private var day: DayKey? { selected ?? initialDay ?? nights.last }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.l) {
                 if let day, let night = history.mainSleep(day) {
@@ -52,6 +53,8 @@ struct SleepNightScreen: View {
             }
             .padding(.horizontal, FBSpace.gutter)
             .padding(.bottom, FBSpace.xl)
+        }
+        .debugScroll(proxy)
         }
         .fbScreen()
         .navigationTitle(String(localized: "Sleep"))
@@ -78,22 +81,43 @@ struct SleepNightScreen: View {
                 pager("chevron.left", String(localized: "Previous night"), enabled: index > 0) { step(-1) }
                 pager("chevron.right", String(localized: "Next night"), enabled: index < nights.count - 1) { step(1) }
             }
-            Text(FBFormat.duration(minutes: metrics?.totalSleepMinutes ?? Double(night.totalSleepMinutes ?? 0)))
-                .textStyle(.figureL)
-                .foregroundStyle(.textPrimary)
-                .accessibilityLabel(Text("Slept \(FBFormat.duration(minutes: metrics?.totalSleepMinutes ?? 0))"))
-            Text(spanLine(night: night, metrics: metrics))
-                .textStyle(.subhead)
-                .foregroundStyle(.textSecondary)
         }
-
-        ListCard {
-            NavigationLink(value: Route.score(.sleep, day: day.index)) {
-                ListRow(title: String(localized: "Sleep score"), value: scoreValue(day), systemImage: "moon", showsDivider: false)
+        let asleep = metrics?.totalSleepMinutes ?? Double(night.totalSleepMinutes ?? 0)
+        NavigationLink(value: Route.score(.sleep, day: day.index)) {
+            Card(padding: FBSpace.m) {
+                HStack(alignment: .center, spacing: FBSpace.m) {
+                    ScoreArc(kind: .sleep, value: history.score(.sleep, day), style: .hero)
+                    VStack(alignment: .leading, spacing: FBSpace.xs) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(FBFormat.duration(minutes: asleep))
+                                .textStyle(.figureM)
+                                .foregroundStyle(.textPrimary)
+                                .accessibilityLabel(Text("Slept \(FBFormat.duration(minutes: asleep))"))
+                            Text(spanLine(night: night, metrics: metrics))
+                                .textStyle(.subhead)
+                                .foregroundStyle(.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        VStack(spacing: FBSpace.xxs) {
+                            FactRow(String(localized: "Deep", comment: "Sleep stage"), night.deepMinutes.map { FBFormat.duration(minutes: Double($0)) })
+                            FactRow(String(localized: "REM", comment: "Sleep stage"), night.remMinutes.map { FBFormat.duration(minutes: Double($0)) })
+                        }
+                    }
+                }
             }
-            .buttonStyle(.fbRow)
         }
-
+        .buttonStyle(.plain)
+        let need = Double(Profile.load().sleepNeed)
+        let napMinutes = history.napMinutes(day)
+        if let metrics {
+            NightReviewCard(notes: Analysis.nightNotes(metrics, napMinutes: napMinutes, sleepNeedMinutes: need), napped: napMinutes > 0)
+        }
+        VStack(alignment: .leading, spacing: FBSpace.xs) {
+            SectionHeader(title: String(localized: "Sleep need"))
+            SleepNeedCard(slept: asleep, naps: napMinutes, need: need,
+                          debt: Analysis.sleepDebt(slept: lastNights(day), sleepNeedMinutes: need))
+        }
+        .id("need")
         let segments = night.hypnogramSegments
         if !segments.isEmpty {
             VStack(alignment: .leading, spacing: FBSpace.xs) {
@@ -113,6 +137,9 @@ struct SleepNightScreen: View {
                 Card { NightLineChart(points: hr, tint: .heart, label: String(localized: "Heart rate")) }
             }
         }
+
+        NightHRVSection(night: night, value: result?.hrv?.rmssd)
+            .id("hrv")
 
         let spo2 = night.spo2Points
         if spo2.count > 1 {
@@ -147,6 +174,14 @@ struct SleepNightScreen: View {
         }
 
         Footnote(sourceNote(night: night, result: result))
+    }
+
+    /// Each of the last days' sleep with its naps, as the sleep debt insight counts them.
+    private func lastNights(_ day: DayKey) -> [Double] {
+        (0 ..< Insights.debtNights).compactMap { back in
+            let d = day.adding(days: -back)
+            return history.sleepMinutes(d).map { $0 + history.napMinutes(d) }
+        }
     }
 
     @ViewBuilder private func details(day: DayKey, night: SleepRecord, result: DayScoreResult?) -> some View {

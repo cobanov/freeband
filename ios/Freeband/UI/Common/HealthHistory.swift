@@ -109,29 +109,42 @@ final class HealthHistory {
         }
     }
 
+    /// What stands out on `day` (Insights). 90 days back: 60 for a baseline, and room for the
+    /// days of a run to have their own.
+    func insights(_ day: DayKey, sleepNeedMinutes: Int) -> [Insight] {
+        let days = (0 ..< 90).map { back -> InsightDay in
+            let d = day.adding(days: -back)
+            // A nap pays back debt: the day's sleep is the night plus its naps.
+            let naps = napMinutes(d)
+            return InsightDay(day: d, restingHR: settledRestingHR(d), hrv: score(d)?.hrv, sleepMinutes: sleepMinutes(d).map { $0 + naps },
+                              midSleepMinute: score(d)?.midSleepMinute, strain: score(.strain, d), recovery: score(.recovery, d))
+        }
+        return Insights.compute(day: day, history: days, sleepNeedMinutes: Double(sleepNeedMinutes))
+    }
+
     /// Daily points ending on `end`, oldest first; days without data are nil (they break lines).
     func points(_ metric: TrendMetric, ending end: DayKey, days: Int = 90,
                 override: [DayKey: Double] = [:]) -> [TrendPoint] {
         (0..<days).reversed().map { back in
             let day = end.adding(days: -back)
-            return TrendPoint(date: day.date, value: override[day] ?? value(metric, on: day))
+            return TrendPoint(date: day.date, value: override[day] ?? settledValue(metric, on: day))
         }
     }
 
     /// Mean of the 7 days before `day` (not counting it).
     func average(_ metric: TrendMetric, before day: DayKey, days: Int = 7) -> Double? {
-        let values = (1...days).compactMap { value(metric, on: day.adding(days: -$0)) }
+        let values = (1...days).compactMap { settledValue(metric, on: day.adding(days: -$0)) }
         return values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
     }
 
     /// Valid days of a metric in the 14 days before `day` (the baseline window).
     func baselineDays(_ metric: TrendMetric, before day: DayKey) -> Int {
-        (1...Baseline.window).filter { value(metric, on: day.adding(days: -$0)) != nil }.count
+        (1...Baseline.window).filter { settledValue(metric, on: day.adding(days: -$0)) != nil }.count
     }
 
     /// 14-day median before `day`.
     func median(_ metric: TrendMetric, before day: DayKey) -> Double? {
-        let values = (1...Baseline.window).compactMap { value(metric, on: day.adding(days: -$0)) }.sorted()
+        let values = (1...Baseline.window).compactMap { settledValue(metric, on: day.adding(days: -$0)) }.sorted()
         guard !values.isEmpty else { return nil }
         let mid = values.count / 2
         return values.count % 2 == 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid]
@@ -157,5 +170,61 @@ struct BandHealthReader<Content: View>: View {
 
     var body: some View {
         content(HealthHistory(bandID: band.id, scores: scores, summaries: summaries, sleeps: sleeps))
+    }
+}
+
+/// One calendar day as the analysis charts draw it.
+struct AnalysisRow: Identifiable {
+    var day: AnalysisDay
+    /// Local midnight.
+    var date: Date
+    /// The night's stages, minutes; nil when the band sent none.
+    var deep: Double?
+    var rem: Double?
+    var light: Double?
+    /// Minutes in heart-rate zones 1...5.
+    var zones: [Int]?
+
+    var id: Int { day.day.index }
+}
+
+extension HealthHistory {
+    /// Resting heart rate for everything but Today's own figure (`Analysis.settledRestingHR`).
+    /// A day is over when a later day has data.
+    func settledRestingHR(_ d: DayKey) -> Double? {
+        Analysis.settledRestingHR(scored: score(d)?.rhr, fromSleep: score(d)?.rhrSource == "sleep",
+                                  bandValue: summary(d)?.hrResting.map(Double.init), dayIsOver: d.index < (lastDay?.index ?? d.index))
+    }
+
+    /// A metric's value as trends and baselines read it: `value`, except that an unfinished
+    /// day's running resting heart rate is left out.
+    func settledValue(_ metric: TrendMetric, on day: DayKey) -> Double? {
+        metric == .restingHeartRate ? settledRestingHR(day) : value(metric, on: day)
+    }
+
+    /// Minutes napped on the day.
+    func napMinutes(_ d: DayKey) -> Double { result(d)?.naps.reduce(0) { $0 + $1.minutes } ?? 0 }
+
+    func analysisDay(_ d: DayKey) -> AnalysisDay {
+        let night = mainSleep(d)
+        let bed = night.map { Analysis.clockMinute($0.bedTime, offsetMinutes: $0.tzOffsetMinutes) }
+        let wake = night.flatMap { n in bed.map { $0 + n.wakeTime.timeIntervalSince(n.bedTime) / 60 } }
+        return AnalysisDay(day: d, sleepMinutes: sleepMinutes(d), napMinutes: napMinutes(d), bedMinute: bed, wakeMinute: wake,
+                           recovery: score(.recovery, d), strain: score(.strain, d),
+                           restingHR: settledRestingHR(d), hrv: score(d)?.hrv, steps: value(.steps, on: d))
+    }
+
+    /// `count` days ending on `end`, oldest first.
+    func analysisRows(ending end: DayKey, count: Int) -> [AnalysisRow] {
+        (0 ..< count).reversed().map { back in
+            let d = end.adding(days: -back)
+            let metrics = result(d)?.sleep.metrics
+            let night = mainSleep(d)
+            return AnalysisRow(day: analysisDay(d), date: d.date,
+                               deep: metrics?.deepMinutes ?? night?.deepMinutes.map(Double.init),
+                               rem: metrics?.remMinutes ?? night?.remMinutes.map(Double.init),
+                               light: metrics?.lightMinutes ?? night?.lightMinutes.map(Double.init),
+                               zones: result(d)?.strain.map { Array($0.zoneMinutes.dropFirst()) })
+        }
     }
 }

@@ -52,6 +52,8 @@ enum FBTextStyle: String, CaseIterable, Identifiable, Sendable {
 
     /// PostScript name for this style's weight; `bold` is the Bold Text accessibility setting.
     func fontName(bold: Bool = false) -> String {
+        // 600 (figures and titles since v4) is already the heaviest cut bundled.
+        if weight >= 600 { return FBTokenTable.FontName.semibold }
         switch (weight >= 500, bold) {
         case (false, false): return FBTokenTable.FontName.regular
         case (false, true): return FBTokenTable.FontName.medium

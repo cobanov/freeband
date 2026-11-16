@@ -39,8 +39,10 @@ struct ScoreArc: View {
         case home
         /// 200pt, 4pt stroke, figureXL with the word in the gap: score detail.
         case detail
-        /// 64pt, 3pt stroke, figureS: Home triad rows at large text sizes.
+        /// 64pt, 6pt stroke, figureS: the Sleep and Strain cards on Home.
         case compact
+        /// 148pt, 12pt stroke, figureL: the Recovery card on Home.
+        case hero
     }
 
     let kind: ScoreKind
@@ -52,6 +54,7 @@ struct ScoreArc: View {
     @ScaledMetric(relativeTo: .title2) private var homeDiameter: CGFloat = 104
     @ScaledMetric(relativeTo: .largeTitle) private var detailDiameter: CGFloat = 200
     @ScaledMetric(relativeTo: .body) private var compactDiameter: CGFloat = FBSize.scoreArcCompact
+    @ScaledMetric(relativeTo: .title2) private var heroDiameter: CGFloat = 148
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.locale) private var locale
     @Environment(\.legibilityWeight) private var legibilityWeight
@@ -64,10 +67,18 @@ struct ScoreArc: View {
         case .home: min(homeDiameter, 150)
         case .detail: min(detailDiameter, 280)
         case .compact: min(compactDiameter, 88)
+        case .hero: min(heroDiameter, 180)
         }
     }
 
-    private var stroke: CGFloat { style == .detail ? FBStroke.arcDetail : FBStroke.arcHome }
+    private var stroke: CGFloat {
+        switch style {
+        case .home: FBStroke.arcHome
+        case .detail: FBStroke.arcDetail
+        case .compact: 6
+        case .hero: 12
+        }
+    }
 
     private var fraction: Double? {
         guard let value else { return nil }
@@ -80,16 +91,21 @@ struct ScoreArc: View {
 
     var body: some View {
         ZStack {
-            ArcShape()
-                .inset(by: stroke / 2)
-                .stroke(.hairlineStrong, style: StrokeStyle(lineWidth: FBStroke.track, lineCap: .butt))
-            notches
-            if let fraction, let band {
+            // The ring: a track in the score's own colour, the value over it with round ends,
+            // and the band thresholds cut out of both.
+            ZStack {
                 ArcShape()
                     .inset(by: stroke / 2)
-                    .trim(from: 0, to: revealed ? fraction : 0)
-                    .stroke(band.color, style: StrokeStyle(lineWidth: stroke, lineCap: .butt))
+                    .stroke(band.map { $0.color.opacity(0.2) } ?? Color.hairlineStrong, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+                if let fraction, let band, fraction > 0 {
+                    ArcShape()
+                        .inset(by: stroke / 2)
+                        .trim(from: 0, to: revealed ? fraction : 0)
+                        .stroke(band.color, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+                }
+                notches.blendMode(.destinationOut)
             }
+            .compositingGroup()
             number
             if wordVisible { gapWord }
         }
@@ -113,7 +129,7 @@ struct ScoreArc: View {
                 var tick = Path()
                 tick.move(to: CGPoint(x: c.x + (r - half) * cos(angle), y: c.y + (r - half) * sin(angle)))
                 tick.addLine(to: CGPoint(x: c.x + (r + half) * cos(angle), y: c.y + (r + half) * sin(angle)))
-                context.stroke(tick, with: .color(.hairlineStrong), style: StrokeStyle(lineWidth: FBStroke.notch, lineCap: .butt))
+                context.stroke(tick, with: .color(.black), style: StrokeStyle(lineWidth: FBStroke.notch, lineCap: .butt))
             }
         }
         .accessibilityHidden(true)
@@ -124,6 +140,7 @@ struct ScoreArc: View {
         case .home: .figureM
         case .detail: .figureXL
         case .compact: .figureS
+        case .hero: .figureL
         }
     }
 
@@ -205,6 +222,8 @@ struct ScoreTile: View {
                 .textStyle(.subhead)
                 .foregroundStyle(value == nil ? Color.textTertiary : Color.textSecondary)
         }
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
         .multilineTextAlignment(alignment == .center ? .center : .leading)
     }
 }

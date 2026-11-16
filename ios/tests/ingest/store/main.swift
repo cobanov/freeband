@@ -80,7 +80,7 @@ func fixture(_ nameContains: String) -> Data? {
 func container() -> ModelContainer {
     // swiftlint:disable:next force_try
     try! ModelContainer(for: Band.self, Sample.self, Webhook.self, ActivityBlob.self, MinuteDay.self, DaySummary.self,
-                        SleepRecord.self, SleepRR.self, ManualReading.self, DailyScore.self,
+                        SleepRecord.self, SleepRR.self, ManualReading.self, DailyScore.self, Workout.self,
                         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
 }
 
@@ -122,7 +122,7 @@ func run() async {
         }
         store(ctx, band: band, data)
     }
-    // A workout summary is stored too and must stay raw.
+    // A workout summary (Gadgetbridge's treadmill v11 test file) becomes one Workout row.
     let workout = hexData("12b1eb69080b8d00fbffefef91ffc0003f12b1eb6930b8eb69180700007f1100008900950100005801000013030000271300005800a300a800a7b35e66668640000000002800e9010000c70400003d0000000e00000010000000ba00170700006666e63f0003000000000000000000a00f0000000000000000000000009411000068000300000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000f2b84b9a")
     store(ctx, band: band, workout)
 
@@ -133,7 +133,13 @@ func run() async {
     equal("nothing pending after", ingest.pendingBlobs().count, 0)
     let blobs = (try? ctx.fetch(FetchDescriptor<ActivityBlob>())) ?? []
     check("every file at the current parser", blobs.allSatisfy { $0.parserVersion == ActivityIngest.parserVersion && $0.parsedAt != nil })
-    equal("workout status", blobs.first { $0.fileID == ActivityFileID(workout.prefix(7))?.hex }?.parseStatus, "unsupported")
+    equal("workout status", blobs.first { $0.fileID == ActivityFileID(workout.prefix(7))?.hex }?.parseStatus, "parsed")
+    let workouts = (try? ctx.fetch(FetchDescriptor<Workout>())) ?? []
+    equal("one workout", workouts.count, 1)
+    // Gadgetbridge's asserted values: calibrated distance 4500 m (measured 4479), average HR 167, load 104.
+    equal("workout facts", [workouts.first?.distanceMeters, workouts.first?.hrAvg, workouts.first?.load], [4500, 167, 104])
+    equal("workout sport and day", [workouts.first?.sport, workouts.first?.day], ["treadmill", "2026-04-24"])
+    equal("zero VO2max is absent", workouts.first?.vo2max, nil)
     // v4 (2025-10-14) and v3 (2025-10-15) minute files: two days.
     equal("minute days", count(MinuteDay.self, ctx), 2)
     // v5 details, v2 details, stages: three sleeps; the no-data stages file makes none.
@@ -240,8 +246,17 @@ func run() async {
     equal("rollup twice: no duplicates", count(DailyScore.self, ctx), 3)
     equal("steps helper", DailyRollup.steps(context: ctx, bandID: band, day: DayKey(string: "2025-10-14")!, now: then) != nil, true)
 
+    // The band sends a manual samples file again under the same id with other readings in it
+    // (measured on a Band 10 Pro): the new reading is added and the earlier ones stay.
+    store(ctx, band: band, hexData("0090a9650402180000a0a96511589fd678b1"))
+    _ = await ingest.ingestPending()
+    equal("manual file with new content: readings added", count(ManualReading.self, ctx), 6)
+    _ = await ingest.reparseAll()
+    equal("reparse all keeps earlier manual readings", count(ManualReading.self, ctx), 6)
+
     // MARK: wiping
 
+    equal("still one workout after the reparses", count(Workout.self, ctx), 1)
     section("wipe")
     ActivityIngest.deleteDerived(context: ctx, bandID: UUID(), includingScores: true)
     try? ctx.save()
@@ -250,6 +265,7 @@ func run() async {
     try? ctx.save()
     equal("derived gone", [count(MinuteDay.self, ctx), count(SleepRecord.self, ctx), count(SleepRR.self, ctx),
                            count(ManualReading.self, ctx), count(DaySummary.self, ctx), count(DailyScore.self, ctx)], [0, 0, 0, 0, 0, 0])
+    equal("workouts gone", count(Workout.self, ctx), 0)
     equal("raw files kept", count(ActivityBlob.self, ctx), names.count + 1)
 
     // MARK: demo data through the real pipeline
@@ -265,6 +281,12 @@ func run() async {
     equal("one band", count(Band.self, dctx), 1)
     check("minute days", count(MinuteDay.self, dctx) == 30)
     check("RR for 20 nights", count(SleepRR.self, dctx) >= 19)
+    // 30 days with a run on about every third; today's is missing before it ends.
+    let demoWorkouts = (try? dctx.fetch(FetchDescriptor<Workout>())) ?? []
+    check("demo workouts", demoWorkouts.count >= 12, "\(demoWorkouts.count)")
+    check("demo workouts are plausible runs", demoWorkouts.allSatisfy {
+        ($0.distanceMeters ?? 0) > 3000 && (110 ... 180).contains($0.hrAvg ?? 0) && (240 ... 480).contains($0.paceAvg ?? 0)
+    }, "\(demoWorkouts.map { [$0.distanceMeters ?? 0, $0.hrAvg ?? 0, $0.paceAvg ?? 0] }.prefix(3))")
     let decoded = demoScores.compactMap(\.result)
     equal("all decode", decoded.count, 30)
     check("first nights: no RR", decoded.prefix(10).allSatisfy { !$0.hasRR })

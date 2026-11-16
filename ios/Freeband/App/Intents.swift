@@ -1,7 +1,8 @@
 import AppIntents
 import SwiftData
 
-// Siri and Shortcuts use the same selected band and actions as the Band tab.
+// Siri and Shortcuts: the same actions as the Band tab. They open the app because
+// CoreBluetooth needs it running (there is no background Bluetooth mode yet).
 
 struct FindBandIntent: AppIntent {
     static var title: LocalizedStringResource = "Find band"

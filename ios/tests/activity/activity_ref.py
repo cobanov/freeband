@@ -291,7 +291,7 @@ class _GroupWalker:
 def _daily_details_record(version: int, header: bytes, cur: Cursor) -> dict:
     g = _GroupWalker(header, cur)
     rec = {
-        "steps": None, "active_calories": None, "distance_m": None, "heart_rate": None,
+        "steps": None, "active_calories": None, "activity_level": None, "distance_m": None, "heart_rate": None,
         "energy": None, "spo2": None, "stress": None,
     }
     extra = 0
@@ -301,10 +301,12 @@ def _daily_details_record(version: int, header: bytes, cur: Cursor) -> dict:
             extra = x.bits(1, 1)
         if x.valid(2):
             rec["steps"] = x.bits(2, 14)
-    x = g.next(8)  # g1: [7..6] unknown | [5..0] active calories
+    x = g.next(8)  # g1: [7..6] activity type (not read) | [5..0] active calories
     if x is not None and x.valid(1):
         rec["active_calories"] = x.bits(2, 6)
-    g.next(8)  # g2: unknown
+    x = g.next(8)  # g2: [7..5] activity level, 0 quiet .. 5 severe | [4..0] sport type (not read)
+    if x is not None and x.valid(0):
+        rec["activity_level"] = x.bits(0, 3)
     x = g.next(16)  # g3: distance in metres
     if x is not None and x.valid(0):
         rec["distance_m"] = x.raw
@@ -470,7 +472,7 @@ def parse_sleep_details(fid: FileId, body: bytes) -> dict:
         out["hr"] = out["spo2"] = out["snore"] = None
         cur.pos = blocks_at
 
-    packets, stages, summaries, rr = [], [], [], []
+    packets, stages, summaries, rr, breaths = [], [], [], [], []
     out["skipped_bytes"] = 0
     data, pos, end = cur.data, cur.pos, cur.end
     while end - pos >= STAGE_PACKET_HEADER:
@@ -521,11 +523,21 @@ def parse_sleep_details(fid: FileId, body: bytes) -> dict:
             rr.append({"ts_raw": ts, "rr_ms": [10 * b for b in payload]})
         else:
             pkt["payload_hex"] = payload.hex()
+            if ptype == 10:
+                # 4-byte records, breaths per minute in byte 1; a packet's records share the
+                # 10 minutes that end at its ts, evenly (docs/ACTIVITY.md 6.3.2)
+                n = length // 4
+                first = packet_seconds(ts) - 600
+                for i in range(n):
+                    rate = payload[4 * i + 1]
+                    if 1 <= rate <= 40:
+                        breaths.append({"ts": first + (i + 1) * 600 // (n + 1), "brpm": rate})
     out["trailing_bytes"] = end - pos
     out["packets"] = packets
     out["stages"] = stages
     out["summaries"] = summaries
     out["rr"] = rr
+    out["respiratory"] = breaths
     out["sleep_spans"] = sleep_spans(packets)
     return out
 
@@ -640,6 +652,126 @@ def parse_manual_samples(fid: FileId, body: bytes, pad: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# workout summary (docs/ACTIVITY.md section 6.6)
+
+WORKOUT_TYPES = {1: "outdoor_running", 2: "walking", 3: "hiking", 4: "trekking", 5: "trail_running",
+                 6: "outdoor_cycling", 7: "indoor_cycling", 8: "freestyle", 15: "outdoor_walking", 16: "hiit",
+                 333: "indoor_walking", 399: "indoor_fitness"}
+# subtype -> (sport when no workout type decides, header bytes by version)
+WORKOUT_HEADERS = {
+    # 0x01 and 0x02 (legacy outdoor run and walk, v4): documented, but no real file seen; they stay raw.
+    0x03: ("treadmill", {5: 4, 9: 6, 10: 8, 11: 9}),
+    0x07: ("indoor_cycling", {8: 7, 9: 8}),
+    0x08: ("freestyle", {5: 3, 7: 5, 8: 6, 9: 6, 10: 6}),
+    0x0B: ("elliptical", {3: 4, 4: 4, 5: 4, 6: 4}),
+    0x0D: ("rowing", {4: 4, 6: 5, 7: 5, 8: 6}),
+    0x16: ("workout", {1: 5, 2: 6, 4: 7, 5: 9, 6: 9, 9: 13}),
+    0x17: ("outdoor_cycling", {4: 6, 5: 6, 6: 7, 8: 8}),
+}
+_TIMES = [("start", 4), ("end", 4), ("active_s", 4)]
+_HR = [("hr_avg", 1), ("hr_max", 1), ("hr_min", 1)]
+_ZONES = [(f"zone_{z}_s", 4) for z in ("extreme", "anaerobic", "aerobic", "fat_burn", "warm_up")]
+_LOAD_VITALITY = [("load", 2), (None, 15), ("vitality", 1)]
+
+
+def workout_fields(subtype: int, v: int) -> list:
+    """(name, size) in file order; size 'f' is an f32, name None skips, 'route' is the route byte."""
+    f = []
+    if subtype in (0x01, 0x02):
+        f = _TIMES + [("distance_m", 4), ("calories", 4), (None, 12), ("steps", 4), (None, 2)] + _HR
+    elif subtype == 0x16:
+        f = [("workout_type", 2)] + _TIMES + [(None, 4), ("distance_m", 4), ("total_calories", 2), ("calories", 2)]
+        f += [("pace_avg", 4)] if v >= 5 else []
+        f += [("pace_max", 4), ("pace_min", 4)]
+        f += [("speed_avg", "f")] if v >= 5 else []
+        f += [("speed_max", "f"), ("steps", 4)]
+        f += [("step_length_cm", 2), ("cadence_avg", 2)] if v >= 5 else []
+        f += [("cadence_max", 2)] + _HR + [(None, 20), ("te_aerobic", "f")]
+        if v == 1:
+            f += [(None, 9)]
+        else:
+            f += [(None, 1), ("te_anaerobic", "f"), (None, 6 if v >= 9 else 1), ("vo2max", 1), (None, 2),
+                  ("recovery_h", 2), (None, 1)]
+        f += _ZONES
+        if v == 6:
+            f += [(None, 21)] + _LOAD_VITALITY
+        elif v == 9:
+            f += [(None, 46)] + _LOAD_VITALITY
+    elif subtype == 0x03:
+        f = _TIMES + [("distance_m", 4), ("calories", 2)]
+        f += [("pace_avg", 4)] if v >= 10 else []
+        f += [("pace_max", 4), ("pace_min", 4), ("steps", 4)]
+        f += [("step_length_cm", 2), ("cadence_avg", 2)] if v >= 10 else []
+        f += [("cadence_max", 2)] + _HR + [("te_aerobic", "f")]
+        f += {9: [(None, 4)], 5: [("vo2max", 1), (None, 1)]}.get(v, [(None, 1), ("vo2max", 1), (None, 2)])
+        f += [("recovery_h", 2)] + _ZONES
+        if v == 9:
+            f += [(None, 39), ("load", 2), (None, 7), ("vitality", 1)]
+        elif v == 11:
+            f += [("total_calories", 2), (None, 4), ("te_anaerobic", "f"), (None, 25),
+                  ("distance_calibrated_m", 4)] + _LOAD_VITALITY
+    elif subtype == 0x08:
+        f = _TIMES + [("calories", 2)] + _HR + ([(None, 6)] if v > 5 else []) + [("te_aerobic", "f")]
+        f += [(None, 2 if v > 6 else 1), ("recovery_h", 2)] + _ZONES
+        if v == 5:
+            f += [(None, 10), ("workout_type", 2)]
+        else:
+            f += [("total_calories", 2), (None, 4), ("te_anaerobic", "f"), (None, 1), ("workout_type", 2),
+                  (None, 8), ("load", 2), (None, 1)]
+            f += [("vitality", 1)] if v > 7 else []
+    elif subtype == 0x07:
+        f = _TIMES + [(None, 4), ("calories", 2), (None, 4)] + _HR + [("te_aerobic", "f"), (None, 2), ("recovery_h", 2)]
+        f += _ZONES + [(None, 6), ("te_anaerobic", "f"), (None, 39), ("load", 2)]
+    elif subtype == 0x17:
+        f = [("workout_type", 2)] + _TIMES + [(None, 4), ("distance_m", 4), ("total_calories", 2), ("calories", 2),
+                                             ("pace_max", 4), ("pace_min", 4)]
+        f += [("speed_avg", "f")] if v >= 5 else []
+        f += [("speed_max", "f")] + _HR + [(None, 20), ("te_aerobic", "f"), (None, 1), ("te_anaerobic", "f")]
+        f += [(None, 6 if v >= 7 else 1), ("vo2max", 1), (None, 2), ("recovery_h", 2), (None, 1)] + _ZONES
+        if v >= 6:
+            f += [(None, 19 if v >= 7 else 14), ("route", 1)] + _LOAD_VITALITY
+    elif subtype == 0x0B:
+        f = _TIMES + [("calories", 2), ("steps", 4)] + ([("cadence_avg", 2)] if v >= 6 else [])
+        f += [("cadence_max", 2)] + _HR + [("te_aerobic", "f"), (None, 2 if v >= 4 else 1), ("recovery_h", 2)] + _ZONES
+        if v >= 6:
+            f += [("total_calories", 2), (None, 4), ("te_anaerobic", "f"), (None, 1), ("route", 1), (None, 9),
+                  ("load", 2), (None, 1), ("vitality", 1)]
+    elif subtype == 0x0D:
+        f = _TIMES + [("calories", 2)] + _HR
+        f += [("te_aerobic", "f"), (None, 2), ("recovery_h", 2)] if v >= 7 else [(None, 8 if v > 4 else 7)]
+        f += _ZONES + ([(None, 5)] if v >= 8 else [])
+        f += [("total_calories", 2) if v >= 7 else (None, 2), ("strokes", 4), ("stroke_rate_avg", 4)]
+        if v >= 7:
+            f += [("stroke_rate_max", 4), (None, 17), ("te_anaerobic", "f"), (None, 6 if v >= 8 else 1), (None, 10),
+                  ("load", 2), (None, 1), ("vitality", 1)]
+    return f
+
+
+def parse_workout_summary(fid: FileId, body: bytes):
+    """None for a sport without a table (kept raw); FormatError for an unknown version."""
+    if fid.subtype not in WORKOUT_HEADERS:
+        return None
+    sport, headers = WORKOUT_HEADERS[fid.subtype]
+    if fid.version not in headers:
+        raise FormatError(f"workout summary subtype {fid.subtype} version {fid.version} unsupported")
+    cur = Cursor(body)
+    cur.take(headers[fid.version])  # validity bitmap, not applied
+    out = {}
+    for name, size in workout_fields(fid.subtype, fid.version):
+        if name == "route":
+            if cur.u8() in (0xFC, 0xFD, 0xFF):
+                cur.take(8)
+        elif name is None:
+            cur.take(size)
+        elif size == "f":
+            out[name] = round(cur.f32(), 2)
+        else:
+            out[name] = int.from_bytes(cur.take(size), "little")
+    out["sport"] = WORKOUT_TYPES.get(out.get("workout_type"), sport)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # dispatch
 
 
@@ -678,8 +810,10 @@ def parse_file(data: bytes, has_crc: bool = True) -> dict:
         out["data"] = parse_sleep_stages(fid, body)
     elif kind == "manual_samples":
         out["data"] = parse_manual_samples(fid, body, pad)
+    elif kind == "workout_summary":
+        out["data"] = parse_workout_summary(fid, body)
     else:
-        out["data"] = None  # workouts and unknown kinds: envelope only
+        out["data"] = None  # workout details, GPS and unknown kinds: envelope only
     return out
 
 

@@ -7,8 +7,7 @@
     "dev": "wrangler dev --local",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "types": "wrangler types",
-    "db:migrate:local": "wrangler d1 migrations apply openband-hub --local"
+    "types": "wrangler types"
   },
   "dependencies": {
     "hono": "4.13.10"

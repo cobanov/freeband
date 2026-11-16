@@ -1,5 +1,7 @@
 # Freeband veri sözleşmesi (v1)
 
+> **2026-11-14:** hesap sunucusu (REST API, web paneli, davet) kaldırıldı; kimse kullanmıyordu. Bu belgede yalnız veri sözleşmesi (`freeband.v1` gövdeleri) geçerli: uygulamanın telefondan gönderdiği webhook'lar ve CSV/JSON dışa aktarma aynı gövdeleri kullanıyor. Uç noktaları, kimlik doğrulamayı ve paneli anlatan bölümler artık tarihî.
+
 Uygulama, webhook'lar ve Cloudflare hub aynı JSON biçimini kullanır. Zamanlar ISO 8601 UTC (`2026-10-13T20:59:41Z`).
 
 Sözleşme `freeband.v1` içinde yalnız **ekleyerek** büyür: yeni tür, yeni olay ya da yeni isteğe bağlı alan gelebilir; var olan alanın anlamı değişmez. Alıcılar (hub ve webhook sunucuları) **tanımadıkları türleri ve alanları yok sayar**, gövdeyi reddetmez.

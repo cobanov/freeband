@@ -1,11 +1,8 @@
-// Freeband hub: Worker entry point.
+// Freeband site: Worker entry point.
 
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "./types";
-import { api } from "./routes/api";
 import { pages } from "./routes/pages";
-import { ConfigError, b64url, randomBytes } from "./lib/crypto";
-import { HttpError, errorBody } from "./lib/http";
 import { html } from "./views/html";
 import { page } from "./views/layout";
 
@@ -26,16 +23,22 @@ function htmlCsp(nonce: string): string {
   ].join("; ");
 }
 
-const API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+const OTHER_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
+/** 18 random bytes as base64url. */
+function newNonce(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_");
+}
 
 /** Security headers on every response; a fresh CSP nonce per request. */
 const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const nonce = b64url(randomBytes(18));
+  const nonce = newNonce();
   c.set("nonce", nonce);
   await next();
   const h = c.res.headers;
   const isHtml = (h.get("content-type") ?? "").startsWith("text/html");
-  h.set("Content-Security-Policy", isHtml ? htmlCsp(nonce) : API_CSP);
+  h.set("Content-Security-Policy", isHtml ? htmlCsp(nonce) : OTHER_CSP);
   h.set("X-Content-Type-Options", "nosniff");
   h.set("Referrer-Policy", "no-referrer");
   h.set("X-Frame-Options", "DENY");
@@ -49,10 +52,7 @@ const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 app.use("*", securityHeaders);
-app.route("/v1", api);
 app.route("/", pages);
-
-const isApi = (path: string): boolean => path === "/v1" || path.startsWith("/v1/");
 
 /** Error pages are Turkish under /tr and English elsewhere. */
 function errorPage(nonce: string, path: string, title: { en: string; tr: string }, text: { en: string; tr: string }): string {
@@ -68,28 +68,14 @@ function errorPage(nonce: string, path: string, title: { en: string; tr: string 
   });
 }
 
-const PROBLEM = { en: "Something went wrong", tr: "Bir sorun var" };
-
-app.notFound((c) => {
-  if (isApi(c.req.path)) return c.json(errorBody("not_found", "Böyle bir uç nokta yok."), 404);
-  return c.html(
+app.notFound((c) =>
+  c.html(
     errorPage(c.get("nonce"), c.req.path, { en: "Page not found", tr: "Sayfa bulunamadı" }, { en: "The page you're looking for isn't here.", tr: "Aradığın sayfa burada değil." }),
     404,
-  );
-});
+  ),
+);
 
 app.onError((err, c) => {
-  if (err instanceof HttpError) {
-    for (const [k, v] of Object.entries(err.headers)) c.header(k, v);
-    if (isApi(c.req.path)) {
-      return c.json(errorBody(err.code, err.message), err.status as 400);
-    }
-    return c.html(errorPage(c.get("nonce"), c.req.path, PROBLEM, { en: err.message, tr: err.message }), err.status as 400);
-  }
-  if (err instanceof ConfigError) {
-    console.error(JSON.stringify({ message: "configuration error", error: err.message }));
-    return c.json(errorBody("not_configured", "Sunucu henüz tam yapılandırılmadı."), 503);
-  }
   // Never echo internals; log the message and the path only (no bodies, no headers).
   console.error(
     JSON.stringify({
@@ -99,28 +85,15 @@ app.onError((err, c) => {
       path: c.req.path,
     }),
   );
-  if (isApi(c.req.path)) return c.json(errorBody("internal", "Beklenmeyen bir hata oldu. Tekrar dene."), 500);
   return c.html(
-    errorPage(c.get("nonce"), c.req.path, PROBLEM, { en: "Something unexpected went wrong. Try again in a little while.", tr: "Beklenmeyen bir hata oldu. Biraz sonra tekrar dene." }),
+    errorPage(
+      c.get("nonce"),
+      c.req.path,
+      { en: "Something went wrong", tr: "Bir sorun var" },
+      { en: "Something unexpected went wrong. Try again in a little while.", tr: "Beklenmeyen bir hata oldu. Biraz sonra tekrar dene." },
+    ),
     500,
   );
 });
 
-export default {
-  fetch: app.fetch,
-
-  /** Daily cleanup of expired sessions and stale rate-limit windows. */
-  async scheduled(_controller, env, ctx) {
-    const now = Date.now();
-    ctx.waitUntil(
-      env.DB.batch([
-        env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?1").bind(now),
-        env.DB.prepare("DELETE FROM rate_limits WHERE window_start < ?1").bind(Math.floor(now / 1000) - 2 * 86_400),
-      ]).then(
-        () => console.log(JSON.stringify({ message: "cleanup done" })),
-        (err: unknown) =>
-          console.error(JSON.stringify({ message: "cleanup failed", error: err instanceof Error ? err.message : String(err) })),
-      ),
-    );
-  },
-} satisfies ExportedHandler<Env>;
+export default { fetch: app.fetch } satisfies ExportedHandler<Env>;

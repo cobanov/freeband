@@ -86,8 +86,8 @@ def load(path: Path = SOURCE) -> dict:
     tokens = json.loads(path.read_text(encoding="utf-8"))
     tokens["_colors"] = resolve_colors(tokens["color"])
     for name, style in tokens["type"].items():
-        if style["weight"] not in (400, 500):
-            raise TokenError(f"type {name!r}: only weights 400 and 500 are allowed (600 is the Bold Text mapping)")
+        if style["weight"] not in (400, 500, 600):
+            raise TokenError(f"type {name!r}: only weights 400, 500 and 600 are allowed")
         if style["relativeTo"] not in TEXT_STYLES:
             raise TokenError(f"type {name!r}: unknown relativeTo {style['relativeTo']!r}")
     for name, motion in tokens["motion"].items():

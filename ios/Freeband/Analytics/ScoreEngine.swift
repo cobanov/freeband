@@ -77,7 +77,9 @@ struct DayScoreResult: Codable, Equatable, Sendable {
 enum ScoreEngine {
     /// Bump when any formula or constant in Analytics/ changes; stored scores with an older
     /// version are recomputed at launch.
-    static let algoVersion = 1
+    /// 2: the sleep score is capped at its duration sub-score + 10 (SleepScore.durationLead).
+    /// 3: no recovery score for a day without a night.
+    static let algoVersion = 3
 
     static func score(_ input: DayInputs, history: [HistoryPoint], profile: Profile) -> DayScoreResult {
         let day = input.day
@@ -120,13 +122,20 @@ enum ScoreEngine {
         }
 
         let yesterday = day.adding(days: -1)
-        let recovery = Recovery.score(Recovery.Inputs(
+        var recovery = Recovery.score(Recovery.Inputs(
             hrv: hrv?.rmssd, hrvHistory: past.compactMap(\.hrv), hasRR: hasRR, hrvWindows: windows,
             restingHR: restingHR, restingHRHistory: past.compactMap(\.restingHR),
             sleepScore: sleep.score.map(Double.init), sleepHistory: past.compactMap(\.sleepScore),
             strainYesterday: past.first { $0.day == yesterday }?.strain,
             strainHistory: past.filter { $0.day < yesterday }.compactMap(\.strain)
         ))
+        // v3: recovery is read from the night. Without one the only resting heart rate is the band's
+        // running daytime value, and early in a day that is nowhere near a resting one (measured
+        // 2026-11-16: 75 bpm at 02:00 against a normal of 64 scored a recovery of 0).
+        if main == nil {
+            recovery.score = nil
+            recovery.confidence = Confidence(.none, reasons: [ConfidenceReason(.noSleep)])
+        }
 
         let strainRest = restingHR?.value ?? Baseline.compute(past.compactMap(\.restingHR), floor: .restingHR)?.median
         let strain = input.minutes.flatMap {
