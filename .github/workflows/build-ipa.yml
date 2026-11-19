@@ -2,7 +2,7 @@ name: Build unsigned iOS IPA
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/watchface-management]
     paths:
       - "ios/**"
       - ".github/workflows/build-ipa.yml"
