@@ -35,6 +35,8 @@ final class BandLink: NSObject, ObservableObject {
     /// `hold` is the held session; it starts only through `hold(_:)`.
     enum Purpose: Equatable {
         case check, sync, live, send([Data]), hold
+        /// Reads or manages installed watch faces over the authenticated command channel.
+        case watchFaces, watchFaceSet(String), watchFaceDelete(String)
         /// Asks the band how it would pair (docs/BIND.md step 1) and stops there.
         case bindProbe
 
@@ -45,6 +47,9 @@ final class BandLink: NSObject, ObservableObject {
             case .live: return "live"
             case .send: return "send"
             case .hold: return "hold"
+            case .watchFaces: return "watch faces"
+            case .watchFaceSet(_): return "set watch face"
+            case .watchFaceDelete(_): return "delete watch face"
             case .bindProbe: return "bind probe"
             }
         }
@@ -234,6 +239,8 @@ final class BandLink: NSObject, ObservableObject {
 
     /// Activity files fetched / requested in this sync.
     @Published private(set) var fileProgress: (done: Int, total: Int)?
+    /// The latest watch-face inventory returned by the band.
+    @Published private(set) var watchFaces: [WatchFace] = []
 
     private var central: CBCentralManager!
     private var target: BandTarget?
@@ -293,6 +300,8 @@ final class BandLink: NSObject, ObservableObject {
     private var fileListMissing = false
     /// Factory file dumps (13/2) already logged in this session, by name.
     private var factoryDumps: Set<String> = []
+    /// An activation/deletion is followed by a fresh inventory read before releasing the channel.
+    private var watchFaceListRefreshPending = false
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
     private var lastCommandBody = Data()
 
@@ -309,6 +318,21 @@ final class BandLink: NSObject, ObservableObject {
     /// Starts a session. A held session gives way (it comes back when this one ends).
     func start(_ target: BandTarget, purpose: Purpose) {
         guard !phase.isBusy, purpose != .hold else { return }
+        switch purpose {
+        case .watchFaceSet(let id):
+            guard watchFaces.contains(where: { $0.id == id }) else {
+                note("watch face change refused: unknown id")
+                return
+            }
+        case .watchFaceDelete(let id):
+            guard let face = watchFaces.first(where: { $0.id == id }),
+                  face.canDelete, !face.isActive else {
+                note("watch face delete refused: only removable inactive faces can be deleted")
+                return
+            }
+        default:
+            break
+        }
         var delay: TimeInterval = 0
         if active, self.purpose == .hold {
             endHold()
@@ -376,6 +400,8 @@ final class BandLink: NSObject, ObservableObject {
         requestedFiles = []
         fileListMissing = false
         factoryDumps = []
+        watchFaceListRefreshPending = false
+        if purpose == .watchFaces { watchFaces = [] }
         active = true
         note("— \(purpose.label): \(target.name), \(target.keys.count) key(s)")
 
@@ -617,6 +643,46 @@ final class BandLink: NSObject, ObservableObject {
             after(2.0, thisRun) { [weak self] in self?.finish() }
             return
         }
+        if purpose == .watchFaces {
+            stage = .reading
+            watchFaces = []
+            watchFaceListRefreshPending = false
+            note("→ watch face list")
+            sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+            let thisRun = run
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.purpose == .watchFaces else { return }
+                self.note("watch face list timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
+        if case .watchFaceSet(let id) = purpose {
+            stage = .reading
+            watchFaceListRefreshPending = true
+            note("→ activate watch face \(id)")
+            sendCommand(MiWatchFaceProtocol.setCommand(id: id), encrypted: true)
+            let thisRun = run
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.purpose == .watchFaceSet(id) else { return }
+                self.note("watch face activation timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
+        if case .watchFaceDelete(let id) = purpose {
+            stage = .reading
+            watchFaceListRefreshPending = true
+            note("→ delete watch face \(id)")
+            sendCommand(MiWatchFaceProtocol.deleteCommand(id: id), encrypted: true)
+            let thisRun = run
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.purpose == .watchFaceDelete(id) else { return }
+                self.note("watch face deletion timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
         stage = purpose == .live ? .live : .reading
         // A sync that reconnected for its next file (reconnectForNextFile) carries on fetching.
         let resuming = purpose == .sync && fileStage == .fetching
@@ -750,6 +816,40 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
+
+        case (4, 0):
+            guard let faces = MiWatchFaceProtocol.readList(from: command) else {
+                note("← watch face list response could not be decoded")
+                return
+            }
+            watchFaces = faces
+            note("← watch face list: \(faces.count) item(s)")
+            if purpose == .watchFaces || watchFaceListRefreshPending {
+                watchFaceListRefreshPending = false
+                finish()
+            }
+
+        case (4, 1):
+            let accepted = MiWatchFaceProtocol.acknowledgement(from: command)
+            note("← watch face activation acknowledgement: \(accepted.map { $0 ? "true" : "false" } ?? "unknown")")
+            if accepted == true, case .watchFaceSet(_) = purpose {
+                watchFaceListRefreshPending = true
+                sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+            } else if case .watchFaceSet(_) = purpose {
+                watchFaceListRefreshPending = false
+                finish()
+            }
+
+        case (4, 2):
+            let accepted = MiWatchFaceProtocol.acknowledgement(from: command)
+            note("← watch face deletion acknowledgement: \(accepted.map { $0 ? "true" : "false" } ?? "unknown")")
+            if accepted == true, case .watchFaceDelete(_) = purpose {
+                watchFaceListRefreshPending = true
+                sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+            } else if case .watchFaceDelete(_) = purpose {
+                watchFaceListRefreshPending = false
+                finish()
+            }
 
         case (13, 2):
             // A Xiaomi Watch S1 Active sends these during file fetches. AstroBox calls type 13

@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "72": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "72"
+          }
+        }
+      }
+    },
     "%@ %@": {
       "localizations": {
         "tr": {
@@ -415,16 +425,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "7 gün"
-          }
-        }
-      }
-    },
-    "72": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "72"
           }
         }
       }
@@ -6925,6 +6925,136 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yatmadan önceki akşama göre düşmedi; %10 ve üstü düşüş olağandır."
+          }
+        }
+      }
+    },
+    "Watch faces": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranlar"
+          }
+        }
+      }
+    },
+    "Loading watch faces…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranlar yükleniyor…"
+          }
+        }
+      }
+    },
+    "No watch faces loaded": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran listesi alınmadı"
+          }
+        }
+      }
+    },
+    "Tap refresh to read the watch faces installed on your band.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saatte yüklü kadranları okumak için yenile düğmesine dokunun."
+          }
+        }
+      }
+    },
+    "Installed on the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saatte yüklü"
+          }
+        }
+      }
+    },
+    "Close Mi Fitness before managing watch faces. Only custom inactive faces can be deleted.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranları yönetmeden önce Mi Fitness'ı kapatın. Yalnızca etkin olmayan özel kadranlar silinebilir."
+          }
+        }
+      }
+    },
+    "Custom watch-face file upload is not available yet for the Mi Band 8 transport.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mi Band 8 aktarım altyapısı için özel kadran dosyası yükleme henüz kullanılamıyor."
+          }
+        }
+      }
+    },
+    "Refresh watch faces": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranları yenile"
+          }
+        }
+      }
+    },
+    "Delete this watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kadran silinsin mi?"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sil"
+          }
+        }
+      }
+    },
+    "Active": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkin"
+          }
+        }
+      }
+    },
+    "Set as active": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkin kadran yap"
+          }
+        }
+      }
+    },
+    "Delete watch face": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranı sil"
           }
         }
       }

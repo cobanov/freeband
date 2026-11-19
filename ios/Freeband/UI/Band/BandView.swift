@@ -110,6 +110,12 @@ private struct BandPage: View {
                 }
 
                 ListCard {
+                    NavigationLink {
+                        WatchFaceManagementView(band: band)
+                    } label: {
+                        ListRow(title: String(localized: "Watch faces"), systemImage: "clock")
+                    }
+                    .buttonStyle(.fbRow)
                     NavigationLink(value: Route.monitoring(band.id)) {
                         ListRow(title: String(localized: "Health monitoring"), systemImage: "heart.text.square")
                     }

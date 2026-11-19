@@ -1,5 +1,5 @@
 // Prints MiProtocol outputs for fixed inputs; check_vectors.py recomputes them independently.
-// Build: swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift main.swift -o /tmp/mitest
+// Build: swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift ../../Freeband/Band/WatchFaces.swift main.swift -o /tmp/mitest
 // Run with TZ=UTC: check_vectors.py formats notify_cmd's timestamp in UTC.
 import CryptoKit
 import Foundation
@@ -129,6 +129,28 @@ let findPhoneParsed = [
     findPhone { _ in },
     findPhone({ var s = PBWriter(); s.varint(5, 0); $0.message(4, s) }, subtype: 18),
 ]
+
+// Watch-face protobuf: list request, repeated inventory items, action payloads and acknowledgements.
+var faceA = PBWriter()
+faceA.string(1, "1001"); faceA.string(2, "Classic"); faceA.bool(3, true); faceA.bool(4, false)
+var faceB = PBWriter()
+faceB.string(1, "2002"); faceB.string(2, "Custom"); faceB.bool(3, false); faceB.bool(4, true)
+var faceList = PBWriter()
+faceList.message(1, faceA); faceList.message(1, faceB)
+var watchfacePayload = PBWriter()
+watchfacePayload.message(1, faceList)
+var watchfaceResponse = PBWriter()
+watchfaceResponse.varint(1, 4); watchfaceResponse.varint(2, 0); watchfaceResponse.message(6, watchfacePayload)
+let parsedWatchFaces = MiWatchFaceProtocol.readList(from: PBMessage(watchfaceResponse.data)!)!
+precondition(parsedWatchFaces.count == 2)
+precondition(parsedWatchFaces[0] == WatchFace(id: "1001", name: "Classic", isActive: true, canDelete: false))
+precondition(parsedWatchFaces[1] == WatchFace(id: "2002", name: "Custom", isActive: false, canDelete: true))
+precondition(hex(MiWatchFaceProtocol.listCommand()) == "08041000")
+precondition(hex(MiWatchFaceProtocol.setCommand(id: "2002")) == "080410013206120432303032")
+precondition(hex(MiWatchFaceProtocol.deleteCommand(id: "2002")) == "080410023206120432303032")
+var watchfaceAckBody = PBWriter(); watchfaceAckBody.bool(4, true)
+var watchfaceAck = PBWriter(); watchfaceAck.varint(1, 4); watchfaceAck.varint(2, 1); watchfaceAck.message(6, watchfaceAckBody)
+precondition(MiWatchFaceProtocol.acknowledgement(from: PBMessage(watchfaceAck.data)!) == true)
 
 let v1: [String: Any] = [
     "ccm_decrypt": hex(MiCrypto.ccmDecrypt(key: key, nonce: ccmNonce, ciphertextAndTag: longCipher) ?? Data()),

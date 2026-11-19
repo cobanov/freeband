@@ -27,6 +27,13 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Verify protocol vectors
+        working-directory: ios/tests/protocol
+        run: |
+          python3 -m pip install cryptography
+          swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift ../../Freeband/Band/WatchFaces.swift main.swift -o /tmp/mitest
+          TZ=UTC /tmp/mitest | python3 check_vectors.py
+
       - name: Build unsigned IPA
         working-directory: ios
         run: sh tools/build-ipa.sh

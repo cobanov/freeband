@@ -148,10 +148,11 @@ struct PBWriter {
     }
 }
 
-/// Minimal proto2 reader: keeps the last varint and the last length-delimited value per field.
+/// Minimal proto2 reader: keeps the last scalar value and all length-delimited values per field.
 struct PBMessage {
     private(set) var varints: [Int: UInt64] = [:]
     private(set) var blobs: [Int: Data] = [:]
+    private(set) var allBlobs: [Int: [Data]] = [:]
     private(set) var fieldNumbers: [Int] = []
 
     init?(_ data: Data) {
@@ -181,7 +182,9 @@ struct PBMessage {
                 i += 8
             case 2:
                 guard let n = readVarint(), n <= UInt64(b.count - i) else { return nil }
-                blobs[field] = Data(b[i..<(i + Int(n))])
+                let blob = Data(b[i..<(i + Int(n))])
+                blobs[field] = blob
+                allBlobs[field, default: []].append(blob)
                 i += Int(n)
             case 5:
                 guard b.count - i >= 4 else { return nil }
@@ -195,6 +198,11 @@ struct PBMessage {
 
     func message(_ field: Int) -> PBMessage? {
         blobs[field].flatMap(PBMessage.init)
+    }
+
+    /// All nested messages for a repeated length-delimited field.
+    func messages(_ field: Int) -> [PBMessage] {
+        (allBlobs[field] ?? []).compactMap(PBMessage.init)
     }
 }
 
