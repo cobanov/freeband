@@ -82,12 +82,17 @@ struct RootView: View {
         .environmentObject(router)
         .tint(.textPrimary)
         .preferredColorScheme(AppearanceSetting(rawValue: appearance)?.colorScheme)
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .background { model.healthExport.pause() }
+            if phase == .active {
+                model.healthExport.resume()
+                model.healthExport.schedule(onlyIfChanged: true)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             // Live mode keeps the band measuring; never leave it running in the background.
             if phase == .background { model.enterBackground() }
             if phase == .active {
-                model.healthExport.resume()
-                model.healthExport.schedule()
                 model.refreshSharedLocation()
                 autoSync()
                 // A held session waiting out a retry opens now (after the sync, if one started).
@@ -98,7 +103,11 @@ struct RootView: View {
             if state == .poweredOn { autoSync() }
         }
         .onChange(of: selectedBand) { model.updateHold() }
-        .onChange(of: bands.count) { model.updateHold() }
+        .onChange(of: bands.count) {
+            model.healthExport.invalidate()
+            model.healthExport.schedule(onlyIfChanged: true)
+            model.updateHold()
+        }
         .fullScreenCover(isPresented: Binding(get: { model.phoneRinging }, set: { if !$0 { model.stopFindPhone() } })) {
             FindPhoneView()
         }

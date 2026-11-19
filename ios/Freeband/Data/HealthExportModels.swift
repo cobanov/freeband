@@ -27,6 +27,7 @@ final class HealthExportLedgerRow {
 @Model
 final class HealthExportSettings {
     var enabled: Bool = false
+    var everEnabled: Bool?
     var lastSuccess: Date?
     /// Following a local deletion, older data is never automatically re-exported, even if the band is re-added.
     var suppressBefore: Date?

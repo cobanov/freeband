@@ -2,11 +2,11 @@ import Foundation
 
 // This file contains no HealthKit calls. In particular, a missing source value is only
 // evidence of deletion when its entire reconciliation scope was successfully rebuilt.
-enum HealthExportKind: String, Codable, CaseIterable {
+enum HealthExportKind: String, Codable, CaseIterable, Sendable {
     case steps, heartRate, restingHeartRate, oxygen, sleep
 }
 
-struct HealthExportSample: Codable, Equatable {
+struct HealthExportSample: Codable, Equatable, Sendable {
     let namespace: UUID
     let kind: HealthExportKind
     let start: Date
@@ -25,7 +25,7 @@ struct HealthExportSample: Codable, Equatable {
     }
 }
 
-struct HealthExportEntry: Codable, Equatable {
+struct HealthExportEntry: Codable, Equatable, Sendable {
     let identifier: String
     let namespace: UUID
     let kind: HealthExportKind
@@ -34,7 +34,7 @@ struct HealthExportEntry: Codable, Equatable {
     var version: Int
     var state: State
 
-    enum State: String, Codable { case savePending, saved, deletePending, deleted, suppressed }
+    enum State: String, Codable, Sendable { case savePending, saved, deletePending, deleted, suppressed }
 }
 
 struct HealthExportScope {

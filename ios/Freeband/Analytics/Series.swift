@@ -239,7 +239,7 @@ struct TimedValue: Equatable, Codable, Sendable {
 
 /// RR intervals that arrived in one packet; `tsRaw` is the packet's i64 time stamp whose unit
 /// is not settled (docs/ACTIVITY.md 6.3.2), see HRV.resolveStart.
-struct RRSegment: Equatable, Sendable {
+struct RRSegment: Equatable, Codable, Sendable {
     var tsRaw: Int64
     var intervalsMs: [Int]
 
@@ -284,7 +284,7 @@ enum ValidRange {
 // MARK: - Analytics inputs
 
 /// One local day of per-minute values, 1440 slots each (nil = no value).
-struct MinuteSeries: Equatable, Sendable {
+struct MinuteSeries: Equatable, Codable, Sendable {
     static let slots = 1440
 
     var day: DayKey

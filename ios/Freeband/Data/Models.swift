@@ -132,6 +132,7 @@ final class ActivityBlob {
     var fetchedAt: Date
     var parsedAt: Date?
     var parseNote: String?
+    @Attribute(.externalStorage) var healthExportSource: Data?
     /// ActivityIngest.parserVersion this file was last parsed with; 0 = never. Files below the
     /// current version are parsed again at launch.
     var parserVersion: Int = 0

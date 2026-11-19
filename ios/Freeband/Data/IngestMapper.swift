@@ -19,7 +19,7 @@ enum ParseStatus: String, Codable, Sendable, CaseIterable {
 }
 
 /// One file's minute values for one local day (or, merged, every file's).
-struct MinuteDayDraft: Equatable, Sendable {
+struct MinuteDayDraft: Equatable, Codable, Sendable {
     var series: MinuteSeries
     var sourceFileIDs: [String]
 
@@ -28,7 +28,7 @@ struct MinuteDayDraft: Equatable, Sendable {
 }
 
 /// The band's own daily summary (file kind daily_summary).
-struct DaySummaryDraft: Equatable, Sendable {
+struct DaySummaryDraft: Equatable, Codable, Sendable {
     var day: DayKey
     var tzOffsetMinutes: Int
     var sourceFileID: String
@@ -64,7 +64,7 @@ enum SleepSourceKind: String, Codable, Sendable {
     case stages
 }
 
-struct SleepDraft: Equatable, Sendable {
+struct SleepDraft: Equatable, Codable, Sendable {
     var sourceFileID: String
     var kind: SleepSourceKind
     var fileVersion: Int
@@ -110,7 +110,7 @@ struct SleepDraft: Equatable, Sendable {
     }
 }
 
-struct ManualReadingDraft: Equatable, Sendable {
+struct ManualReadingDraft: Equatable, Codable, Sendable {
     var sourceFileID: String
     var ts: Date
     var day: DayKey

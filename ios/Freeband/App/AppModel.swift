@@ -34,7 +34,6 @@ final class AppModel: ObservableObject {
     /// Earliest day per band whose scores must be recomputed once no session is running.
     var pendingRollup: [UUID: DayKey] = [:]
     private var ingestTask: Task<Void, Never>?
-    var syncProcessingTask: Task<Void, Never>?
     private var ingestAgain = false
     private var dayObservers: [NSObjectProtocol] = []
 
@@ -51,8 +50,6 @@ final class AppModel: ObservableObject {
     // Background sync state (methods in AppModel+Background.swift).
     var lastBackgroundSync = Date.distantPast
     var syncBackgroundTask = UIBackgroundTaskIdentifier.invalid
-    var backgroundSessionActive = false
-    var backgroundOwnsLink = false
     var watchers: Set<AnyCancellable> = []
     /// Show sleep on the band (docs/SLEEP-WRITEBACK.md): once per night, after the sync that
     /// brought it, the night's summary goes to the band (Command{8,41}), which is what fills the
@@ -69,6 +66,7 @@ final class AppModel: ObservableObject {
         findPhoneAlert = isDemo ? nil : FindPhoneAlert()
         ingest = ActivityIngest(context: context)
         healthExport = HealthExportService(context: context, demo: isDemo)
+        healthExport.pause()
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
@@ -339,6 +337,7 @@ final class AppModel: ObservableObject {
     }
 
     private func record(_ id: UUID, _ draft: SampleDraft) {
+        if draft.kind == "live" { healthExport.invalidate() }
         sessionDrafts.append(draft)
         context.insert(Sample(bandID: id, draft: draft))
         if draft.kind == "battery", let band = band(id) { band.lastBattery = draft.level }
@@ -362,12 +361,12 @@ final class AppModel: ObservableObject {
             try? context.save()
         }
         let device = Payload.Device(band)
-        syncProcessingTask = Task {
+        Task {
             await waitForIngest()
             let parsed = sessionIngest
             sessionIngest = IngestSummary()
             runPendingRollups()
-            healthExport.schedule()
+            healthExport.schedule(onlyIfChanged: true)
             notifyMorningSummary(id)
             writeBackSleep(id)
             if !parsed.isEmpty {
@@ -507,12 +506,13 @@ final class AppModel: ObservableObject {
             } while self.ingestAgain
             self.ingestTask = nil
             self.runPendingRollups()
-            self.healthExport.schedule()
+            self.healthExport.schedule(onlyIfChanged: true)
         }
     }
 
     private func absorb(_ summary: IngestSummary) {
         guard !summary.isEmpty else { return }
+        healthExport.invalidate()
         sessionIngest.absorb(summary)
         for (band, day) in summary.earliestTouched {
             pendingRollup[band] = min(pendingRollup[band] ?? day, day)
@@ -575,7 +575,7 @@ final class AppModel: ObservableObject {
         ingestTask = nil
         rescoreAll()
         setCalibration(makeReport(summary, bandID: nil, outcome: "reparse all"))
-        healthExport.schedule()
+        healthExport.schedule(onlyIfChanged: true)
         if ingestAgain {
             ingestAgain = false
             scheduleIngest()

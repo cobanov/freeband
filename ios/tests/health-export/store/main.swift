@@ -19,13 +19,13 @@ final class FakeWriter: HealthKitWriting {
     var allowed: Set<HealthExportKind> = Set(HealthExportKind.allCases)
     func status(for kind: HealthExportKind) -> HKAuthorizationStatus { allowed.contains(kind) ? .sharingAuthorized : .sharingDenied }
     func requestAuthorization() async throws { }
-    func save(_ sample: HealthExportSample, version: Int) async throws {
-        saves.append((sample.identifier, version))
+    func save(_ writes: [HealthExportWrite]) async throws {
+        saves += writes.map { ($0.sample.identifier, $0.version) }
         if let delay { try await Task.sleep(for: delay) }
         if failNext { failNext = false; throw Failure.injected }
     }
-    func delete(identifier: String, kind: HealthExportKind) async throws {
-        deletes.append(identifier)
+    func delete(identifiers: [String], kind: HealthExportKind) async throws {
+        deletes += identifiers
         if failNextDelete { failNextDelete = false; throw Failure.injected }
     }
     enum Failure: Error { case injected }
@@ -77,10 +77,12 @@ final class FakeWriter: HealthKitWriting {
         let interrupted = fake.saves[0]
         service.pause(); await settle(service)
         let interruptedRows = try context.fetch(FetchDescriptor<HealthExportLedgerRow>())
+        check(service.parsedFileCount == 1, "first export parses the source once")
         check(interruptedRows.contains { $0.identifier == interrupted.0 && $0.state == "savePending" },
               "interrupted export keeps its retryable ledger entry")
         fake.delay = nil; fake.failNext = true
         service.resume(); service.schedule(); await settle(service)
+        check(service.parsedFileCount == 0, "retry reuses the cached source after interruption")
         let first = fake.saves.first
         check(first != nil, "an eligible sample is attempted")
         let pending = try context.fetch(FetchDescriptor<HealthExportLedgerRow>())
@@ -114,6 +116,7 @@ final class FakeWriter: HealthKitWriting {
         fake.failNextDelete = true
         other.schedule(); await settle(other)
         let deletionAttempt = fake.deletes.last
+        check(other.parsedFileCount == 1, "a reingested, corrected source invalidates its cached parse")
         check(deletionAttempt != nil, "a removed source sample is targeted")
         let pendingDeletion = try context.fetch(FetchDescriptor<HealthExportLedgerRow>())
         check(pendingDeletion.contains { $0.identifier == deletionAttempt && $0.state == "deletePending" }, "failed deletion remains pending")
@@ -139,11 +142,13 @@ final class FakeWriter: HealthKitWriting {
         blob.parseStatus = ParseStatus.partial.rawValue; try context.save()
         other.schedule(); await settle(other)
         check(fake.saves.isEmpty && fake.deletes.isEmpty, "partial source cannot change Health")
-        try other.suppressHistory()
+        other.disable()
+        let formerlyEnabled = HealthExportService(context: context, demo: false, writer: fake)
+        try formerlyEnabled.suppressHistory()
         let suppressed = try context.fetch(FetchDescriptor<HealthExportLedgerRow>())
         check(suppressed.allSatisfy { $0.state == "suppressed" }, "local deletion retains tombstones")
-        other.disable(); fake.saves.removeAll(); other.schedule(); await settle(other)
-        check(fake.saves.isEmpty && !other.enabled, "disabled service does not export")
+        fake.saves.removeAll(); formerlyEnabled.schedule(); await settle(formerlyEnabled)
+        check(fake.saves.isEmpty && !formerlyEnabled.enabled, "disabled service does not export")
         let demo = HealthExportService(context: context, demo: true, writer: fake)
         check(!demo.available, "demo export unavailable at boundary")
         // A summary-only band and live observation must export without a minute file.
@@ -171,6 +176,9 @@ final class FakeWriter: HealthKitWriting {
         _ = await ActivityIngest(context: fresh).ingestPending()
         let summaryWriter = FakeWriter()
         let summaryService = HealthExportService(context: fresh, demo: false, writer: summaryWriter)
+        try summaryService.suppressHistory()
+        let unusedSettings = try fresh.fetchCount(FetchDescriptor<HealthExportSettings>())
+        check(unusedSettings == 0, "local deletion before first activation creates no Health settings or cutoff")
         await summaryService.enable(); await settle(summaryService)
         let exported = try fresh.fetch(FetchDescriptor<HealthExportLedgerRow>())
         check(exported.contains { $0.kind == "steps" && $0.state == "saved" }, "summary steps exported")
@@ -181,6 +189,15 @@ final class FakeWriter: HealthKitWriting {
         summaryService.schedule(); await settle(summaryService)
         check(summaryWriter.saves.count == count, "repeat sync is idempotent")
         check(summaryService.status?.contains("up to date") == true, "unchanged sync is reported accurately")
+        check(summaryService.parsedFileCount == 0, "forced export of unchanged data does not reparse files")
+        let reopened = HealthExportService(context: ModelContext(freshContainer), demo: false, writer: summaryWriter)
+        reopened.schedule(); await settle(reopened)
+        check(reopened.parsedFileCount == 0 && summaryWriter.saves.count == count,
+              "a new context reuses persisted source projections and ledger rows")
+        let unchangedLastSuccess = summaryService.lastSuccess
+        summaryService.pause(); summaryService.resume()
+        summaryService.schedule(onlyIfChanged: true); await settle(summaryService)
+        check(summaryService.lastSuccess == unchangedLastSuccess, "foregrounding unchanged data skips export work")
         // A corrupt historical file must not prevent a separately verified live observation.
         let badID = ActivityFileID(timestamp: summaryID.timestamp, tzQuarterHours: summaryID.tzQuarterHours,
                                    version: 4, type: 0, subtype: 0, detailType: 0)
@@ -224,6 +241,11 @@ final class FakeWriter: HealthKitWriting {
         let emptyService = HealthExportService(context: emptyContainer.mainContext, demo: false, writer: FakeWriter())
         await emptyService.enable(); await settle(emptyService)
         check(emptyService.status?.contains("No exportable") == true, "empty source is not reported as a successful export")
+        emptyService.disable()
+        let previouslyEnabled = HealthExportService(context: emptyContainer.mainContext, demo: false, writer: FakeWriter())
+        try previouslyEnabled.suppressHistory()
+        let settings = try emptyContainer.mainContext.fetch(FetchDescriptor<HealthExportSettings>()).first
+        check(settings?.suppressBefore != nil, "activation still counts after turning off before the first successful export")
         // Optional private real-file check: input is never copied, logged, or written to disk.
         if let path = ProcessInfo.processInfo.environment["FREEBAND_PRIVATE_SUMMARY"] {
             let privateContainer = try ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true))

@@ -1,13 +1,18 @@
 import Foundation
 import HealthKit
 
+struct HealthExportWrite: Sendable {
+    let sample: HealthExportSample
+    let version: Int
+}
+
 /// Only write authorization and mutations are exposed. No HealthKit query or read permission.
 protocol HealthKitWriting {
     var available: Bool { get }
     func status(for kind: HealthExportKind) -> HKAuthorizationStatus
     func requestAuthorization() async throws
-    func save(_ sample: HealthExportSample, version: Int) async throws
-    func delete(identifier: String, kind: HealthExportKind) async throws
+    func save(_ writes: [HealthExportWrite]) async throws
+    func delete(identifiers: [String], kind: HealthExportKind) async throws
 }
 
 struct HealthKitWriter: HealthKitWriting {
@@ -34,7 +39,11 @@ struct HealthKitWriter: HealthKitWriting {
 
     enum WriterError: Error { case invalidSample }
 
-    func save(_ sample: HealthExportSample, version: Int) async throws {
+    func save(_ writes: [HealthExportWrite]) async throws {
+        try await store.save(writes.map { try object($0.sample, version: $0.version) })
+    }
+
+    private func object(_ sample: HealthExportSample, version: Int) throws -> HKSample {
         guard version > 0, sample.start <= sample.end else { throw WriterError.invalidSample }
         let metadata: [String: Any] = [HKMetadataKeySyncIdentifier: sample.identifier,
                                        HKMetadataKeySyncVersion: version]
@@ -67,12 +76,12 @@ struct HealthKitWriter: HealthKitWriting {
             object = HKCategorySample(type: HKCategoryType(.sleepAnalysis), value: value.rawValue,
                                       start: sample.start, end: sample.end, metadata: metadata)
         }
-        try await store.save(object)
+        return object
     }
 
-    func delete(identifier: String, kind: HealthExportKind) async throws {
-        guard identifier.hasPrefix("freeband.v1.") else { throw WriterError.invalidSample }
-        let predicate = HKQuery.predicateForObjects(withMetadataKey: HKMetadataKeySyncIdentifier, allowedValues: [identifier])
+    func delete(identifiers: [String], kind: HealthExportKind) async throws {
+        guard identifiers.allSatisfy({ $0.hasPrefix("freeband.v1.") }) else { throw WriterError.invalidSample }
+        let predicate = HKQuery.predicateForObjects(withMetadataKey: HKMetadataKeySyncIdentifier, allowedValues: identifiers)
         _ = try await store.deleteObjects(of: type(kind), predicate: predicate)
     }
 }

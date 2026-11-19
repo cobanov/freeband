@@ -71,12 +71,13 @@ The docs are in Turkish, except `docs/BLE-V1.md` and `docs/STAY-CONNECTED.md`.
 
 Apple Health export is optional under Band → Freeband settings → Integrations → Apple Health.
 When enabled, Freeband writes eligible steps, heart rate and sleep stages from the phone's stored
-band history after syncing, including during permitted background runs. It requests no Health read access. Incomplete files and days
+band history after syncing while Freeband is in the foreground. Data received in the background is
+exported when you reopen Freeband. It requests no Health read access. Incomplete files and days
 with ambiguous timestamps are withheld. Corrections can update or remove Freeband's own Health
 entries. Use one exporting iPhone per band; reinstalling or switching phones can create duplicates.
 Turning export off, removing a band, or deleting local data does not delete
-Health entries. Health-side deletions cannot be detected. Deleting local data also prevents older
-history from being automatically exported again on that phone.
+Health entries. Health-side deletions cannot be detected. Once export has been enabled, deleting
+local data also prevents older history from being automatically exported again on that phone.
 
 The export also supports the band's daily resting-heart-rate estimate and individually timed
 blood-oxygen readings. A daily step summary is exported as one cumulative interval when detailed
