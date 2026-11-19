@@ -55,7 +55,7 @@ final class ActivityIngest {
     /// woke-up events (Xiaomi Watch S1 Active).
     /// 5: daily details carry the per-minute activity level (the band's Moving minutes).
     /// 6: workout summaries are parsed into Workout rows.
-    static let parserVersion = 6
+    nonisolated static let parserVersion = 6
 
     let context: ModelContext
 

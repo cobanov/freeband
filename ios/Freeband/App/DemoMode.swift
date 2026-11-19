@@ -24,6 +24,7 @@ final class AppSession: ObservableObject {
     /// app as it was, and to the app proper whenever a real band is already set up.
     func setDemo(_ on: Bool) {
         model.stop()
+        model.healthExport.invalidate()
         // The old model's link goes away with it; let go of a held session first.
         model.link.hold(nil)
         DemoMode.isOn = on
@@ -36,7 +37,7 @@ final class AppSession: ObservableObject {
 
     static let models: [any PersistentModel.Type] = [Band.self, Sample.self, Webhook.self, ActivityBlob.self,
                                                      MinuteDay.self, DaySummary.self, SleepRecord.self, SleepRR.self,
-                                                     ManualReading.self, DailyScore.self, Workout.self]
+                                                     ManualReading.self, DailyScore.self, Workout.self, HealthExportLedgerRow.self, HealthExportSettings.self]
 
     /// When the store exists but can't be opened or migrated, crashing would crash at every
     /// launch. The store's files are set aside under another name (nothing is deleted) and a new

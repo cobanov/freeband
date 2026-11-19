@@ -6928,6 +6928,682 @@
           }
         }
       }
+    },
+    "Allowed to write": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowed to write"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazma izni var"
+          }
+        }
+      }
+    },
+    "Apple Health": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health"
+          }
+        }
+      }
+    },
+    "Apple Health access is restricted on this device.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health access is restricted on this device."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu cihazda Apple Health erişimi kısıtlanmış."
+          }
+        }
+      }
+    },
+    "Apple Health is unavailable on this device or with demo data.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health is unavailable on this device or with demo data."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health bu cihazda veya demo verileriyle kullanılamıyor."
+          }
+        }
+      }
+    },
+    "Apple Health is up to date; no new records.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health is up to date; no new records."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health güncel; yeni kayıt yok."
+          }
+        }
+      }
+    },
+    "Apple Health permission request failed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health permission request failed."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health izin isteği başarısız oldu."
+          }
+        }
+      }
+    },
+    "Apple Health sync could not finish. Try again when Health data is available.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health sync could not finish. Try again when Health data is available."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health senkronu tamamlanamadı. Sağlık verileri kullanılabilir olduğunda yeniden dene."
+          }
+        }
+      }
+    },
+    "Apple Health write access was denied. Change it in the Health app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health write access was denied. Change it in the Health app."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health yazma izni verilmedi. Sağlık uygulamasından değiştirebilirsin."
+          }
+        }
+      }
+    },
+    "Change write access in the Health app under your profile, Apps, Freeband.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change write access in the Health app under your profile, Apps, Freeband."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazma iznini Sağlık uygulamasında profilin, Uygulamalar, Freeband bölümünden değiştir."
+          }
+        }
+      }
+    },
+    "Could not safely delete local data. Try again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not safely delete local data. Try again."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefondaki veriler güvenli biçimde silinemedi. Yeniden dene."
+          }
+        }
+      }
+    },
+    "Could not save Apple Health settings.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not save Apple Health settings."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health ayarları kaydedilemedi."
+          }
+        }
+      }
+    },
+    "Deleting Freeband data or removing a band does not delete Health entries. Older history on this phone will not be exported again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleting Freeband data or removing a band does not delete Health entries. Older history on this phone will not be exported again."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband verilerini veya bandı silmek Sağlık kayıtlarını silmez. Bu telefondaki eski geçmiş yeniden aktarılmaz."
+          }
+        }
+      }
+    },
+    "Freeband can write eligible band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. It never reads Apple Health.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband can write eligible band steps, heart rate, resting heart rate, blood oxygen and sleep stages to Apple Health. It never reads Apple Health."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband, uygun bant adımlarını, nabzı, dinlenik nabzı, kandaki oksijeni ve uyku evrelerini Apple Health’e yazabilir. Apple Health verilerini asla okumaz."
+          }
+        }
+      }
+    },
+    "Freeband writes eligible history and may update or remove its own entries when band data changes. Re-enabling resumes pending corrections.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband writes eligible history and may update or remove its own entries when band data changes. Re-enabling resumes pending corrections."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband uygun geçmişi yazar ve bant verileri değiştiğinde kendi kayıtlarını güncelleyebilir veya silebilir. Yeniden açmak bekleyen düzeltmeleri sürdürür."
+          }
+        }
+      }
+    },
+    "Last successful sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last successful sync"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son başarılı senkron"
+          }
+        }
+      }
+    },
+    "No exportable band data is available yet. Sync the band and try again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No exportable band data is available yet. Sync the band and try again."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz aktarılabilir bant verisi yok. Bandı senkronize edip yeniden dene."
+          }
+        }
+      }
+    },
+    "Not requested": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not requested"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İstenmedi"
+          }
+        }
+      }
+    },
+    "Open app settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open app settings"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulama ayarlarını aç"
+          }
+        }
+      }
+    },
+    "Readings, raw files, sleep and scores are deleted. Bands and keys stay. Apple Health data is not deleted. Older history will not be exported again.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçümler, ham dosyalar, uyku ve skorlar silinir. Bantlar ve anahtarlar kalır. Apple Health verileri silinmez. Eski geçmiş yeniden aktarılmaz."
+          }
+        }
+      }
+    },
+    "Ready to sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to sync"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senkrona hazır"
+          }
+        }
+      }
+    },
+    "Request write access": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request write access"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazma izni iste"
+          }
+        }
+      }
+    },
+    "Sync now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync now"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi senkronize et"
+          }
+        }
+      }
+    },
+    "Syncing…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syncing…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senkronize ediliyor…"
+          }
+        }
+      }
+    },
+    "This band's records, raw files, scores and key are deleted from this phone. Apple Health entries remain. Older history will not be exported again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This band's records, raw files, scores and key are deleted from this phone. Apple Health entries remain. Older history will not be exported again."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu bandın kayıtları, ham dosyaları, skorları ve anahtarı telefondan silinir. Apple Health kayıtları kalır. Eski geçmiş yeniden aktarılmaz."
+          }
+        }
+      }
+    },
+    "Turn off Apple Health": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off Apple Health"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health’i kapat"
+          }
+        }
+      }
+    },
+    "Turn on Apple Health": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Apple Health"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health’i aç"
+          }
+        }
+      }
+    },
+    "Turn on Apple Health export?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Apple Health export?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health aktarımı açılsın mı?"
+          }
+        }
+      }
+    },
+    "Turning on exports eligible history stored on this phone and later syncs. Corrections can update or remove entries Freeband previously wrote.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açıldığında bu telefonda saklanan uygun geçmiş ve sonraki senkronizasyonlar aktarılır. Düzeltmeler Freeband'in daha önce yazdığı kayıtları güncelleyebilir veya kaldırabilir."
+          }
+        }
+      }
+    },
+    "Use one exporting iPhone per band. Reinstalling or using another phone can create duplicates. Health-side deletions cannot be detected.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use one exporting iPhone per band. Reinstalling or using another phone can create duplicates. Health-side deletions cannot be detected."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her bant için aktarım yapan tek bir iPhone kullan. Yeniden yükleme veya başka telefon kullanma yinelenen kayıtlar oluşturabilir. Sağlık uygulamasındaki silmeler algılanamaz."
+          }
+        }
+      }
+    },
+    "Write access": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write access"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazma izni"
+          }
+        }
+      }
+    },
+    "Write access denied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write access denied"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazma izni verilmedi"
+          }
+        }
+      }
+    },
+    "ambiguous minute or sleep data": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ambiguous minute or sleep data"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "belirsiz dakika veya uyku verileri"
+          }
+        }
+      }
+    },
+    "daily summary": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "daily summary"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "günlük özet"
+          }
+        }
+      }
+    },
+    "manual readings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "manual readings"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "manuel ölçümler"
+          }
+        }
+      }
+    },
+    "minute data": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "minute data"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dakika verileri"
+          }
+        }
+      }
+    },
+    "sleep": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sleep"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "uyku"
+          }
+        }
+      }
+    },
+    "Apple Health sync finished: %lld records written, %lld removed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health sync finished: %lld records written, %lld removed."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health senkronu bitti: %1$lld kayıt yazıldı, %2$lld silindi."
+          }
+        }
+      }
+    },
+    "Apple Health sync incomplete: %lld records written, %lld removed. Bands with matching identifiers need attention.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health sync incomplete: %lld records written, %lld removed. Bands with matching identifiers need attention."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health senkronu eksik: %1$lld kayıt yazıldı, %2$lld silindi. Kimlikleri eşleşen bantları kontrol et."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. A Health write or removal failed; try again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial Apple Health sync: %lld records written. A Health write or removal failed; try again."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health kısmen senkronlandı: %lld kayıt yazıldı. Bir yazma veya silme işlemi başarısız oldu; yeniden dene."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. Check %@ in Diagnostics.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial Apple Health sync: %lld records written. Check %@ in Diagnostics."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health kısmen senkronlandı: %1$lld kayıt yazıldı. Tanılama bölümünde %2$@ kontrol et."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. Some data needs attention.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial Apple Health sync: %lld records written. Some data needs attention."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health kısmen senkronlandı: %lld kayıt yazıldı. Bazı veriler için işlem gerekiyor."
+          }
+        }
+      }
+    },
+    "Partial Apple Health sync: %lld records written. Some write permissions are missing.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial Apple Health sync: %lld records written. Some write permissions are missing."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health kısmen senkronlandı: %lld kayıt yazıldı. Bazı yazma izinleri eksik."
+          }
+        }
+      }
+    },
+    "Written: steps %lld, heart rate %lld, resting heart rate %lld, oxygen %lld, sleep %lld.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Written: steps %lld, heart rate %lld, resting heart rate %lld, oxygen %lld, sleep %lld."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazılanlar: adım %1$lld, nabız %2$lld, dinlenik nabız %3$lld, oksijen %4$lld, uyku %5$lld."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
