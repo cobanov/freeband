@@ -30,9 +30,10 @@ jobs:
       - name: Verify protocol vectors
         working-directory: ios/tests/protocol
         run: |
-          python3 -m pip install cryptography
+          python3 -m venv /tmp/freeband-test-venv
+          /tmp/freeband-test-venv/bin/python -m pip install cryptography
           swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift ../../Freeband/Band/WatchFaces.swift main.swift -o /tmp/mitest
-          TZ=UTC /tmp/mitest | python3 check_vectors.py
+          TZ=UTC /tmp/mitest | /tmp/freeband-test-venv/bin/python check_vectors.py
 
       - name: Build unsigned IPA
         working-directory: ios
