@@ -308,6 +308,7 @@ final class BandLink: NSObject, ObservableObject {
     /// Upload state for one imported Mi Band 8 face; each 0055 part waits for its channel ACK.
     private var watchFaceUploadParts: [Data] = []
     private var watchFaceUploadIndex = 0
+    private var watchFaceUploadTimerToken = 0
     private var watchFaceUploadID: String?
     private var watchFaceUploadName: String?
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
@@ -411,6 +412,7 @@ final class BandLink: NSObject, ObservableObject {
         watchFaceListRefreshPending = false
         watchFaceUploadParts = []
         watchFaceUploadIndex = 0
+        watchFaceUploadTimerToken = 0
         watchFaceUploadID = nil
         watchFaceUploadName = nil
         if purpose == .watchFaces { watchFaces = [] }
@@ -1319,12 +1321,14 @@ final class BandLink: NSObject, ObservableObject {
         guard isInstallingWatchFace, watchFaceUploadIndex < watchFaceUploadParts.count,
               v1Channels[Self.v1Upload] != nil else { return }
         let part = watchFaceUploadParts[watchFaceUploadIndex]
+        watchFaceUploadTimerToken += 1
+        let timerToken = watchFaceUploadTimerToken
         note("→ watch-face data part \(watchFaceUploadIndex + 1)/\(watchFaceUploadParts.count), \(part.count) bytes")
         v1Step(Self.v1Upload) { $0.send(part) }
         let thisRun = run
         after(30, thisRun) { [weak self] in
             guard let self, self.active, self.isInstallingWatchFace,
-                  self.watchFaceUploadIndex < self.watchFaceUploadParts.count else { return }
+                  self.watchFaceUploadTimerToken == timerToken else { return }
             self.note("watch-face data part acknowledgement timed out")
             self.fail(.timeout)
         }
@@ -1375,6 +1379,7 @@ final class BandLink: NSObject, ObservableObject {
                     fail(.notRead)
                     return
                 }
+                watchFaceUploadTimerToken += 1
                 watchFaceUploadIndex += 1
                 if watchFaceUploadIndex < watchFaceUploadParts.count {
                     sendNextWatchFaceUploadPart()
