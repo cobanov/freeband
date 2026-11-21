@@ -140,7 +140,8 @@ struct WatchFaceManagementView: View {
         } message: {
             Text(importError ?? "")
         }
-face?"),
+        .confirmationDialog(
+            String(localized: "Delete this watch face?"),
             isPresented: $showingDeleteConfirmation,
             titleVisibility: .visible
         ) {
