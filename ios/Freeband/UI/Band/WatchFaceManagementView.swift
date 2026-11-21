@@ -14,6 +14,7 @@ struct WatchFaceManagementView: View {
     @State private var didAutoLoad = false
     @State private var showingImporter = false
     @State private var importedFace: ImportedWatchFace?
+    @State private var importedPreview: MiWatchFacePreview?
     @State private var showingInstallConfirmation = false
     @State private var importError: String?
 
@@ -71,7 +72,7 @@ struct WatchFaceManagementView: View {
 
                 if let importedFace {
                     VStack(alignment: .leading, spacing: 10) {
-                        if let preview = importedFace.preview, let previewImage = makePreviewImage(preview) {
+                        if let preview = importedPreview, let previewImage = makePreviewImage(preview) {
                             Image(uiImage: previewImage)
                                 .resizable()
                                 .scaledToFit()
@@ -135,7 +136,10 @@ struct WatchFaceManagementView: View {
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 let data = try Data(contentsOf: url)
                 importedFace = try MiWatchFaceUpload.parseFile(data)
+                importedPreview = MiWatchFacePreview.decode(data)
             } catch {
+                importedFace = nil
+                importedPreview = nil
                 importError = error.localizedDescription
             }
         }
