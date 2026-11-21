@@ -183,7 +183,7 @@ struct MiV1Channel {
         }
         if body.count + 6 <= writeSize {
             var write = Data([0, 0, 2, ctr == nil ? 2 : 1])
-            if let ctr, incrementNonce { write.append(Self.u16(Int(ctr))) }
+            if let ctr { write.append(Self.u16(Int(ctr))) }
             write.append(body)
             inFlight = .single
             out.writes.append(write)
