@@ -80,6 +80,7 @@ enum MiWatchFaceUpload {
 
     static func parseFile(_ data: Data) throws -> ImportedWatchFace {
         guard data.count >= 0xA8 else { throw ParseFailure.headerTooShort }
+        guard data.count <= 16 * 1024 * 1024 else { throw ParseFailure.fileTooLarge }
         let bytes = [UInt8](data)
         guard Array(bytes[0..<4]) == [0x5A, 0xA5, 0x34, 0x12] else {
             throw ParseFailure.invalidMagic
@@ -129,7 +130,7 @@ enum MiWatchFaceUpload {
                 (UInt32(pixels[6]) << 16) | (UInt32(pixels[7]) << 24)
             bytesPerPixel = Int(info & 0x0F)
             let decodedLength = Int(info >> 4)
-            guard bytesPerPixel > 0, decodedLength > 0, decodedLength <= 8 * 1024 * 1024 else { return nil }
+            guard (1...4).contains(bytesPerPixel), decodedLength > 0, decodedLength <= 8 * 1024 * 1024 else { return nil }
             let encoded = Array(pixels.dropFirst(8))
             if sign == 0x10 || bytesPerPixel == 1 {
                 guard let decoded = decodeRLE20(encoded, expected: decodedLength) else { return nil }
@@ -271,6 +272,7 @@ enum MiWatchFaceUpload {
 
     enum ParseFailure: Error, LocalizedError {
         case headerTooShort
+        case fileTooLarge
         case invalidMagic
         case invalidID
         case missingAlwaysOnFace(Int)
@@ -278,6 +280,7 @@ enum MiWatchFaceUpload {
         var errorDescription: String? {
             switch self {
             case .headerTooShort: return "The file is shorter than a Mi Band 8 watch-face header."
+            case .fileTooLarge: return "The watch-face file is larger than the 16 MB safety limit."
             case .invalidMagic: return "This file does not have a recognized Xiaomi watch-face signature."
             case .invalidID: return "The watch-face ID in the file is missing or invalid."
             case .missingAlwaysOnFace(let count):
