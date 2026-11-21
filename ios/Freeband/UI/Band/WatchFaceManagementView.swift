@@ -146,7 +146,7 @@ struct WatchFaceManagementView: View {
             }
         }
         .confirmationDialog(
-            String(localized: "Install and activate this watch face?"),
+            String(localized: "Install and replace matching watch face?"),
             isPresented: $showingInstallConfirmation,
             titleVisibility: .visible
         ) {
@@ -156,7 +156,7 @@ struct WatchFaceManagementView: View {
             }
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
-            Text(String(localized: "This writes a binary watch-face file to your Mi Band 8 and then activates it. An incompatible file may cause problems with the band."))
+            Text(String(localized: "Freeband checks the band for this ID first. If a matching inactive custom face exists, it is deleted before this file is installed. Active or non-removable faces are not deleted."))
         }
         .alert(String(localized: "Couldn't open watch-face file"), isPresented: Binding(
             get: { importError != nil },
