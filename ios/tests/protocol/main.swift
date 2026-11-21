@@ -187,7 +187,7 @@ metadataFile.replaceSubrange(0..<4, with: Data([0x5A, 0xA5, 0x34, 0x12]))
 metadataFile[0x1C] = 2
 metadataFile.replaceSubrange(0x20..<0x24, with: Data([0xA8, 0, 0, 0]))
 metadataFile.replaceSubrange(0x28..<0x31, with: Data("561170642".utf8))
-metadataFile.replaceSubrange(0x68..<0x71, with: Data("Atatürk".utf8))
+metadataFile.replaceSubrange(0x68..<0xA4, with: Data("Atatürk".utf8) + Data(repeating: 0, count: 52))
 metadataFile.append(contentsOf: [14, 0, 0, 0, 2, 0, 2, 0, 4, 0, 0, 0, 0, 64, 128, 255])
 let parsedMetadata = try! MiWatchFaceUpload.parseFile(metadataFile)
 precondition(parsedMetadata.id == "561170642")
