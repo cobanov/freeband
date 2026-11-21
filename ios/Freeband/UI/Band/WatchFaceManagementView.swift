@@ -15,7 +15,11 @@ struct WatchFaceManagementView: View {
     @State private var importError: String?
 
     private var isBusy: Bool { link.phase.isBusy }
-    private var isLoading: Bool { isBusy && link.purpose == .watchFaces }
+    private var isInstalling: Bool {
+        if case .watchFaceInstall = link.purpose { return isBusy }
+        return false
+    }
+    private var isLoading: Bool { isBusy && (link.purpose == .watchFaces || isInstalling) }
 
     var body: some View {
         List {
@@ -23,7 +27,9 @@ struct WatchFaceManagementView: View {
                 if isLoading {
                     HStack(spacing: 12) {
                         ProgressView()
-                        Text(String(localized: "Loading watch faces…"))
+                        Text(isInstalling
+                             ? String(localized: "Installing watch face…")
+                             : String(localized: "Loading watch faces…"))
                     }
                 }
 
