@@ -178,8 +178,29 @@ precondition(MiWatchFaceUpload.md5(Data("abc".utf8)).map { String(format: "%02x"
 precondition(MiWatchFaceUpload.crc32(Data("123456789".utf8)) == 0xCBF43926)
 precondition(uploadParts.count == 3)
 precondition(Array(uploadParts[0].prefix(4)) == [3, 0, 1, 0])
+
+let uploadSingleFrame = uploadChannelFrameForTest()
+precondition(Array(uploadSingleFrame.prefix(6)) == [0, 0, 2, 1, 0, 0])
+
+var metadataFile = Data(repeating: 0, count: 0xA8)
+metadataFile.replaceSubrange(0..<4, with: Data([0x5A, 0xA5, 0x34, 0x12]))
+metadataFile[0x1C] = 2
+metadataFile.replaceSubrange(0x28..<0x31, with: Data("561170642".utf8))
+metadataFile.replaceSubrange(0x68..<0x71, with: Data("Atatürk".utf8))
+let parsedMetadata = try! MiWatchFaceUpload.parseFile(metadataFile)
+precondition(parsedMetadata.id == "561170642")
+precondition(parsedMetadata.name == "Atatürk")
+precondition(parsedMetadata.faceCount == 2)
 precondition(MiWatchFaceUpload.installCommand(faceID: "167210065", size: 379168).map { String(format: "%02x", $0) }.joined()
     == "080410043211320f0a0931363732313030363510a09217")
+
+func uploadChannelFrameForTest() -> Data {
+    var channel = MiV1Channel(maxWrite: 244)
+    channel.cipher = v1Cipher
+    channel.authenticated()
+    channel.incrementNonce = false
+    return channel.send(Data(repeating: 0x5A, count: 32)).writes[0]
+}
 
 var uploadChannel = MiV1Channel(maxWrite: 244)
 uploadChannel.cipher = v1Cipher
