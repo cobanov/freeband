@@ -75,6 +75,46 @@ enum MiWatchFaceUpload {
         return result
     }
 
+
+    static func parseFile(_ data: Data) throws -> ImportedWatchFace {
+        guard data.count >= 0xA8 else { throw ParseFailure.headerTooShort }
+        let bytes = [UInt8](data)
+        guard Array(bytes[0..<4]) == [0x5A, 0xA5, 0x34, 0x12] else {
+            throw ParseFailure.invalidMagic
+        }
+        let faceCount = Int(bytes[0x1C]) | (Int(bytes[0x1D]) << 8)
+        guard faceCount == 2 else { throw ParseFailure.missingAlwaysOnFace(faceCount) }
+
+        func headerString(_ range: Range<Int>) -> String? {
+            let raw = Data(bytes[range])
+            let trimmed = raw.prefix { $0 != 0 }
+            guard !trimmed.isEmpty else { return nil }
+            return String(data: Data(trimmed), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard let id = headerString(0x28..<0x31), id.allSatisfy({ $0.isASCII && ($0.isNumber || $0.isLetter || $0 == "_" || $0 == "-") }) else {
+            throw ParseFailure.invalidID
+        }
+        let name = headerString(0x68..<0xA4) ?? "Imported watch face"
+        return ImportedWatchFace(id: id, name: name, data: data, faceCount: faceCount)
+    }
+
+    enum ParseFailure: Error, LocalizedError {
+        case headerTooShort
+        case invalidMagic
+        case invalidID
+        case missingAlwaysOnFace(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .headerTooShort: return "The file is shorter than a Mi Band 8 watch-face header."
+            case .invalidMagic: return "This file does not have a recognized Xiaomi watch-face signature."
+            case .invalidID: return "The watch-face ID in the file is missing or invalid."
+            case .missingAlwaysOnFace(let count):
+                return "This file contains \(count) face style(s). Mi Band 8 requires both the normal and always-on styles."
+            }
+        }
+    }
+
     static func md5(_ data: Data) -> Data {
         var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
         data.withUnsafeBytes { bytes in
@@ -105,4 +145,12 @@ enum MiWatchFaceUpload {
         data.append(UInt8((value >> 16) & 0xFF))
         data.append(UInt8((value >> 24) & 0xFF))
     }
+}
+
+
+struct ImportedWatchFace: Equatable, Identifiable {
+    let id: String
+    let name: String
+    let data: Data
+    let faceCount: Int
 }
