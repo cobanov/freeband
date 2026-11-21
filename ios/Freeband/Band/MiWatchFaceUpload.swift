@@ -1,7 +1,7 @@
 import CommonCrypto
 import CoreGraphics
 import Foundation
-import UIKit
+import ImageIO
 
 /// Mi Band 8 watch-face upload payloads (BLE V1, FE95/0055).
 /// BLE V1 channel framing is handled separately by MiV1Channel.
@@ -213,7 +213,11 @@ enum MiWatchFaceUpload {
                                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
                                   provider: provider, decode: nil,
                                   shouldInterpolate: true, intent: .defaultIntent) else { return nil }
-        return UIImage(cgImage: image).pngData()
+        let pngData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(pngData, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return pngData as Data
     }
 
     private static func decodeRLE10(_ input: [UInt8], expected: Int, bytesPerPixel: Int) -> [UInt8]? {
