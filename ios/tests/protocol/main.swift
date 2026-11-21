@@ -195,6 +195,10 @@ let parsedMetadata = try! MiWatchFaceUpload.parseFile(metadataFile)
 precondition(parsedMetadata.id == "561170642")
 precondition(parsedMetadata.name == "Atatürk")
 precondition(parsedMetadata.faceCount == 2)
+let decodedPreview = MiWatchFacePreview.decode(metadataFile)!
+precondition(decodedPreview.width == 2)
+precondition(decodedPreview.height == 2)
+precondition(decodedPreview.rgba.count == 16)
 precondition(MiWatchFaceUpload.installCommand(faceID: "167210065", size: 379168).map { String(format: "%02x", $0) }.joined()
     == "080410043211320f0a0931363732313030363510a09217")
 
