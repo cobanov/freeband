@@ -311,6 +311,8 @@ final class BandLink: NSObject, ObservableObject {
     private var watchFaceUploadTimerToken = 0
     private var watchFaceUploadID: String?
     private var watchFaceUploadName: String?
+    private var watchFaceInstallPrepared = false
+    private var watchFaceActivationAcknowledged = false
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
     private var lastCommandBody = Data()
 
@@ -415,6 +417,8 @@ final class BandLink: NSObject, ObservableObject {
         watchFaceUploadTimerToken = 0
         watchFaceUploadID = nil
         watchFaceUploadName = nil
+        watchFaceInstallPrepared = false
+        watchFaceActivationAcknowledged = false
         if purpose == .watchFaces { watchFaces = [] }
         active = true
         note("— \(purpose.label): \(target.name), \(target.keys.count) key(s)")
@@ -697,7 +701,7 @@ final class BandLink: NSObject, ObservableObject {
             sendCommand(MiWatchFaceUpload.installCommand(faceID: id, size: data.count), encrypted: true)
             let thisRun = run
             after(20, thisRun) { [weak self] in
-                guard let self, self.active, self.isInstallingWatchFace else { return }
+                guard let self, self.active, self.isInstallingWatchFace, !self.watchFaceInstallPrepared else { return }
                 self.note("watch face install preparation timed out")
                 self.fail(.timeout)
             }
@@ -858,13 +862,14 @@ final class BandLink: NSObject, ObservableObject {
                 fail(.notRead)
                 return
             }
+            watchFaceInstallPrepared = true
             guard case .watchFaceInstall(_, _, let data) = purpose else { return }
             let request = MiWatchFaceUpload.uploadRequest(size: data.count, md5: MiWatchFaceUpload.md5(data))
             note("→ request watch-face data upload")
             sendCommand(request, encrypted: true)
             let thisRun = run
             after(20, thisRun) { [weak self] in
-                guard let self, self.active, self.isInstallingWatchFace else { return }
+                guard let self, self.active, self.isInstallingWatchFace, self.watchFaceUploadParts.isEmpty else { return }
                 self.note("watch-face upload negotiation timed out")
                 self.fail(.timeout)
             }
@@ -910,6 +915,7 @@ final class BandLink: NSObject, ObservableObject {
             let accepted = MiWatchFaceProtocol.acknowledgement(from: command)
             note("← watch face activation acknowledgement: \(accepted.map { $0 ? "true" : "false" } ?? "unknown")")
             if accepted == true, (isInstallingWatchFace || isSettingWatchFace) {
+                if isInstallingWatchFace { watchFaceActivationAcknowledged = true }
                 watchFaceListRefreshPending = true
                 sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
             } else if isSettingWatchFace || isInstallingWatchFace {
@@ -1341,7 +1347,7 @@ final class BandLink: NSObject, ObservableObject {
         sendCommand(MiWatchFaceProtocol.setCommand(id: id), encrypted: true)
         let thisRun = run
         after(15, thisRun) { [weak self] in
-            guard let self, self.active, self.isInstallingWatchFace else { return }
+            guard let self, self.active, self.isInstallingWatchFace, !self.watchFaceActivationAcknowledged else { return }
             self.note("imported watch-face activation timed out")
             self.fail(.timeout)
         }
