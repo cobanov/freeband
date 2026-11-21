@@ -7188,6 +7188,26 @@
           }
         }
       }
+    },
+    "Install and replace matching watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aynı kimliğe sahip kadran varsa değiştirilerek yüklensin mi?"
+          }
+        }
+      }
+    },
+    "Freeband checks the band for this ID first. If a matching inactive custom face exists, it is deleted before this file is installed. Active or non-removable faces are not deleted.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband önce saatte bu kimliği kontrol eder. Aynı kimliğe sahip etkin olmayan özel bir kadran varsa yeni dosya yüklenmeden önce silinir. Etkin veya silinemeyen kadranlar silinmez."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
