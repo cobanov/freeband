@@ -24,6 +24,10 @@ struct WatchFaceManagementView: View {
         return false
     }
     private var isLoading: Bool { isBusy && (link.purpose == .watchFaces || isInstalling) }
+    private var matchingInstalledFace: WatchFace? {
+        guard let importedFace else { return nil }
+        return link.watchFaces.first(where: { $0.id == importedFace.id })
+    }
 
     var body: some View {
         List {
@@ -92,13 +96,23 @@ struct WatchFaceManagementView: View {
                         Text("\(String(localized: "Mi Band 8 watch-face file")) · \(importedFace.data.count) bayt")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        Button(String(localized: "Install and activate")) {
+                        if matchingInstalledFace != nil {
+                            Label(String(localized: "A watch face with this ID is already installed"), systemImage: "exclamationmark.triangle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.orange)
+                            Text(String(localized: "Delete the matching watch face from the band before installing this file. If it is active, activate another face first. Freeband will not delete it automatically."))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Button(matchingInstalledFace == nil
+                               ? String(localized: "Install and activate")
+                               : String(localized: "Delete matching face to continue")) {
                             showingInstallConfirmation = true
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(Color(red: 0.08, green: 0.29, blue: 0.58))
                         .foregroundStyle(.white)
-                        .disabled(isBusy)
+                        .disabled(isBusy || matchingInstalledFace != nil)
                     }
                     .padding(.vertical, 4)
                 }
@@ -146,7 +160,7 @@ struct WatchFaceManagementView: View {
             }
         }
         .confirmationDialog(
-            String(localized: "Install and replace matching watch face?"),
+            String(localized: "Install this watch face?"),
             isPresented: $showingInstallConfirmation,
             titleVisibility: .visible
         ) {
@@ -156,7 +170,7 @@ struct WatchFaceManagementView: View {
             }
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
-            Text(String(localized: "Freeband checks the band for this ID first. If a matching inactive custom face exists, it is deleted before this file is installed. Active or non-removable faces are not deleted."))
+            Text(String(localized: "The watch will be checked again before installation. Any matching face must be deleted manually first."))
         }
         .alert(String(localized: "Couldn't open watch-face file"), isPresented: Binding(
             get: { importError != nil },
