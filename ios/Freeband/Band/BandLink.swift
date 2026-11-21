@@ -915,6 +915,14 @@ final class BandLink: NSObject, ObservableObject {
                 if isInstallingWatchFace { watchFaceActivationAcknowledged = true }
                 watchFaceListRefreshPending = true
                 sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+                if isInstallingWatchFace {
+                    let thisRun = run
+                    after(12, thisRun) { [weak self] in
+                        guard let self, self.active, self.isInstallingWatchFace, self.watchFaceListRefreshPending else { return }
+                        self.note("installed watch-face list refresh timed out")
+                        self.fail(.timeout)
+                    }
+                }
             } else if isSettingWatchFace || isInstallingWatchFace {
                 watchFaceListRefreshPending = false
                 finish()
