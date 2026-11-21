@@ -1,8 +1,5 @@
 import CommonCrypto
-import CoreFoundation
-import CoreGraphics
 import Foundation
-import ImageIO
 
 /// Mi Band 8 watch-face upload payloads (BLE V1, FE95/0055).
 /// BLE V1 channel framing is handled separately by MiV1Channel.
@@ -99,13 +96,13 @@ enum MiWatchFaceUpload {
             throw ParseFailure.invalidID
         }
         let name = headerString(0x68..<0xA4) ?? "Imported watch face"
-        return ImportedWatchFace(id: id, name: name, data: data, faceCount: faceCount, previewPNG: previewPNG(data))
+        return ImportedWatchFace(id: id, name: name, data: data, faceCount: faceCount, preview: preview(data))
     }
 
 
     /// Decodes the main preview image block into PNG for the import screen.
     /// Unsupported preview encodings simply produce no preview; the BIN itself remains untouched.
-    private static func previewPNG(_ data: Data) -> Data? {
+    private static func preview(_ data: Data) -> MiWatchFacePreview? {
         let b = [UInt8](data)
         guard b.count >= 0x24 else { return nil }
         func u16(_ o: Int) -> Int {
@@ -206,22 +203,7 @@ enum MiWatchFaceUpload {
             }
         }
 
-        guard let providerData = rgba.withUnsafeBufferPointer({
-            CFDataCreate(kCFAllocatorDefault, $0.baseAddress, $0.count)
-        }), let provider = CGDataProvider(data: providerData),
-              let image = CGImage(width: width, height: height,
-                                  bitsPerComponent: 8, bitsPerPixel: 32,
-                                  bytesPerRow: width * 4,
-                                  space: CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                                  provider: provider, decode: nil,
-                                  shouldInterpolate: true, intent: .defaultIntent),
-              let pngData = CFDataCreateMutable(kCFAllocatorDefault, 0),
-              let destination = CGImageDestinationCreateWithData(pngData, "public.png" as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination),
-              let pngBytes = CFDataGetBytePtr(pngData) else { return nil }
-        return Data(bytes: pngBytes, count: CFDataGetLength(pngData))
+        return MiWatchFacePreview(width: width, height: height, rgba: Data(rgba))
     }
 
     private static func decodeRLE10(_ input: [UInt8], expected: Int, bytesPerPixel: Int) -> [UInt8]? {
@@ -330,5 +312,12 @@ struct ImportedWatchFace: Equatable, Identifiable {
     let name: String
     let data: Data
     let faceCount: Int
-    let previewPNG: Data?
+    let preview: MiWatchFacePreview?
+}
+
+struct MiWatchFacePreview: Equatable {
+    let width: Int
+    let height: Int
+    /// Premultiplied RGBA pixels, row-major.
+    let rgba: Data
 }
