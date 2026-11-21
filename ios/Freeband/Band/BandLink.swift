@@ -420,8 +420,6 @@ final class BandLink: NSObject, ObservableObject {
         watchFaceInstallPrepared = false
         watchFaceActivationAcknowledged = false
         watchFacePreflightPending = false
-        watchFaceReplacementPending = false
-        watchFaceReplacementListRefreshPending = false
         if purpose == .watchFaces { watchFaces = [] }
         active = true
         note("— \(purpose.label): \(target.name), \(target.keys.count) key(s)")
@@ -761,8 +759,6 @@ final class BandLink: NSObject, ObservableObject {
     private func beginWatchFaceUploadPreparation() {
         guard isInstallingWatchFace,
               case .watchFaceInstall(let id, let name, let data) = purpose else { return }
-        watchFaceReplacementPending = false
-        watchFaceReplacementListRefreshPending = false
         watchFaceUploadID = id
         note("→ prepare watch face install: \(name), \(data.count) bytes")
         sendCommand(MiWatchFaceUpload.installCommand(faceID: id, size: data.count), encrypted: true)
