@@ -1347,7 +1347,7 @@ final class BandLink: NSObject, ObservableObject {
 
     private func activateImportedWatchFace() {
         guard isInstallingWatchFace, let id = watchFaceUploadID else { return }
-        watchFaceListRefreshPending = true
+        watchFaceListRefreshPending = false
         note("→ activate imported watch face \(id)")
         sendCommand(MiWatchFaceProtocol.setCommand(id: id), encrypted: true)
         let thisRun = run
