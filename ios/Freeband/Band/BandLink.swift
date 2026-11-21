@@ -310,7 +310,6 @@ final class BandLink: NSObject, ObservableObject {
     private var watchFaceUploadIndex = 0
     private var watchFaceUploadTimerToken = 0
     private var watchFaceUploadID: String?
-    private var watchFaceUploadName: String?
     private var watchFaceInstallPrepared = false
     private var watchFaceActivationAcknowledged = false
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
@@ -416,7 +415,6 @@ final class BandLink: NSObject, ObservableObject {
         watchFaceUploadIndex = 0
         watchFaceUploadTimerToken = 0
         watchFaceUploadID = nil
-        watchFaceUploadName = nil
         watchFaceInstallPrepared = false
         watchFaceActivationAcknowledged = false
         if purpose == .watchFaces { watchFaces = [] }
@@ -691,7 +689,6 @@ final class BandLink: NSObject, ObservableObject {
         if case .watchFaceInstall(let id, let name, let data) = purpose {
             stage = .reading
             watchFaceUploadID = id
-            watchFaceUploadName = name
             guard v1Characteristics[Self.v1Upload] != nil else {
                 note("watch face install unavailable: the band has no 0055 upload characteristic")
                 fail(.channelUnavailable)
