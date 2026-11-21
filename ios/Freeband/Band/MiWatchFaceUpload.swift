@@ -1,4 +1,5 @@
 import CommonCrypto
+import CoreFoundation
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -205,20 +206,22 @@ enum MiWatchFaceUpload {
             }
         }
 
-        let providerData = Data(rgba) as CFData
-        guard let provider = CGDataProvider(data: providerData),
+        guard let providerData = rgba.withUnsafeBufferPointer({
+            CFDataCreate(kCFAllocatorDefault, $0.baseAddress, $0.count)
+        }), let provider = CGDataProvider(data: providerData),
               let image = CGImage(width: width, height: height,
                                   bitsPerComponent: 8, bitsPerPixel: 32,
                                   bytesPerRow: width * 4,
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
                                   provider: provider, decode: nil,
-                                  shouldInterpolate: true, intent: .defaultIntent) else { return nil }
-        let pngData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(pngData, "public.png" as CFString, 1, nil) else { return nil }
+                                  shouldInterpolate: true, intent: .defaultIntent),
+              let pngData = CFDataCreateMutable(kCFAllocatorDefault, 0),
+              let destination = CGImageDestinationCreateWithData(pngData, "public.png" as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return pngData as Data
+        guard CGImageDestinationFinalize(destination),
+              let pngBytes = CFDataGetBytePtr(pngData) else { return nil }
+        return Data(bytes: pngBytes, count: CFDataGetLength(pngData))
     }
 
     private static func decodeRLE10(_ input: [UInt8], expected: Int, bytesPerPixel: Int) -> [UInt8]? {
