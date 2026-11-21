@@ -89,13 +89,15 @@ struct WatchFaceManagementView: View {
                         Text("ID: \(importedFace.id)")
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
-                        Text(String(localized: "Mi Band 8 watch-face file · \(importedFace.data.count) bytes"))
+                        Text("\(String(localized: "Mi Band 8 watch-face file")) · \(importedFace.data.count) bayt")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                         Button(String(localized: "Install and activate")) {
                             showingInstallConfirmation = true
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(Color(red: 0.08, green: 0.29, blue: 0.58))
+                        .foregroundStyle(.white)
                         .disabled(isBusy)
                     }
                     .padding(.vertical, 4)
