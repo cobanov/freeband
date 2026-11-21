@@ -1,5 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import CoreFoundation
+import CoreGraphics
 import UIKit
 
 struct WatchFaceManagementView: View {
@@ -69,7 +71,7 @@ struct WatchFaceManagementView: View {
 
                 if let importedFace {
                     VStack(alignment: .leading, spacing: 10) {
-                        if let previewData = importedFace.previewPNG, let previewImage = UIImage(data: previewData) {
+                        if let preview = importedFace.preview, let previewImage = makePreviewImage(preview) {
                             Image(uiImage: previewImage)
                                 .resizable()
                                 .scaledToFit()
@@ -220,6 +222,23 @@ struct WatchFaceManagementView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func makePreviewImage(_ preview: MiWatchFacePreview) -> UIImage? {
+        let bytes = [UInt8](preview.rgba)
+        guard bytes.count == preview.width * preview.height * 4,
+              let providerData = bytes.withUnsafeBufferPointer({
+                  CFDataCreate(kCFAllocatorDefault, $0.baseAddress, $0.count)
+              }),
+              let provider = CGDataProvider(data: providerData),
+              let image = CGImage(width: preview.width, height: preview.height,
+                                  bitsPerComponent: 8, bitsPerPixel: 32,
+                                  bytesPerRow: preview.width * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                  provider: provider, decode: nil,
+                                  shouldInterpolate: true, intent: .defaultIntent) else { return nil }
+        return UIImage(cgImage: image)
     }
 
     private func refresh() {
