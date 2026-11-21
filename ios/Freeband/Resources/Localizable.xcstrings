@@ -6954,7 +6954,7 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kadran listesi alınmadı"
+            "value": "Kadran listesi alınamadı"
           }
         }
       }
@@ -6974,7 +6974,7 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saatte yüklü"
+            "value": "Saatte yüklü kadranlar"
           }
         }
       }
@@ -7055,6 +7055,136 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kadranı sil"
+          }
+        }
+      }
+    },
+    "Installing watch face…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran yükleniyor…"
+          }
+        }
+      }
+    },
+    "Choose .bin watch-face file": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".bin kadran dosyası seç"
+          }
+        }
+      }
+    },
+    "Preview unavailable": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önizleme kullanılamıyor"
+          }
+        }
+      }
+    },
+    "Mi Band 8 watch-face file": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mi Band 8 kadran dosyası"
+          }
+        }
+      }
+    },
+    "Install and activate": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükle ve etkinleştir"
+          }
+        }
+      }
+    },
+    "Install and activate this watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kadran yüklensin ve etkinleştirilsin mi?"
+          }
+        }
+      }
+    },
+    "Install": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükle"
+          }
+        }
+      }
+    },
+    "This writes a binary watch-face file to your Mi Band 8 and then activates it. An incompatible file may cause problems with the band.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu işlem bir kadran dosyasını Mi Band 8'e yükler ve ardından etkinleştirir. Uyumsuz bir dosya bileklikte sorunlara yol açabilir."
+          }
+        }
+      }
+    },
+    "Couldn't open watch-face file": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran dosyası açılamadı"
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamam"
+          }
+        }
+      }
+    },
+    "Import a watch face": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran içe aktar"
+          }
+        }
+      }
+    },
+    "Only Mi Band 8 binary watch faces with both the normal and always-on styles are accepted. Keep the band charged and close Mi Fitness during installation.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yalnızca normal ve sürekli açık ekran stillerini içeren Mi Band 8 kadran dosyaları kabul edilir. Yükleme sırasında bilekliği şarjlı tutun ve Mi Fitness'ı kapatın."
+          }
+        }
+      }
+    },
+    "Watch face": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran"
           }
         }
       }
