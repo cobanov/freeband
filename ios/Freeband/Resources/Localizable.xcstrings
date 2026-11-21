@@ -7208,6 +7208,56 @@
           }
         }
       }
+    },
+    "A watch face with this ID is already installed": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saatte bu kimliğe sahip bir kadran zaten yüklü."
+          }
+        }
+      }
+    },
+    "Delete the matching watch face from the band before installing this file. If it is active, activate another face first. Freeband will not delete it automatically.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu dosyayı yüklemeden önce aynı kimliğe sahip kadranı saatten silin. Kadran etkinse önce başka bir kadranı etkinleştirin. Freeband mevcut kadranı otomatik olarak silmez."
+          }
+        }
+      }
+    },
+    "Delete matching face to continue": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devam etmek için aynı kimlikli kadranı silin"
+          }
+        }
+      }
+    },
+    "Install this watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kadran yüklensin mi?"
+          }
+        }
+      }
+    },
+    "The watch will be checked again before installation. Any matching face must be deleted manually first.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükleme öncesinde saat yeniden kontrol edilir. Aynı kimlikli bir kadran varsa önce elle silinmelidir."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
