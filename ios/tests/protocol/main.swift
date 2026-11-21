@@ -179,7 +179,7 @@ precondition(MiWatchFaceUpload.crc32(Data("123456789".utf8)) == 0xCBF43926)
 precondition(uploadParts.count == 3)
 precondition(Array(uploadParts[0].prefix(4)) == [3, 0, 1, 0])
 precondition(MiWatchFaceUpload.installCommand(faceID: "167210065", size: 379168).map { String(format: "%02x", $0) }.joined()
-    == "08041004320f320d0a0931363732313030363510a0f117")
+    == "080410043211320f0a0931363732313030363510a09217")
 
 var uploadChannel = MiV1Channel(maxWrite: 244)
 uploadChannel.cipher = v1Cipher
