@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Only the newest branch build is useful for this iterative IPA workflow.
+concurrency:
+  group: freeband-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-26-intel
