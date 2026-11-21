@@ -312,6 +312,10 @@ final class BandLink: NSObject, ObservableObject {
     private var watchFaceUploadID: String?
     private var watchFaceInstallPrepared = false
     private var watchFaceActivationAcknowledged = false
+    /// Before uploading, check the band's inventory so an existing matching ID can be replaced safely.
+    private var watchFacePreflightPending = false
+    private var watchFaceReplacementPending = false
+    private var watchFaceReplacementListRefreshPending = false
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
     private var lastCommandBody = Data()
 
@@ -417,6 +421,9 @@ final class BandLink: NSObject, ObservableObject {
         watchFaceUploadID = nil
         watchFaceInstallPrepared = false
         watchFaceActivationAcknowledged = false
+        watchFacePreflightPending = false
+        watchFaceReplacementPending = false
+        watchFaceReplacementListRefreshPending = false
         if purpose == .watchFaces { watchFaces = [] }
         active = true
         note("— \(purpose.label): \(target.name), \(target.keys.count) key(s)")
@@ -694,12 +701,15 @@ final class BandLink: NSObject, ObservableObject {
                 fail(.channelUnavailable)
                 return
             }
-            note("→ prepare watch face install: \(name), \(data.count) bytes")
-            sendCommand(MiWatchFaceUpload.installCommand(faceID: id, size: data.count), encrypted: true)
+            // The band rejects an already-installed ID. Read its inventory first and, if possible,
+            // remove the old inactive copy before starting the upload.
+            watchFacePreflightPending = true
+            note("→ check installed watch faces for duplicate ID \(id)")
+            sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
             let thisRun = run
-            after(20, thisRun) { [weak self] in
-                guard let self, self.active, self.isInstallingWatchFace, !self.watchFaceInstallPrepared else { return }
-                self.note("watch face install preparation timed out")
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.isInstallingWatchFace, self.watchFacePreflightPending else { return }
+                self.note("watch-face duplicate check timed out")
                 self.fail(.timeout)
             }
             return
@@ -747,6 +757,22 @@ final class BandLink: NSObject, ObservableObject {
             guard let self, self.active else { return }
             self.note("time limit reached (\(Int(window)) s)")
             self.finish()
+        }
+    }
+
+    private func beginWatchFaceUploadPreparation() {
+        guard isInstallingWatchFace,
+              case .watchFaceInstall(let id, let name, let data) = purpose else { return }
+        watchFaceReplacementPending = false
+        watchFaceReplacementListRefreshPending = false
+        watchFaceUploadID = id
+        note("→ prepare watch face install: \(name), \(data.count) bytes")
+        sendCommand(MiWatchFaceUpload.installCommand(faceID: id, size: data.count), encrypted: true)
+        let thisRun = run
+        after(20, thisRun) { [weak self] in
+            guard let self, self.active, self.isInstallingWatchFace, !self.watchFaceInstallPrepared else { return }
+            self.note("watch face install preparation timed out")
+            self.fail(.timeout)
         }
     }
 
@@ -903,6 +929,43 @@ final class BandLink: NSObject, ObservableObject {
             }
             watchFaces = faces
             note("← watch face list: \(faces.count) item(s)")
+            if isInstallingWatchFace && watchFacePreflightPending {
+                watchFacePreflightPending = false
+                guard let id = watchFaceUploadID else { fail(.notRead); return }
+                if let existing = faces.first(where: { $0.id == id }) {
+                    guard existing.canDelete && !existing.isActive else {
+                        note(existing.isActive
+                             ? "matching watch face is active and cannot be safely replaced; activate another face first"
+                             : "matching watch face is not removable; cannot replace it automatically")
+                        fail(.notRead)
+                        return
+                    }
+                    watchFaceReplacementPending = true
+                    note("→ remove existing inactive watch face with matching ID \(id)")
+                    sendCommand(MiWatchFaceProtocol.deleteCommand(id: id), encrypted: true)
+                    let thisRun = run
+                    after(12, thisRun) { [weak self] in
+                        guard let self, self.active, self.isInstallingWatchFace, self.watchFaceReplacementPending else { return }
+                        self.note("watch-face replacement deletion timed out")
+                        self.fail(.timeout)
+                    }
+                } else {
+                    beginWatchFaceUploadPreparation()
+                }
+                return
+            }
+            if isInstallingWatchFace && watchFaceReplacementListRefreshPending {
+                watchFaceReplacementListRefreshPending = false
+                guard let id = watchFaceUploadID else { fail(.notRead); return }
+                guard !faces.contains(where: { $0.id == id }) else {
+                    note("old watch face still appears in the band inventory; upload cancelled")
+                    fail(.notRead)
+                    return
+                }
+                note("old matching watch face removed; continuing with replacement upload")
+                beginWatchFaceUploadPreparation()
+                return
+            }
             if purpose == .watchFaces || watchFaceListRefreshPending {
                 watchFaceListRefreshPending = false
                 finish()
@@ -931,7 +994,21 @@ final class BandLink: NSObject, ObservableObject {
         case (4, 2):
             let accepted = MiWatchFaceProtocol.acknowledgement(from: command)
             note("← watch face deletion acknowledgement: \(accepted.map { $0 ? "true" : "false" } ?? "unknown")")
-            if accepted == true, case .watchFaceDelete(_) = purpose {
+            if accepted == true, isInstallingWatchFace, watchFaceReplacementPending {
+                watchFaceReplacementPending = false
+                watchFaceReplacementListRefreshPending = true
+                sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+                let thisRun = run
+                after(12, thisRun) { [weak self] in
+                    guard let self, self.active, self.isInstallingWatchFace, self.watchFaceReplacementListRefreshPending else { return }
+                    self.note("watch-face inventory refresh after replacement timed out")
+                    self.fail(.timeout)
+                }
+            } else if isInstallingWatchFace, watchFaceReplacementPending {
+                watchFaceReplacementPending = false
+                note("band refused deletion of the existing matching watch face")
+                fail(.notRead)
+            } else if accepted == true, case .watchFaceDelete(_) = purpose {
                 watchFaceListRefreshPending = true
                 sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
             } else if case .watchFaceDelete(_) = purpose {
