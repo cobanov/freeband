@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct WatchFaceManagementView: View {
     let band: Band
@@ -8,6 +9,10 @@ struct WatchFaceManagementView: View {
     @State private var deleteCandidate: WatchFace?
     @State private var showingDeleteConfirmation = false
     @State private var didAutoLoad = false
+    @State private var showingImporter = false
+    @State private var importedFace: ImportedWatchFace?
+    @State private var showingInstallConfirmation = false
+    @State private var importError: String?
 
     private var isBusy: Bool { link.phase.isBusy }
     private var isLoading: Bool { isBusy && link.purpose == .watchFaces }
@@ -48,9 +53,35 @@ struct WatchFaceManagementView: View {
             }
 
             Section {
-                Label(String(localized: "Custom watch-face file upload is not available yet for the Mi Band 8 transport."), systemImage: "info.circle")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                Button {
+                    showingImporter = true
+                } label: {
+                    Label(String(localized: "Choose .bin watch-face file"), systemImage: "square.and.arrow.down")
+                }
+                .disabled(isBusy)
+
+                if let importedFace {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(importedFace.name)
+                            .font(.headline)
+                        Text("ID: \(importedFace.id)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                        Text(String(localized: "Mi Band 8 watch-face file · \(importedFace.data.count) bytes"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button(String(localized: "Install and activate")) {
+                            showingInstallConfirmation = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isBusy)
+                    }
+                    .padding(.vertical, 4)
+                }
+            } header: {
+                Text(String(localized: "Import a watch face"))
+            } footer: {
+                Text(String(localized: "Only Mi Band 8 binary watch faces with both the normal and always-on styles are accepted. Keep the band charged and close Mi Fitness during installation."))
             }
         }
         .listStyle(.insetGrouped)
@@ -71,8 +102,45 @@ struct WatchFaceManagementView: View {
             didAutoLoad = true
             if link.watchFaces.isEmpty && !isBusy { refresh() }
         }
+        .fileImporter(
+            isPresented: $showingImporter,
+            allowedContentTypes: [UTType(filenameExtension: "bin") ?? .data],
+            allowsMultipleSelection: false
+        ) { result in
+            do {
+                let urls = try result.get()
+                guard let url = urls.first else { return }
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                let data = try Data(contentsOf: url)
+                importedFace = try MiWatchFaceUpload.parseFile(data)
+                showingInstallConfirmation = true
+            } catch {
+                importError = error.localizedDescription
+            }
+        }
         .confirmationDialog(
-            String(localized: "Delete this watch face?"),
+            String(localized: "Install and activate this watch face?"),
+            isPresented: $showingInstallConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Install"), role: .destructive) {
+                guard let face = importedFace else { return }
+                model.start(band, .watchFaceInstall(id: face.id, name: face.name, data: face.data))
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "This writes a binary watch-face file to your Mi Band 8 and then activates it. An incompatible file may cause problems with the band."))
+        }
+        .alert(String(localized: "Couldn't open watch-face file"), isPresented: Binding(
+            get: { importError != nil },
+            set: { if !$0 { importError = nil } }
+        )) {
+            Button(String(localized: "OK"), role: .cancel) { importError = nil }
+        } message: {
+            Text(importError ?? "")
+        }
+face?"),
             isPresented: $showingDeleteConfirmation,
             titleVisibility: .visible
         ) {
