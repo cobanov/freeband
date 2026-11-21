@@ -91,7 +91,7 @@ enum MiWatchFaceUpload {
             guard !trimmed.isEmpty else { return nil }
             return String(data: Data(trimmed), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        guard let id = headerString(0x28..<0x31), id.allSatisfy({ $0.isASCII && ($0.isNumber || $0.isLetter || $0 == "_" || $0 == "-") }) else {
+        guard let id = headerString(0x28..<0x31), id.utf8.allSatisfy({ ($0 >= 48 && $0 <= 57) || ($0 >= 65 && $0 <= 90) || ($0 >= 97 && $0 <= 122) || $0 == 95 || $0 == 45 }) else {
             throw ParseFailure.invalidID
         }
         let name = headerString(0x68..<0xA4) ?? "Imported watch face"
