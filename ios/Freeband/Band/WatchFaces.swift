@@ -35,7 +35,7 @@ enum MiWatchFaceProtocol {
                   !id.isEmpty else { return nil }
 
             let name = item.blobs[2].flatMap { String(data: $0, encoding: .utf8) }
-                .flatMap { $0.isEmpty ? nil : $0 } ?? "Watch face \(id)"
+                .flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Watch face \(id)")
 
             return WatchFace(
                 id: id,
