@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct WatchFaceManagementView: View {
     let band: Band
@@ -67,7 +68,19 @@ struct WatchFaceManagementView: View {
                 .disabled(isBusy)
 
                 if let importedFace {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let previewData = importedFace.previewPNG, let previewImage = UIImage(data: previewData) {
+                            Image(uiImage: previewImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 190)
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else {
+                            Label(String(localized: "Preview unavailable"), systemImage: "photo")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                         Text(importedFace.name)
                             .font(.headline)
                         Text("ID: \(importedFace.id)")
