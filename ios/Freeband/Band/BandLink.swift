@@ -37,6 +37,8 @@ final class BandLink: NSObject, ObservableObject {
         case check, sync, live, send([Data]), hold
         /// Reads or manages installed watch faces over the authenticated command channel.
         case watchFaces, watchFaceSet(String), watchFaceDelete(String)
+        /// Installs an imported Mi Band 8 watch-face binary, then activates it.
+        case watchFaceInstall(id: String, name: String, data: Data)
         /// Asks the band how it would pair (docs/BIND.md step 1) and stops there.
         case bindProbe
 
@@ -50,6 +52,7 @@ final class BandLink: NSObject, ObservableObject {
             case .watchFaces: return "watch faces"
             case .watchFaceSet(_): return "set watch face"
             case .watchFaceDelete(_): return "delete watch face"
+            case .watchFaceInstall(_, let name, _): return "install watch face \(name)"
             case .bindProbe: return "bind probe"
             }
         }
@@ -302,6 +305,11 @@ final class BandLink: NSObject, ObservableObject {
     private var factoryDumps: Set<String> = []
     /// An activation/deletion is followed by a fresh inventory read before releasing the channel.
     private var watchFaceListRefreshPending = false
+    /// Upload state for one imported Mi Band 8 face; each 0055 part waits for its channel ACK.
+    private var watchFaceUploadParts: [Data] = []
+    private var watchFaceUploadIndex = 0
+    private var watchFaceUploadID: String?
+    private var watchFaceUploadName: String?
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
     private var lastCommandBody = Data()
 
@@ -401,6 +409,10 @@ final class BandLink: NSObject, ObservableObject {
         fileListMissing = false
         factoryDumps = []
         watchFaceListRefreshPending = false
+        watchFaceUploadParts = []
+        watchFaceUploadIndex = 0
+        watchFaceUploadID = nil
+        watchFaceUploadName = nil
         if purpose == .watchFaces { watchFaces = [] }
         active = true
         note("— \(purpose.label): \(target.name), \(target.keys.count) key(s)")
