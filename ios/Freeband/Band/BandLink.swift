@@ -682,6 +682,25 @@ final class BandLink: NSObject, ObservableObject {
             }
             return
         }
+        if case .watchFaceInstall(let id, let name, let data) = purpose {
+            stage = .reading
+            watchFaceUploadID = id
+            watchFaceUploadName = name
+            guard v1Characteristics[Self.v1Upload] != nil else {
+                note("watch face install unavailable: the band has no 0055 upload characteristic")
+                fail(.channelUnavailable)
+                return
+            }
+            note("→ prepare watch face install: \(name), \(data.count) bytes")
+            sendCommand(MiWatchFaceUpload.installCommand(faceID: id, size: data.count), encrypted: true)
+            let thisRun = run
+            after(20, thisRun) { [weak self] in
+                guard let self, self.active, self.isInstallingWatchFace else { return }
+                self.note("watch face install preparation timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
         if case .watchFaceDelete(let id) = purpose {
             stage = .reading
             watchFaceListRefreshPending = true
@@ -828,6 +847,50 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
+
+        case (4, 4) where isInstallingWatchFace:
+            let status = command.message(6)?.varints[5] ?? 0
+            note("← watch face install preparation status: \(status)")
+            guard status == 0 else {
+                note(status == 2 ? "watch face is already installed" : "watch face install refused (status \(status))")
+                fail(.notRead)
+                return
+            }
+            guard case .watchFaceInstall(_, _, let data) = purpose else { return }
+            let request = MiWatchFaceUpload.uploadRequest(size: data.count, md5: MiWatchFaceUpload.md5(data))
+            note("→ request watch-face data upload")
+            sendCommand(request, encrypted: true)
+            let thisRun = run
+            after(20, thisRun) { [weak self] in
+                guard let self, self.active, self.isInstallingWatchFace else { return }
+                self.note("watch-face upload negotiation timed out")
+                self.fail(.timeout)
+            }
+
+        case (22, 0) where isInstallingWatchFace:
+            guard let ack = command.message(24)?.message(2) else {
+                note("← upload acknowledgement missing")
+                fail(.notRead)
+                return
+            }
+            let errno = ack.varints[2] ?? 0
+            guard errno == 0 else {
+                note("← upload refused (errno \(errno))")
+                fail(.notRead)
+                return
+            }
+            guard case .watchFaceInstall(_, _, let data) = purpose else { return }
+            let resume = Int(ack.varints[4] ?? 0)
+            let chunkSize = Int(ack.varints[5] ?? UInt64(MiWatchFaceUpload.defaultChunkSize))
+            do {
+                watchFaceUploadParts = try MiWatchFaceUpload.parts(file: data, chunkSize: chunkSize, resumePosition: resume)
+                watchFaceUploadIndex = 0
+                note("← upload accepted: \(watchFaceUploadParts.count) part(s), \(chunkSize)-byte part size, resume \(resume)")
+                sendNextWatchFaceUploadPart()
+            } catch {
+                note("watch-face upload payload error: \(error)")
+                fail(.notRead)
+            }
 
         case (4, 0):
             guard let faces = MiWatchFaceProtocol.readList(from: command) else {
