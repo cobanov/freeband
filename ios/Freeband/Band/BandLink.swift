@@ -907,10 +907,10 @@ final class BandLink: NSObject, ObservableObject {
         case (4, 1):
             let accepted = MiWatchFaceProtocol.acknowledgement(from: command)
             note("← watch face activation acknowledgement: \(accepted.map { $0 ? "true" : "false" } ?? "unknown")")
-            if accepted == true, case .watchFaceSet(_) = purpose {
+            if accepted == true, (isInstallingWatchFace || isSettingWatchFace) {
                 watchFaceListRefreshPending = true
                 sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
-            } else if case .watchFaceSet(_) = purpose {
+            } else if isSettingWatchFace || isInstallingWatchFace {
                 watchFaceListRefreshPending = false
                 finish()
             }
@@ -1305,6 +1305,44 @@ final class BandLink: NSObject, ObservableObject {
 
     // MARK: V1 (docs/BLE-V1.md)
 
+    private var isInstallingWatchFace: Bool {
+        if case .watchFaceInstall = purpose { return true }
+        return false
+    }
+
+    private var isSettingWatchFace: Bool {
+        if case .watchFaceSet = purpose { return true }
+        return false
+    }
+
+    private func sendNextWatchFaceUploadPart() {
+        guard isInstallingWatchFace, watchFaceUploadIndex < watchFaceUploadParts.count,
+              v1Channels[Self.v1Upload] != nil else { return }
+        let part = watchFaceUploadParts[watchFaceUploadIndex]
+        note("→ watch-face data part \(watchFaceUploadIndex + 1)/\(watchFaceUploadParts.count), \(part.count) bytes")
+        v1Step(Self.v1Upload) { $0.send(part) }
+        let thisRun = run
+        after(30, thisRun) { [weak self] in
+            guard let self, self.active, self.isInstallingWatchFace,
+                  self.watchFaceUploadIndex < self.watchFaceUploadParts.count else { return }
+            self.note("watch-face data part acknowledgement timed out")
+            self.fail(.timeout)
+        }
+    }
+
+    private func activateImportedWatchFace() {
+        guard isInstallingWatchFace, let id = watchFaceUploadID else { return }
+        watchFaceListRefreshPending = true
+        note("→ activate imported watch face \(id)")
+        sendCommand(MiWatchFaceProtocol.setCommand(id: id), encrypted: true)
+        let thisRun = run
+        after(15, thisRun) { [weak self] in
+            guard let self, self.active, self.isInstallingWatchFace else { return }
+            self.note("imported watch-face activation timed out")
+            self.fail(.timeout)
+        }
+    }
+
     /// Runs one step of a V1 channel: writes what it returns to the same characteristic, then acts
     /// on its events. The channel is stored back first, since an event can send more.
     private func v1Step(_ uuid: CBUUID, _ step: (inout MiV1Channel) -> MiV1Channel.Output) {
@@ -1331,7 +1369,21 @@ final class BandLink: NSObject, ObservableObject {
             default: note("← \(uuid.uuidString) \(body.count) bytes, not used")
             }
         case .acknowledged(let accepted):
-            if !accepted {
+            if uuid == Self.v1Upload, isInstallingWatchFace {
+                guard accepted else {
+                    note("← watch-face upload part \(watchFaceUploadIndex + 1) refused")
+                    fail(.notRead)
+                    return
+                }
+                watchFaceUploadIndex += 1
+                if watchFaceUploadIndex < watchFaceUploadParts.count {
+                    sendNextWatchFaceUploadPart()
+                } else {
+                    note("← all watch-face data parts acknowledged")
+                    let thisRun = run
+                    after(1.5, thisRun) { [weak self] in self?.activateImportedWatchFace() }
+                }
+            } else if !accepted {
                 note("← \(uuid.uuidString) refused a message")
             } else if purpose == .hold, authed {
                 // Whether the band took what the phone sent on the held session (docs/STAY-CONNECTED.md section 7).
@@ -1512,7 +1564,9 @@ extension BandLink: CBPeripheralDelegate {
         for uuid in Self.v1SubscribeOrder {
             guard let characteristic = found.first(where: { $0.uuid == uuid }) else { continue }
             v1Characteristics[characteristic.uuid] = characteristic
-            v1Channels[characteristic.uuid] = MiV1Channel(maxWrite: maxWrite)
+            var channel = MiV1Channel(maxWrite: maxWrite)
+            if uuid == Self.v1Upload { channel.incrementNonce = false }
+            v1Channels[characteristic.uuid] = channel
             peripheral.setNotifyValue(true, for: characteristic)
         }
     }
