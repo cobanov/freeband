@@ -171,6 +171,23 @@ let v1: [String: Any] = [
     "v1_auth_reset": authReset,
 ]
 
+// Mi Band 8 watch-face upload: command protobuf, MD5/CRC32 and 0055 part framing.
+let uploadSample = Data((0..<5000).map { UInt8($0 & 0xFF) })
+let uploadParts = try! MiWatchFaceUpload.parts(file: uploadSample, chunkSize: 2048)
+precondition(MiWatchFaceUpload.md5(Data("abc".utf8)).map { String(format: "%02x", $0) }.joined() == "900150983cd24fb0d6963f7d28e17f72")
+precondition(MiWatchFaceUpload.crc32(Data("123456789".utf8)) == 0xCBF43926)
+precondition(uploadParts.count == 3)
+precondition(Array(uploadParts[0].prefix(4)) == [3, 0, 1, 0])
+precondition(MiWatchFaceUpload.installCommand(faceID: "167210065", size: 379168).map { String(format: "%02x", $0) }.joined()
+    == "08041004320f320d0a0931363732313030363510a0f117")
+
+var uploadChannel = MiV1Channel(maxWrite: 244)
+uploadChannel.cipher = v1Cipher
+uploadChannel.authenticated()
+uploadChannel.incrementNonce = false
+let uploadChannelFrames = [fmt(uploadChannel.send(Data(repeating: 0x5A, count: 32)))]
+precondition(uploadChannel.counter == 1)
+
 // Health monitoring settings (docs/CAPABILITIES.md §9.1-9.3). hrBody is what a band could
 // return, with fields the app doesn't know (20, 21, a fixed32 22) that must come back unchanged.
 func pb(_ build: (inout PBWriter) -> Void) -> PBWriter { var w = PBWriter(); build(&w); return w }

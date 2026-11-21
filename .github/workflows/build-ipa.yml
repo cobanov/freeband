@@ -32,7 +32,7 @@ jobs:
         run: |
           python3 -m venv /tmp/freeband-test-venv
           /tmp/freeband-test-venv/bin/python -m pip install cryptography
-          swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift ../../Freeband/Band/WatchFaces.swift main.swift -o /tmp/mitest
+          swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift ../../Freeband/Band/WatchFaces.swift ../../Freeband/Band/MiWatchFaceUpload.swift main.swift -o /tmp/mitest
           TZ=UTC /tmp/mitest | /tmp/freeband-test-venv/bin/python check_vectors.py
 
       - name: Build unsigned IPA
