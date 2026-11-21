@@ -133,7 +133,6 @@ struct WatchFaceManagementView: View {
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 let data = try Data(contentsOf: url)
                 importedFace = try MiWatchFaceUpload.parseFile(data)
-                showingInstallConfirmation = true
             } catch {
                 importError = error.localizedDescription
             }
