@@ -35,6 +35,10 @@ final class BandLink: NSObject, ObservableObject {
     /// `hold` is the held session; it starts only through `hold(_:)`.
     enum Purpose: Equatable {
         case check, sync, live, send([Data]), hold
+        /// Reads or manages installed watch faces over the authenticated command channel.
+        case watchFaces, watchFaceSet(String), watchFaceDelete(String)
+        /// Installs an imported Mi Band 8 watch-face binary, then activates it.
+        case watchFaceInstall(id: String, name: String, data: Data)
         /// Asks the band how it would pair (docs/BIND.md step 1) and stops there.
         case bindProbe
 
@@ -45,6 +49,10 @@ final class BandLink: NSObject, ObservableObject {
             case .live: return "live"
             case .send: return "send"
             case .hold: return "hold"
+            case .watchFaces: return "watch faces"
+            case .watchFaceSet(_): return "set watch face"
+            case .watchFaceDelete(_): return "delete watch face"
+            case .watchFaceInstall(_, let name, _): return "install watch face \(name)"
             case .bindProbe: return "bind probe"
             }
         }
@@ -234,6 +242,8 @@ final class BandLink: NSObject, ObservableObject {
 
     /// Activity files fetched / requested in this sync.
     @Published private(set) var fileProgress: (done: Int, total: Int)?
+    /// The latest watch-face inventory returned by the band.
+    @Published private(set) var watchFaces: [WatchFace] = []
 
     private var central: CBCentralManager!
     private var target: BandTarget?
@@ -293,6 +303,17 @@ final class BandLink: NSObject, ObservableObject {
     private var fileListMissing = false
     /// Factory file dumps (13/2) already logged in this session, by name.
     private var factoryDumps: Set<String> = []
+    /// An activation/deletion is followed by a fresh inventory read before releasing the channel.
+    private var watchFaceListRefreshPending = false
+    /// Upload state for one imported Mi Band 8 face; each 0055 part waits for its channel ACK.
+    private var watchFaceUploadParts: [Data] = []
+    private var watchFaceUploadIndex = 0
+    private var watchFaceUploadTimerToken = 0
+    private var watchFaceUploadID: String?
+    private var watchFaceInstallPrepared = false
+    private var watchFaceActivationAcknowledged = false
+    /// Recheck the band's inventory immediately before upload to prevent duplicate IDs.
+    private var watchFacePreflightPending = false
     /// The command being handled, so a reply nobody handles can be logged with its bytes.
     private var lastCommandBody = Data()
 
@@ -309,6 +330,21 @@ final class BandLink: NSObject, ObservableObject {
     /// Starts a session. A held session gives way (it comes back when this one ends).
     func start(_ target: BandTarget, purpose: Purpose) {
         guard !phase.isBusy, purpose != .hold else { return }
+        switch purpose {
+        case .watchFaceSet(let id):
+            guard watchFaces.contains(where: { $0.id == id }) else {
+                note("watch face change refused: unknown id")
+                return
+            }
+        case .watchFaceDelete(let id):
+            guard let face = watchFaces.first(where: { $0.id == id }),
+                  face.canDelete, !face.isActive else {
+                note("watch face delete refused: only removable inactive faces can be deleted")
+                return
+            }
+        default:
+            break
+        }
         var delay: TimeInterval = 0
         if active, self.purpose == .hold {
             endHold()
@@ -376,6 +412,15 @@ final class BandLink: NSObject, ObservableObject {
         requestedFiles = []
         fileListMissing = false
         factoryDumps = []
+        watchFaceListRefreshPending = false
+        watchFaceUploadParts = []
+        watchFaceUploadIndex = 0
+        watchFaceUploadTimerToken = 0
+        watchFaceUploadID = nil
+        watchFaceInstallPrepared = false
+        watchFaceActivationAcknowledged = false
+        watchFacePreflightPending = false
+        if purpose == .watchFaces { watchFaces = [] }
         active = true
         note("— \(purpose.label): \(target.name), \(target.keys.count) key(s)")
 
@@ -617,6 +662,67 @@ final class BandLink: NSObject, ObservableObject {
             after(2.0, thisRun) { [weak self] in self?.finish() }
             return
         }
+        if purpose == .watchFaces {
+            stage = .reading
+            watchFaces = []
+            watchFaceListRefreshPending = false
+            note("→ watch face list")
+            sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+            let thisRun = run
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.purpose == .watchFaces else { return }
+                self.note("watch face list timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
+        if case .watchFaceSet(let id) = purpose {
+            stage = .reading
+            watchFaceListRefreshPending = true
+            note("→ activate watch face \(id)")
+            sendCommand(MiWatchFaceProtocol.setCommand(id: id), encrypted: true)
+            let thisRun = run
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.purpose == .watchFaceSet(id) else { return }
+                self.note("watch face activation timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
+        if case .watchFaceInstall(let id, let name, let data) = purpose {
+            stage = .reading
+            watchFaceUploadID = id
+            guard v1Characteristics[Self.v1Upload] != nil else {
+                note("watch face install unavailable: the band has no 0055 upload characteristic")
+                fail(.channelUnavailable)
+                return
+            }
+            // The band rejects an already-installed ID. Recheck the inventory before upload;
+            // never delete an existing watch face automatically.
+            watchFacePreflightPending = true
+            note("→ check installed watch faces for duplicate ID \(id)")
+            sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+            let thisRun = run
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.isInstallingWatchFace, self.watchFacePreflightPending else { return }
+                self.note("watch-face duplicate check timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
+        if case .watchFaceDelete(let id) = purpose {
+            stage = .reading
+            watchFaceListRefreshPending = true
+            note("→ delete watch face \(id)")
+            sendCommand(MiWatchFaceProtocol.deleteCommand(id: id), encrypted: true)
+            let thisRun = run
+            after(12, thisRun) { [weak self] in
+                guard let self, self.active, self.purpose == .watchFaceDelete(id) else { return }
+                self.note("watch face deletion timed out")
+                self.fail(.timeout)
+            }
+            return
+        }
         stage = purpose == .live ? .live : .reading
         // A sync that reconnected for its next file (reconnectForNextFile) carries on fetching.
         let resuming = purpose == .sync && fileStage == .fetching
@@ -647,6 +753,20 @@ final class BandLink: NSObject, ObservableObject {
             guard let self, self.active else { return }
             self.note("time limit reached (\(Int(window)) s)")
             self.finish()
+        }
+    }
+
+    private func beginWatchFaceUploadPreparation() {
+        guard isInstallingWatchFace,
+              case .watchFaceInstall(let id, let name, let data) = purpose else { return }
+        watchFaceUploadID = id
+        note("→ prepare watch face install: \(name), \(data.count) bytes")
+        sendCommand(MiWatchFaceUpload.installCommand(faceID: id, size: data.count), encrypted: true)
+        let thisRun = run
+        after(20, thisRun) { [weak self] in
+            guard let self, self.active, self.isInstallingWatchFace, !self.watchFaceInstallPrepared else { return }
+            self.note("watch face install preparation timed out")
+            self.fail(.timeout)
         }
     }
 
@@ -750,6 +870,105 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
+
+        case (4, 4) where isInstallingWatchFace:
+            let status = command.message(6)?.varints[5] ?? 0
+            note("← watch face install preparation status: \(status)")
+            guard status == 0 else {
+                note(status == 2 ? "watch face is already installed" : "watch face install refused (status \(status))")
+                fail(.notRead)
+                return
+            }
+            watchFaceInstallPrepared = true
+            guard case .watchFaceInstall(_, _, let data) = purpose else { return }
+            let request = MiWatchFaceUpload.uploadRequest(size: data.count, md5: MiWatchFaceUpload.md5(data))
+            note("→ request watch-face data upload")
+            sendCommand(request, encrypted: true)
+            let thisRun = run
+            after(20, thisRun) { [weak self] in
+                guard let self, self.active, self.isInstallingWatchFace, self.watchFaceUploadParts.isEmpty else { return }
+                self.note("watch-face upload negotiation timed out")
+                self.fail(.timeout)
+            }
+
+        case (22, 0) where isInstallingWatchFace:
+            guard let ack = command.message(24)?.message(2) else {
+                note("← upload acknowledgement missing")
+                fail(.notRead)
+                return
+            }
+            let errno = ack.varints[2] ?? 0
+            guard errno == 0 else {
+                note("← upload refused (errno \(errno))")
+                fail(.notRead)
+                return
+            }
+            guard case .watchFaceInstall(_, _, let data) = purpose else { return }
+            let resume = Int(ack.varints[4] ?? 0)
+            let chunkSize = Int(ack.varints[5] ?? UInt64(MiWatchFaceUpload.defaultChunkSize))
+            do {
+                watchFaceUploadParts = try MiWatchFaceUpload.parts(file: data, chunkSize: chunkSize, resumePosition: resume)
+                watchFaceUploadIndex = 0
+                note("← upload accepted: \(watchFaceUploadParts.count) part(s), \(chunkSize)-byte part size, resume \(resume)")
+                sendNextWatchFaceUploadPart()
+            } catch {
+                note("watch-face upload payload error: \(error)")
+                fail(.notRead)
+            }
+
+        case (4, 0):
+            guard let faces = MiWatchFaceProtocol.readList(from: command) else {
+                note("← watch face list response could not be decoded")
+                return
+            }
+            watchFaces = faces
+            note("← watch face list: \(faces.count) item(s)")
+            if isInstallingWatchFace && watchFacePreflightPending {
+                watchFacePreflightPending = false
+                guard let id = watchFaceUploadID else { fail(.notRead); return }
+                if faces.contains(where: { $0.id == id }) {
+                    note("matching watch face ID \(id) is already installed; refusing upload until the user deletes it manually")
+                    fail(.notRead)
+                } else {
+                    beginWatchFaceUploadPreparation()
+                }
+                return
+            }
+            if purpose == .watchFaces || watchFaceListRefreshPending {
+                watchFaceListRefreshPending = false
+                finish()
+            }
+
+        case (4, 1):
+            let accepted = MiWatchFaceProtocol.acknowledgement(from: command)
+            note("← watch face activation acknowledgement: \(accepted.map { $0 ? "true" : "false" } ?? "unknown")")
+            if accepted == true, (isInstallingWatchFace || isSettingWatchFace) {
+                if isInstallingWatchFace { watchFaceActivationAcknowledged = true }
+                watchFaceListRefreshPending = true
+                sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+                if isInstallingWatchFace {
+                    let thisRun = run
+                    after(12, thisRun) { [weak self] in
+                        guard let self, self.active, self.isInstallingWatchFace, self.watchFaceListRefreshPending else { return }
+                        self.note("installed watch-face list refresh timed out")
+                        self.fail(.timeout)
+                    }
+                }
+            } else if isSettingWatchFace || isInstallingWatchFace {
+                watchFaceListRefreshPending = false
+                finish()
+            }
+
+        case (4, 2):
+            let accepted = MiWatchFaceProtocol.acknowledgement(from: command)
+            note("← watch face deletion acknowledgement: \(accepted.map { $0 ? "true" : "false" } ?? "unknown")")
+            if accepted == true, case .watchFaceDelete(_) = purpose {
+                watchFaceListRefreshPending = true
+                sendCommand(MiWatchFaceProtocol.listCommand(), encrypted: true)
+            } else if case .watchFaceDelete(_) = purpose {
+                watchFaceListRefreshPending = false
+                finish()
+            }
 
         case (13, 2):
             // A Xiaomi Watch S1 Active sends these during file fetches. AstroBox calls type 13
@@ -1130,6 +1349,46 @@ final class BandLink: NSObject, ObservableObject {
 
     // MARK: V1 (docs/BLE-V1.md)
 
+    private var isInstallingWatchFace: Bool {
+        if case .watchFaceInstall = purpose { return true }
+        return false
+    }
+
+    private var isSettingWatchFace: Bool {
+        if case .watchFaceSet = purpose { return true }
+        return false
+    }
+
+    private func sendNextWatchFaceUploadPart() {
+        guard isInstallingWatchFace, watchFaceUploadIndex < watchFaceUploadParts.count,
+              v1Channels[Self.v1Upload] != nil else { return }
+        let part = watchFaceUploadParts[watchFaceUploadIndex]
+        watchFaceUploadTimerToken += 1
+        let timerToken = watchFaceUploadTimerToken
+        note("→ watch-face data part \(watchFaceUploadIndex + 1)/\(watchFaceUploadParts.count), \(part.count) bytes")
+        v1Step(Self.v1Upload) { $0.send(part) }
+        let thisRun = run
+        after(30, thisRun) { [weak self] in
+            guard let self, self.active, self.isInstallingWatchFace,
+                  self.watchFaceUploadTimerToken == timerToken else { return }
+            self.note("watch-face data part acknowledgement timed out")
+            self.fail(.timeout)
+        }
+    }
+
+    private func activateImportedWatchFace() {
+        guard isInstallingWatchFace, let id = watchFaceUploadID else { return }
+        watchFaceListRefreshPending = false
+        note("→ activate imported watch face \(id)")
+        sendCommand(MiWatchFaceProtocol.setCommand(id: id), encrypted: true)
+        let thisRun = run
+        after(15, thisRun) { [weak self] in
+            guard let self, self.active, self.isInstallingWatchFace, !self.watchFaceActivationAcknowledged else { return }
+            self.note("imported watch-face activation timed out")
+            self.fail(.timeout)
+        }
+    }
+
     /// Runs one step of a V1 channel: writes what it returns to the same characteristic, then acts
     /// on its events. The channel is stored back first, since an event can send more.
     private func v1Step(_ uuid: CBUUID, _ step: (inout MiV1Channel) -> MiV1Channel.Output) {
@@ -1156,7 +1415,22 @@ final class BandLink: NSObject, ObservableObject {
             default: note("← \(uuid.uuidString) \(body.count) bytes, not used")
             }
         case .acknowledged(let accepted):
-            if !accepted {
+            if uuid == Self.v1Upload, isInstallingWatchFace {
+                guard accepted else {
+                    note("← watch-face upload part \(watchFaceUploadIndex + 1) refused")
+                    fail(.notRead)
+                    return
+                }
+                watchFaceUploadTimerToken += 1
+                watchFaceUploadIndex += 1
+                if watchFaceUploadIndex < watchFaceUploadParts.count {
+                    sendNextWatchFaceUploadPart()
+                } else {
+                    note("← all watch-face data parts acknowledged")
+                    let thisRun = run
+                    after(1.5, thisRun) { [weak self] in self?.activateImportedWatchFace() }
+                }
+            } else if !accepted {
                 note("← \(uuid.uuidString) refused a message")
             } else if purpose == .hold, authed {
                 // Whether the band took what the phone sent on the held session (docs/STAY-CONNECTED.md section 7).
@@ -1337,7 +1611,9 @@ extension BandLink: CBPeripheralDelegate {
         for uuid in Self.v1SubscribeOrder {
             guard let characteristic = found.first(where: { $0.uuid == uuid }) else { continue }
             v1Characteristics[characteristic.uuid] = characteristic
-            v1Channels[characteristic.uuid] = MiV1Channel(maxWrite: maxWrite)
+            var channel = MiV1Channel(maxWrite: maxWrite)
+            if uuid == Self.v1Upload { channel.incrementNonce = false }
+            v1Channels[characteristic.uuid] = channel
             peripheral.setNotifyValue(true, for: characteristic)
         }
     }

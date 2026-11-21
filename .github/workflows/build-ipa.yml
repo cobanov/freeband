@@ -1,0 +1,53 @@
+name: Build unsigned iOS IPA
+
+on:
+  push:
+    branches: [main, feature/watchface-management]
+    paths:
+      - "ios/**"
+      - ".github/workflows/build-ipa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Only the newest branch build is useful for this iterative IPA workflow.
+concurrency:
+  group: freeband-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26-intel
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Verify protocol vectors
+        working-directory: ios/tests/protocol
+        run: |
+          python3 -m venv /tmp/freeband-test-venv
+          /tmp/freeband-test-venv/bin/python -m pip install cryptography
+          swiftc ../../Freeband/Band/MiProtocol.swift ../../Freeband/Band/MiProtocolV1.swift ../../Freeband/Band/MiBind.swift ../../Freeband/Band/WatchFaces.swift ../../Freeband/Band/MiWatchFaceUpload.swift ../../Freeband/Band/MiWatchFacePreview.swift main.swift -o /tmp/mitest
+          TZ=UTC /tmp/mitest | /tmp/freeband-test-venv/bin/python check_vectors.py
+
+      - name: Build unsigned IPA
+        working-directory: ios
+        run: sh tools/build-ipa.sh
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Freeband-unsigned-IPA
+          path: ios/build/Freeband.ipa
+          if-no-files-found: error
+          retention-days: 7

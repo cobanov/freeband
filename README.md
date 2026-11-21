@@ -26,7 +26,7 @@ Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1
 | Redmi Watch 5 Active: authentication, battery, live stats, and fetching and parsing its daily summary, per-minute and sleep files | verified on firmware 2.2.105 |
 | Xiaomi Watch S1 Active, on the older BLE V1 channel: authentication, battery, live stats, notifications, its activity files, and sleep sessions from the watch's fell-asleep and woke-up events. The watch ignores Find, so Freeband hides it | verified on firmware 1.4.174 |
 | Find Phone: with Stay connected on (Band tab), Freeband keeps a session open in the background, and the watch's Find Phone rings the iPhone, also locked and on silent. Mi Fitness can't connect while it's on ([docs/STAY-CONNECTED.md](docs/STAY-CONNECTED.md)) | verified on a Xiaomi Watch S1 Active, firmware 1.4.174; a whole night idle not tested yet |
-| Mi Band 8, on BLE V1 | expected to work: Gadgetbridge puts it on the same channel as the Watch S1 Active. Not tested on a band yet ([#4](https://github.com/cobanov/freeband/issues/4)) |
+| Mi Band 8, on BLE V1 | Tested and verified on Band 8. ([#4](https://github.com/cobanov/freeband/issues/4)) |
 | Parsing them: per-minute data, daily summary, sleep and sleep stages, manual readings | implemented and tested against fixtures; not yet checked with real files from a Band 10 |
 | Sleep, Recovery and Strain scores with contributors and confidence | implemented (algorithm v1) |
 | Worth noticing: what stands out today against your own normal (resting heart rate, HRV, sleep debt, sleep timing, hard days on low recovery) | implemented and tested (v1 thresholds, not validated on real weeks yet) |
@@ -34,7 +34,8 @@ Read your Xiaomi Smart Band 10 / 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1
 | Webhooks (sent from the phone to your own address, signed) and CSV/JSON export | done |
 | The account server (REST API, web panel, invites) | removed on 2026-11-14: nobody used it. The website stays |
 | Health monitoring settings on the band: heart rate interval, heart rate during sleep, blood oxygen, all-day stress (Band tab) | reading verified on a Band 10 Pro (firmware 3.201.026), and writing the heart rate interval; the other writes not tried yet |
-| Alarms, Do Not Disturb, weather, watch faces | not built yet |
+| Alarms, Do Not Disturb and weather | not built yet |
+| Watch faces: list, activate, and delete removable inactive faces | implemented over BLE V1 commands; live-band verification pending. Custom `.bin` / `.mwz` upload pending |
 | Background sync: a sync finishes after you leave the app, iOS's background refresh runs one, and with Stay connected on the band coming back in range or changing state starts one ([docs/STAY-CONNECTED.md](docs/STAY-CONNECTED.md) section 4.1) | implemented; not tried on a band yet |
 | Clear the band after sync (off by default): finished minute files and past files that Freeband has stored and fully parsed are acknowledged at the next sync, and the band deletes them | implemented; not tried on a band yet |
 | A morning summary notification, the first time a background sync brings the day's scores | implemented; not tried on a band yet |
@@ -93,7 +94,7 @@ cd hub && npm install && npx tsc --noEmit && npx vitest run
 
 ## Try it yourself
 
-Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10, 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1 Active (a Mi Band 8 should work too, untested), and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
+Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10, 10 Pro, Redmi Watch 5 Active or Xiaomi Watch S1 Active (a Mi Band 8, tested on the fork), and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
 
 1. **Pair the band with Mi Fitness once**, if it isn't already, and let it sync. This is the only time you need Mi Fitness: Xiaomi's server creates the band's key during pairing.
 2. **Check the key folder.** In the Files app, On My iPhone should show a `Mi Fitness` folder.

@@ -66,6 +66,8 @@ struct MiV1Channel {
     private(set) var encrypts = false
     /// The counter of the next encrypted outgoing message.
     private(set) var counter: UInt16 = 1
+    /// Upload characteristic 0x0055 encrypts with nonce counter zero for every payload.
+    var incrementNonce = true
 
     private enum InFlight {
         case single
@@ -175,9 +177,9 @@ struct MiV1Channel {
         var body = message
         var ctr: UInt16?
         if encrypts, let cipher {
-            ctr = counter
-            body = cipher.encrypt(message, counter: counter)
-            counter &+= 1
+            ctr = incrementNonce ? counter : 0
+            body = cipher.encrypt(message, counter: ctr!)
+            if incrementNonce { counter &+= 1 }
         }
         if body.count + 6 <= writeSize {
             var write = Data([0, 0, 2, ctr == nil ? 2 : 1])
@@ -186,7 +188,7 @@ struct MiV1Channel {
             inFlight = .single
             out.writes.append(write)
         } else {
-            let whole = (ctr.map { [UInt8](Self.u16(Int($0))) } ?? []) + [UInt8](body)
+            let whole = ((ctr != nil && incrementNonce) ? [UInt8](Self.u16(Int(ctr!))) : []) + [UInt8](body)
             let sliceSize = writeSize - 2
             let count = (whole.count + sliceSize - 1) / sliceSize
             inFlight = .chunked(body: whole, sliceSize: sliceSize)

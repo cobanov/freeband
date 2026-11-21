@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "72": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "72"
+          }
+        }
+      }
+    },
     "%@ %@": {
       "localizations": {
         "tr": {
@@ -415,16 +425,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "7 gün"
-          }
-        }
-      }
-    },
-    "72": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "72"
           }
         }
       }
@@ -6925,6 +6925,336 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yatmadan önceki akşama göre düşmedi; %10 ve üstü düşüş olağandır."
+          }
+        }
+      }
+    },
+    "Watch faces": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranlar"
+          }
+        }
+      }
+    },
+    "Loading watch faces…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranlar yükleniyor…"
+          }
+        }
+      }
+    },
+    "No watch faces loaded": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran listesi alınamadı"
+          }
+        }
+      }
+    },
+    "Tap refresh to read the watch faces installed on your band.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saatte yüklü kadranları okumak için yenile düğmesine dokunun."
+          }
+        }
+      }
+    },
+    "Installed on the band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saatte yüklü kadranlar"
+          }
+        }
+      }
+    },
+    "Close Mi Fitness before managing watch faces. Only custom inactive faces can be deleted.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranları yönetmeden önce Mi Fitness'ı kapatın. Yalnızca etkin olmayan özel kadranlar silinebilir."
+          }
+        }
+      }
+    },
+    "Custom watch-face file upload is not available yet for the Mi Band 8 transport.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mi Band 8 aktarım altyapısı için özel kadran dosyası yükleme henüz kullanılamıyor."
+          }
+        }
+      }
+    },
+    "Refresh watch faces": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranları yenile"
+          }
+        }
+      }
+    },
+    "Delete this watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kadran silinsin mi?"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sil"
+          }
+        }
+      }
+    },
+    "Active": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkin"
+          }
+        }
+      }
+    },
+    "Set as active": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkin kadran yap"
+          }
+        }
+      }
+    },
+    "Delete watch face": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadranı sil"
+          }
+        }
+      }
+    },
+    "Installing watch face…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran yükleniyor…"
+          }
+        }
+      }
+    },
+    "Choose .bin watch-face file": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".bin kadran dosyası seç"
+          }
+        }
+      }
+    },
+    "Preview unavailable": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önizleme kullanılamıyor"
+          }
+        }
+      }
+    },
+    "Mi Band 8 watch-face file": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mi Band 8 kadran dosyası"
+          }
+        }
+      }
+    },
+    "Install and activate": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükle ve etkinleştir"
+          }
+        }
+      }
+    },
+    "Install and activate this watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kadran yüklensin ve etkinleştirilsin mi?"
+          }
+        }
+      }
+    },
+    "Install": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükle"
+          }
+        }
+      }
+    },
+    "This writes a binary watch-face file to your Mi Band 8 and then activates it. An incompatible file may cause problems with the band.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu işlem bir kadran dosyasını Mi Band 8'e yükler ve ardından etkinleştirir. Uyumsuz bir dosya bileklikte sorunlara yol açabilir."
+          }
+        }
+      }
+    },
+    "Couldn't open watch-face file": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran dosyası açılamadı"
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamam"
+          }
+        }
+      }
+    },
+    "Import a watch face": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran içe aktar"
+          }
+        }
+      }
+    },
+    "Only Mi Band 8 binary watch faces with both the normal and always-on styles are accepted. Keep the band charged and close Mi Fitness during installation.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yalnızca normal ve sürekli açık ekran stillerini içeren Mi Band 8 kadran dosyaları kabul edilir. Yükleme sırasında bilekliği şarjlı tutun ve Mi Fitness'ı kapatın."
+          }
+        }
+      }
+    },
+    "Watch face": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadran"
+          }
+        }
+      }
+    },
+    "Install and replace matching watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aynı kimliğe sahip kadran varsa değiştirilerek yüklensin mi?"
+          }
+        }
+      }
+    },
+    "Freeband checks the band for this ID first. If a matching inactive custom face exists, it is deleted before this file is installed. Active or non-removable faces are not deleted.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband önce saatte bu kimliği kontrol eder. Aynı kimliğe sahip etkin olmayan özel bir kadran varsa yeni dosya yüklenmeden önce silinir. Etkin veya silinemeyen kadranlar silinmez."
+          }
+        }
+      }
+    },
+    "A watch face with this ID is already installed": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saatte bu kimliğe sahip bir kadran zaten yüklü."
+          }
+        }
+      }
+    },
+    "Delete the matching watch face from the band before installing this file. If it is active, activate another face first. Freeband will not delete it automatically.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu dosyayı yüklemeden önce aynı kimliğe sahip kadranı saatten silin. Kadran etkinse önce başka bir kadranı etkinleştirin. Freeband mevcut kadranı otomatik olarak silmez."
+          }
+        }
+      }
+    },
+    "Delete matching face to continue": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devam etmek için aynı kimlikli kadranı silin"
+          }
+        }
+      }
+    },
+    "Install this watch face?": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kadran yüklensin mi?"
+          }
+        }
+      }
+    },
+    "The watch will be checked again before installation. Any matching face must be deleted manually first.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükleme öncesinde saat yeniden kontrol edilir. Aynı kimlikli bir kadran varsa önce elle silinmelidir."
           }
         }
       }
